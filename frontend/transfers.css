@@ -1,0 +1,578 @@
+/* style.css (or transfer.css) */
+
+:root {
+    --purple-dark: #4a004a;
+    --purple-medium: #6a006a;
+    --purple-light: #8a008a;
+    --white: #ffffff;
+    --light-gray: #f0f0f0;
+    --dark-text: #333333;
+    --border-color: #ddd;
+    --glow-color: rgba(138, 0, 138, 0.5); /* Lighter purple for glow */
+    --hover-purple: #5a005a;
+}
+
+/* Base styles for glowing effect */
+@keyframes glow {
+    0% { box-shadow: 0 0 5px var(--glow-color); }
+    50% { box-shadow: 0 0 15px var(--glow-color), 0 0 25px var(--glow-color); }
+    100% { box-shadow: 0 0 5px var(--glow-color); }
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: var(--light-gray);
+    color: var(--dark-text);
+    line-height: 1.6;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Header */
+.dashboard-header {
+    background-color: var(--purple-dark);
+    color: var(--white);
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-header .logo .logo-barclays {
+    height: 40px; /* Adjust as needed */
+    width: auto;
+}
+
+.dashboard-header .user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.dashboard-header .user-info .profile-icon {
+    font-size: 24px;
+    color: var(--white);
+}
+
+.dashboard-header .user-info span {
+    font-weight: bold;
+}
+
+.dashboard-header .user-info a {
+    color: var(--white);
+    text-decoration: none;
+    padding: 5px 10px;
+    border: 1px solid var(--white);
+    border-radius: 5px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dashboard-header .user-info a:hover {
+    background-color: var(--white);
+    color: var(--purple-dark);
+}
+
+/* Main Content Wrapper */
+.transfer-content {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start; /* Align to top */
+    padding: 20px;
+}
+
+/* Transfer Card */
+.transfer-card {
+    background-color: var(--white);
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1), 0 0 30px var(--glow-color); /* Initial glow */
+    width: 100%;
+    max-width: 700px;
+    box-sizing: border-box;
+    animation: glow 3s infinite alternate; /* Apply glowing animation */
+}
+
+.transfer-card h2 {
+    text-align: center;
+    color: var(--purple-dark);
+    margin-bottom: 25px;
+    font-size: 2em;
+    font-weight: 700;
+}
+
+/* Current Balance Display */
+.current-balance {
+    background-color: var(--purple-light);
+    color: var(--white);
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.current-balance h3 {
+    margin: 0;
+    font-size: 1.3em;
+}
+
+#display_current_balance {
+    font-weight: bold;
+    font-size: 1.5em;
+    margin-right: 5px;
+}
+
+/* Messages */
+.message {
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.message.error {
+    background-color: #ffe0e0;
+    color: #cc0000;
+    border: 1px solid #ff9999;
+}
+
+.message.success {
+    background-color: #e0ffe0;
+    color: #008000;
+    border: 1px solid #99ff99;
+}
+
+.message.info {
+    background-color: #e0f0ff;
+    color: #0056b3;
+    border: 1px solid #99ccff;
+}
+
+/* Form Styling */
+.form-standard .form-group {
+    margin-bottom: 20px;
+}
+
+.form-standard label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--purple-dark);
+}
+
+.form-standard input[type="text"],
+.form-standard input[type="number"],
+.form-standard select,
+.form-standard textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1em;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-standard input[type="text"]:focus,
+.form-standard input[type="number"]:focus,
+.form-standard select:focus,
+.form-standard textarea:focus {
+    border-color: var(--purple-light);
+    box-shadow: 0 0 0 3px rgba(138, 0, 138, 0.2);
+    outline: none;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+}
+
+.input-group .input-group-addon {
+    background-color: var(--light-gray);
+    border: 1px solid var(--border-color);
+    border-right: none;
+    padding: 12px 15px;
+    border-radius: 8px 0 0 8px;
+    font-weight: bold;
+    color: var(--purple-dark);
+}
+
+.input-group input {
+    border-radius: 0 8px 8px 0;
+}
+
+.form-standard small {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 0.9em;
+}
+
+/* Transfer Type Selector Buttons */
+.transfer-type-selector {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+    justify-content: center;
+}
+
+.type-button {
+    flex: 1;
+    background-color: var(--light-gray);
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    padding: 20px 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px; /* Ensure a decent size */
+}
+
+.type-button i {
+    font-size: 3em;
+    color: var(--purple-medium);
+    margin-bottom: 10px;
+    transition: color 0.3s ease;
+}
+
+.type-button p {
+    margin: 0;
+    font-weight: 600;
+    color: var(--dark-text);
+    font-size: 1.1em;
+    transition: color 0.3s ease;
+}
+
+.type-button:hover {
+    border-color: var(--purple-medium);
+    box-shadow: 0 0 10px rgba(138, 0, 138, 0.3);
+}
+
+.type-button.selected {
+    background-color: var(--purple-medium);
+    border-color: var(--purple-dark);
+    color: var(--white);
+    box-shadow: 0 0 15px var(--glow-color); /* More intense glow when selected */
+}
+
+.type-button.selected i,
+.type-button.selected p {
+    color: var(--white);
+}
+
+/* Sub-method selection */
+.sub-method-selection {
+    background-color: var(--light-gray);
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.05);
+}
+
+.sub-method-selection h4 {
+    margin-top: 0;
+    color: var(--purple-dark);
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.radio-group label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: var(--dark-text);
+    font-weight: normal; /* Override general label bold */
+    transition: color 0.2s ease;
+}
+
+.radio-group input[type="radio"] {
+    margin-right: 10px;
+    accent-color: var(--purple-medium); /* Style radio button itself */
+}
+
+.radio-group label:hover {
+    color: var(--purple-medium);
+}
+
+/* Specific Transfer Method Fields */
+.transfer-method-fields {
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+    margin-top: 25px;
+}
+
+.transfer-method-fields h4 {
+    color: var(--purple-dark);
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-align: center;
+    border-bottom: 2px solid var(--purple-light);
+    padding-bottom: 10px;
+}
+
+/* Recipient Name Group (dynamic visibility) */
+.recipient-name-group {
+    /* Base style, will be hidden/shown by JS */
+}
+
+/* Submit Button */
+.button-primary {
+    background-color: var(--purple-dark);
+    color: var(--white);
+    padding: 15px 25px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1em;
+    cursor: pointer;
+    width: 100%;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    margin-top: 20px;
+    font-weight: 600;
+}
+
+.button-primary:hover {
+    background-color: var(--hover-purple);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2), 0 0 20px var(--glow-color);
+}
+
+.button-primary:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.back-link {
+    display: block;
+    text-align: center;
+    margin-top: 25px;
+    color: var(--purple-medium);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.3s ease;
+}
+
+.back-link:hover {
+    color: var(--purple-dark);
+    text-decoration: underline;
+}
+
+/* Hidden Utility Class */
+.hidden {
+    display: none !important;
+}
+
+/* Modal Styles */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    z-index: 1000; /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgba(0, 0, 0, 0.6); /* Black w/ opacity */
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.modal-content {
+    background-color: var(--white);
+    margin: auto;
+    padding: 30px;
+    border-radius: 12px;
+    position: relative;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.2), 0 0 40px var(--glow-color);
+    text-align: center;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+.modal-content h2 {
+    color: var(--purple-dark);
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 1.8em;
+}
+
+.modal-content p {
+    margin-bottom: 10px;
+    color: var(--dark-text);
+}
+
+.modal-details {
+    background-color: var(--light-gray);
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin-top: 20px;
+    margin-bottom: 25px;
+    text-align: left;
+}
+
+.modal-details p {
+    margin: 8px 0;
+    display: flex;
+    justify-content: space-between;
+    font-weight: 500;
+}
+
+.modal-details p strong {
+    color: var(--purple-dark);
+    min-width: 120px;
+}
+.modal-details p span {
+    font-weight: normal;
+    text-align: right;
+    flex-grow: 1;
+}
+
+
+.modal .close-button {
+    color: var(--purple-dark);
+    position: absolute;
+    top: 15px;
+    right: 25px;
+    font-size: 35px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.modal .close-button:hover,
+.modal .close-button:focus {
+    color: var(--purple-light);
+    text-decoration: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .dashboard-header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    .dashboard-header .user-info {
+        flex-direction: column;
+        gap: 8px;
+    }
+    .dashboard-header .user-info a {
+        padding: 3px 8px;
+        font-size: 0.9em;
+    }
+
+    .transfer-card {
+        padding: 20px;
+        border-radius: 10px;
+    }
+
+    .transfer-card h2 {
+        font-size: 1.8em;
+        margin-bottom: 20px;
+    }
+
+    .current-balance {
+        padding: 12px 15px;
+        margin-bottom: 20px;
+    }
+    .current-balance h3 {
+        font-size: 1.1em;
+    }
+    #display_current_balance {
+        font-size: 1.3em;
+    }
+
+    .form-standard input,
+    .form-standard select,
+    .form-standard textarea,
+    .input-group .input-group-addon {
+        padding: 10px;
+        font-size: 0.95em;
+    }
+
+    .transfer-type-selector {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .type-button {
+        padding: 15px 10px;
+        min-height: 80px;
+    }
+    .type-button i {
+        font-size: 2.5em;
+        margin-bottom: 5px;
+    }
+    .type-button p {
+        font-size: 1em;
+    }
+
+    .sub-method-selection {
+        padding: 15px;
+    }
+
+    .sub-method-selection h4,
+    .transfer-method-fields h4 {
+        font-size: 1.2em;
+    }
+
+    .button-primary {
+        padding: 12px 20px;
+        font-size: 1em;
+    }
+
+    .modal-content {
+        padding: 20px;
+        width: 95%; /* Make modal slightly wider on small screens */
+    }
+    .modal-content h2 {
+        font-size: 1.6em;
+    }
+    .modal-details p {
+        flex-direction: column; /* Stack details on small screens */
+        align-items: flex-start;
+        margin-bottom: 10px;
+    }
+    .modal-details p strong {
+        margin-bottom: 3px;
+    }
+    .modal .close-button {
+        font-size: 30px;
+        top: 10px;
+        right: 15px;
+    }
+}
+
+/* Accessibility: Focus styles */
+*:focus-visible {
+    outline: 3px solid var(--purple-light);
+    outline-offset: 2px;
+    border-radius: 5px;
+}

@@ -1,0 +1,36 @@
+# Composer-specific ignores
+/vendor/
+composer.lock  # Optional: If you want to let Composer manage lock file on deploy, but generally it's better to commit this.
+
+# Environment variables file (CRUCIAL for security!)
+.env
+.env.*.local # Ignore any local environment override files like .env.local
+
+# IDE and OS specific files
+.idea/             # JetBrains IDEs (IntelliJ, PhpStorm, WebStorm, etc.)
+.vscode/           # VS Code settings
+.DS_Store          # macOS specific desktop services store
+Thumbs.db          # Windows thumbnail cache
+npm-debug.log      # npm debug logs (if you use Node.js tools)
+yarn-error.log     # yarn error logs
+
+# Log files and temporary files
+*.log
+*.tmp
+*.temp
+temp/
+cache/
+
+# User-generated upload directories (if any)
+/uploads/
+/public/uploads/
+
+# PHP-specific ignores
+*.phar             # Compiled PHP archives
+*.php~             # Editor backup files
+*.bak              # Backup files
+*.swp              # Vim swap files
+.phpunit.result.cache # PHPUnit cache
+
+# If you have specific development-only config files not meant for repo
+# Config.local.php

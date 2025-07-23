@@ -1,0 +1,582 @@
+/* Path: C:\xampp\htdocs\hometownbank\frontend\transfer.css */
+
+/* General Body and Container Styling */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(135deg, #2c003e, #0a011d); /* Dark purple to very dark purple/blue */
+    color: #e0e0e0; /* Light grey for text */
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.container {
+    display: flex;
+    flex-direction: column; /* Stack header, main, sidebar */
+    min-height: 100vh;
+    width: 100%;
+    max-width: 1400px; /* Max width for the entire layout */
+    margin: 0 auto; /* Center the container */
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5); /* Stronger shadow for depth */
+}
+
+/* Header Styling (assuming .dashboard-header or .header) */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 25px;
+    background-color: rgba(30, 0, 45, 0.8); /* Slightly lighter, transparent dark purple */
+    border-bottom: 1px solid rgba(150, 0, 255, 0.3); /* Purple border */
+    color: #ffffff;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.menu-icon {
+    font-size: 24px;
+    cursor: pointer;
+    color: #c9a0dc; /* Soft purple */
+    transition: color 0.3s ease;
+}
+
+.menu-icon:hover {
+    color: #e6b3ff; /* Lighter purple on hover */
+}
+
+.greeting h1 {
+    margin: 0;
+    font-size: 24px;
+    color: #ffffff;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5); /* Subtle white glow */
+}
+
+.profile-pic img {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    border: 2px solid #a052c9; /* Purple border */
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.profile-pic img:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(200, 100, 255, 0.7); /* Purple glow on hover */
+}
+
+
+/* Main Content / Form Area */
+.main-content {
+    flex-grow: 1; /* Allows main content to take available space */
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* Center content vertically too */
+    z-index: 1; /* Ensure it's above background but below sidebar overlay */
+}
+
+.transfer-form-container {
+    background-color: rgba(255, 255, 255, 0.08); /* Semi-transparent white background */
+    backdrop-filter: blur(8px); /* Frosted glass effect */
+    border-radius: 15px;
+    padding: 35px 45px;
+    box-shadow: 0 0 25px rgba(150, 0, 255, 0.3), 0 0 40px rgba(255, 255, 255, 0.1); /* Purple and white glow */
+    width: 100%;
+    max-width: 600px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    animation: fadeInScale 0.7s ease-out;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.transfer-form-container h2 {
+    color: #ffffff;
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 28px;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8); /* Stronger white glow */
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #e0e0e0; /* Light grey */
+    font-weight: bold;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select,
+.form-group textarea {
+    width: calc(100% - 20px); /* Adjust for padding */
+    padding: 12px;
+    border: 1px solid rgba(200, 100, 255, 0.5); /* Light purple border */
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.1); /* Slightly transparent white input background */
+    color: #ffffff;
+    font-size: 16px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    outline: none;
+}
+
+.form-group input[type="text"]::placeholder,
+.form-group input[type="number"]::placeholder,
+.form-group textarea::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    border-color: #a052c9; /* Stronger purple on focus */
+    box-shadow: 0 0 15px rgba(200, 100, 255, 0.6); /* Purple glow on focus */
+}
+
+.form-group select option {
+    background-color: #2c003e; /* Dark background for dropdown options */
+    color: #ffffff;
+}
+
+.currency-symbol {
+    color: #c9a0dc; /* Purple color for currency symbol */
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+#display_current_balance, #current_currency_display {
+    font-weight: bold;
+    color: #c9a0dc; /* Purple for balance */
+}
+
+/* Messages */
+.message {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    font-weight: bold;
+    text-align: center;
+    animation: slideInFromTop 0.5s ease-out;
+}
+
+.message.success {
+    background-color: rgba(144, 238, 144, 0.2); /* Light green with transparency */
+    color: #90ee90; /* Light green text */
+    border: 1px solid #90ee90;
+    box-shadow: 0 0 10px rgba(144, 238, 144, 0.5);
+}
+
+.message.error {
+    background-color: rgba(255, 99, 71, 0.2); /* Tomato red with transparency */
+    color: #ff6347; /* Tomato red text */
+    border: 1px solid #ff6347;
+    box-shadow: 0 0 10px rgba(255, 99, 71, 0.5);
+}
+
+@keyframes slideInFromTop {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Button Styling */
+.button-primary {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(45deg, #a052c9, #6a0dad); /* Purple gradient */
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 5px 20px rgba(160, 82, 201, 0.4); /* Soft purple shadow */
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+.button-primary:hover {
+    background: linear-gradient(45deg, #b862e3, #8a2be2); /* Lighter purple gradient on hover */
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(160, 82, 201, 0.6); /* Enhanced shadow on hover */
+}
+
+.button-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 15px rgba(160, 82, 201, 0.4);
+}
+
+.back-link {
+    color: #c9a0dc; /* Purple color */
+    text-decoration: none;
+    font-size: 16px;
+    margin-top: 20px;
+    display: inline-block;
+    transition: color 0.3s ease;
+}
+
+.back-link:hover {
+    color: #e6b3ff; /* Lighter purple on hover */
+    text-decoration: underline;
+}
+
+/* Sidebar Styling (from previous context, ensure consistency) */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    display: none; /* Hidden by default */
+    transition: opacity 0.3s ease;
+    opacity: 0;
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px; /* Start off-screen */
+    width: 260px;
+    height: 100%;
+    background: linear-gradient(180deg, #1a002a, #000000); /* Dark gradient for sidebar */
+    color: #ffffff;
+    box-shadow: 2px 0 15px rgba(0, 0, 0, 0.5);
+    z-index: 101;
+    transition: left 0.3s ease-out;
+    padding: 20px;
+    box-sizing: border-box; /* Include padding in width */
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar.active {
+    left: 0; /* Slide in */
+}
+
+.close-sidebar-button {
+    background: none;
+    border: none;
+    color: #e6b3ff; /* Light purple */
+    font-size: 24px;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.close-sidebar-button:hover {
+    color: #ffffff;
+}
+
+.sidebar-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-profile-pic {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border: 3px solid #a052c9; /* Purple border */
+}
+
+.sidebar-header h3 {
+    margin: 10px 0 5px;
+    color: #ffffff;
+    font-size: 20px;
+}
+
+.sidebar-header p {
+    color: #bbbbbb;
+    font-size: 14px;
+}
+
+.sidebar-nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1; /* Allows nav to take up remaining space */
+}
+
+.sidebar-nav ul li {
+    margin-bottom: 10px;
+}
+
+.sidebar-nav ul li a {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    color: #e0e0e0;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.sidebar-nav ul li a i {
+    margin-right: 15px;
+    font-size: 18px;
+    color: #c9a0dc; /* Purple icon */
+}
+
+.sidebar-nav ul li a:hover {
+    background-color: rgba(160, 82, 201, 0.2); /* Light purple hover background */
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(160, 82, 201, 0.4); /* Subtle glow on hover */
+}
+
+.sidebar-nav ul li a.active {
+    background-color: #a052c9; /* Stronger purple for active */
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(160, 82, 201, 0.6);
+    font-weight: bold;
+}
+
+.sidebar-nav ul li a.active i {
+    color: #ffffff; /* White icon for active */
+}
+
+.logout-button {
+    background: linear-gradient(45deg, #8a2be2, #a052c9); /* Purple gradient for logout */
+    color: #ffffff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 15px rgba(160, 82, 201, 0.4);
+}
+
+.logout-button:hover {
+    background: linear-gradient(45deg, #9933ff, #b862e3); /* Lighter gradient on hover */
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(160, 82, 201, 0.6);
+}
+
+/* Modal Styling (for success/error messages) */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #3a0050, #1a002a); /* Dark purple gradient */
+    border-radius: 15px;
+    padding: 40px;
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(160, 82, 201, 0.8), 0 0 60px rgba(255, 255, 255, 0.2); /* Stronger glow */
+    position: relative;
+    transform: translateY(-50px);
+    opacity: 0;
+    transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+    border: 1px solid rgba(200, 100, 255, 0.5);
+}
+
+.modal-overlay.active .modal-content {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.modal-content h3 {
+    color: #e6b3ff; /* Light purple for heading */
+    margin-top: 0;
+    font-size: 28px;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+    margin-bottom: 20px;
+}
+
+.modal-content p {
+    color: #e0e0e0; /* Light text for paragraphs */
+    margin-bottom: 15px;
+    line-height: 1.8;
+}
+
+.modal-content strong {
+    color: #ffffff; /* White for strong text */
+}
+
+.modal-content .status-pending {
+    color: #FFA500; /* Orange for pending status */
+    font-weight: bold;
+}
+
+.modal-content .modal-reference {
+    font-family: 'Courier New', Courier, monospace;
+    background-color: rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    border-radius: 5px;
+    display: inline-block;
+    margin-top: 10px;
+    color: #90ee90; /* Greenish glow for reference */
+    box-shadow: 0 0 8px rgba(144, 238, 144, 0.3);
+}
+
+.modal-button {
+    background: linear-gradient(45deg, #6a0dad, #a052c9); /* Purple gradient button */
+    color: #ffffff;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 17px;
+    font-weight: bold;
+    margin-top: 25px;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 5px 20px rgba(160, 82, 201, 0.4);
+}
+
+.modal-button:hover {
+    background: linear-gradient(45deg, #8a2be2, #b862e3); /* Lighter gradient on hover */
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(160, 82, 201, 0.6);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header {
+        padding: 10px 15px;
+    }
+
+    .greeting h1 {
+        font-size: 20px;
+    }
+
+    .menu-icon {
+        font-size: 20px;
+    }
+
+    .profile-pic img {
+        width: 40px;
+        height: 40px;
+    }
+
+    .transfer-form-container {
+        padding: 25px 30px;
+    }
+
+    .transfer-form-container h2 {
+        font-size: 24px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea,
+    .button-primary {
+        font-size: 15px;
+        padding: 10px;
+    }
+
+    .sidebar {
+        width: 230px;
+        left: -250px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header {
+        flex-wrap: wrap;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .greeting {
+        width: 100%;
+        order: 1; /* Move greeting below icons */
+        margin-top: 10px;
+    }
+
+    .menu-icon, .profile-pic {
+        order: 0; /* Keep icons at the top */
+        flex-basis: 50%;
+        text-align: center;
+    }
+    .profile-pic {
+        text-align: right;
+    }
+    .menu-icon {
+        text-align: left;
+    }
+
+    .transfer-form-container {
+        padding: 20px;
+        box-shadow: 0 0 15px rgba(150, 0, 255, 0.3), 0 0 25px rgba(255, 255, 255, 0.1); /* Smaller glow for small screens */
+    }
+
+    .transfer-form-container h2 {
+        font-size: 20px;
+    }
+
+    .modal-content {
+        padding: 25px;
+    }
+
+    .modal-content h3 {
+        font-size: 22px;
+    }
+
+    .modal-button {
+        padding: 10px 20px;
+        font-size: 15px;
+    }
+}

@@ -1,0 +1,881 @@
+/* Path: C:\xampp\htdocs\hometownbank\frontend\dashboard.css */
+
+/* General Body and Container Styling */
+body {
+    font-family: 'Poppins', sans-serif; /* Using Poppins as per transfer.php */
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(135deg, #2c003e, #0a011d); /* Dark purple to very dark purple/blue */
+    color: #e0e0e0; /* Light grey for text */
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.container {
+    display: flex;
+    flex-direction: column; /* Stack header, sections vertically */
+    min-height: 100vh;
+    width: 100%;
+    max-width: 1400px; /* Max width for the entire layout */
+    margin: 0 auto; /* Center the container */
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5); /* Stronger shadow for depth */
+}
+
+/* Header Styling */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 25px;
+    background-color: rgba(30, 0, 45, 0.8); /* Slightly lighter, transparent dark purple */
+    border-bottom: 1px solid rgba(150, 0, 255, 0.3); /* Purple border */
+    color: #ffffff;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.menu-icon {
+    font-size: 24px;
+    cursor: pointer;
+    color: #c9a0dc; /* Soft purple */
+    transition: color 0.3s ease;
+}
+
+.menu-icon:hover {
+    color: #e6b3ff; /* Lighter purple on hover */
+}
+
+.greeting h1 {
+    margin: 0;
+    font-size: 24px;
+    color: #ffffff;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5); /* Subtle white glow */
+    white-space: nowrap; /* Prevent "Hi, John Doe" from wrapping */
+}
+
+.profile-pic img {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    border: 2px solid #a052c9; /* Purple border */
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.profile-pic img:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(200, 100, 255, 0.7); /* Purple glow on hover */
+}
+
+/* Section Common Styling */
+section {
+    padding: 25px;
+    margin: 20px;
+    background-color: rgba(255, 255, 255, 0.08); /* Semi-transparent white background */
+    backdrop-filter: blur(8px); /* Frosted glass effect */
+    border-radius: 15px;
+    box-shadow: 0 0 25px rgba(150, 0, 255, 0.3), 0 0 40px rgba(255, 255, 255, 0.1); /* Purple and white glow */
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    animation: fadeInScale 0.7s ease-out;
+}
+
+section h2 {
+    color: #ffffff;
+    font-size: 24px;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8); /* Stronger white glow */
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Accounts Section */
+.accounts-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.accounts-header-row h2 {
+    margin: 0;
+}
+
+.view-all-link a {
+    color: #c9a0dc; /* Purple link */
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.view-all-link a:hover {
+    color: #e6b3ff; /* Lighter purple on hover */
+    text-decoration: underline;
+}
+
+/* --- Carousel Specific Styles for Accounts --- */
+.account-cards-container {
+    display: flex; /* Use flexbox for horizontal layout */
+    overflow: hidden; /* Hide cards outside the view */
+    scroll-snap-type: x mandatory; /* Optional: for native smooth snapping */
+    -webkit-overflow-scrolling: touch; /* For smoother scrolling on iOS */
+    gap: 20px; /* Space between cards */
+    margin-bottom: 20px;
+    /* Remove grid properties if they were here */
+}
+
+.account-card {
+    flex: 0 0 calc(100% / var(--cards-per-view, 1) - var(--gap-reduction, 0px)); /* Control card width based on visible cards */
+    min-width: 280px; /* Minimum width for each card */
+    max-width: 400px; /* Max width to prevent cards from getting too large */
+    background-color: rgba(255, 255, 255, 0.05); /* Lighter transparent white for cards */
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column; /* Stack details and balance vertically */
+    justify-content: space-between;
+    align-items: flex-start; /* Align content to the left */
+    border: 1px solid rgba(200, 100, 255, 0.3); /* Purple border */
+    box-shadow: 0 0 15px rgba(160, 82, 201, 0.2), 0 0 25px rgba(255, 255, 255, 0.05); /* Subtle glow */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    scroll-snap-align: start; /* Snap each card to the start of the container */
+    box-sizing: border-box; /* Include padding and border in the width */
+}
+
+.account-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 20px rgba(160, 82, 201, 0.4), 0 0 30px rgba(255, 255, 255, 0.1); /* Enhanced glow on hover */
+}
+
+.account-details {
+    width: 100%; /* Take full width of card */
+    text-align: left;
+    margin-bottom: 10px; /* Space between details and balance */
+}
+
+.account-type {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 5px;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+}
+
+.account-number {
+    font-size: 14px;
+    color: #bbbbbb;
+}
+
+.account-balance {
+    width: 100%; /* Take full width of card */
+    text-align: right;
+    margin-top: auto; /* Push to the bottom if content above is variable */
+}
+
+.balance-amount {
+    font-size: 20px;
+    font-weight: 700;
+    color: #90ee90; /* Green for positive balance */
+    margin-bottom: 5px;
+    text-shadow: 0 0 8px rgba(144, 238, 144, 0.5); /* Green glow */
+}
+
+.balance-status {
+    font-size: 12px;
+    color: #aaaaaa;
+}
+
+.loading-message {
+    text-align: center;
+    color: #bbbbbb;
+    padding: 20px;
+    font-style: italic;
+    width: 100%; /* Ensure it takes full width when alone */
+}
+
+/* Pagination Dots Styling */
+.account-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 15px;
+    gap: 8px; /* Space between dots */
+}
+
+.account-pagination .dot {
+    width: 10px;
+    height: 10px;
+    background-color: rgba(255, 255, 255, 0.3); /* Light grey transparent dot */
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.account-pagination .dot.active {
+    background-color: #e6b3ff; /* Glowing purple for active dot */
+    transform: scale(1.2);
+    box-shadow: 0 0 8px rgba(230, 179, 255, 0.8);
+}
+
+.account-pagination .dot:hover {
+    background-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+}
+/* --- End Carousel Specific Styles --- */
+
+
+/* Actions Section */
+.actions-section {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 20px;
+    text-align: center;
+}
+
+.action-button {
+    background-color: rgba(160, 82, 201, 0.15); /* Purple transparent background */
+    border-radius: 12px;
+    padding: 20px 15px;
+    flex: 1;
+    min-width: 120px;
+    max-width: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    border: 1px solid rgba(160, 82, 201, 0.4);
+    box-shadow: 0 0 15px rgba(160, 82, 201, 0.3);
+}
+
+.action-button:hover {
+    background-color: rgba(160, 82, 201, 0.25);
+    transform: translateY(-5px);
+    box-shadow: 0 0 25px rgba(160, 82, 201, 0.6); /* Stronger purple glow on hover */
+}
+
+.action-button i {
+    font-size: 36px;
+    color: #e6b3ff; /* Lighter purple icon */
+    margin-bottom: 10px;
+    text-shadow: 0 0 10px rgba(230, 179, 255, 0.7); /* Glowing icon */
+}
+
+.action-button p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: #ffffff;
+}
+
+/* Bank Cards Section */
+.bank-cards-section {
+    text-align: center;
+}
+
+.view-cards-button {
+    background: linear-gradient(45deg, #a052c9, #6a0dad); /* Purple gradient button */
+    color: #ffffff;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 15px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 5px 20px rgba(160, 82, 201, 0.4); /* Soft purple shadow */
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+.view-cards-button:hover {
+    background: linear-gradient(45deg, #b862e3, #8a2be2); /* Lighter purple gradient on hover */
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(160, 82, 201, 0.6); /* Enhanced shadow on hover */
+}
+
+.view-cards-button i {
+    font-size: 20px;
+}
+
+.card-list-container {
+    margin-top: 20px;
+    /* You might want to add specific styling for individual cards here if they were dynamically loaded */
+}
+
+/* Activity/Transactions Section */
+.activity-section {
+    margin-bottom: 40px; /* Space at the bottom */
+}
+
+.transactions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.transactions-header h2 {
+    margin: 0;
+}
+
+.more-options {
+    font-size: 28px;
+    font-weight: bold;
+    color: #c9a0dc;
+    cursor: pointer;
+    line-height: 1; /* Adjust to center vertically */
+    transition: color 0.3s ease;
+}
+
+.more-options:hover {
+    color: #e6b3ff;
+}
+
+.transaction-list {
+    background-color: rgba(255, 255, 255, 0.03); /* Very light transparent white */
+    border-radius: 12px;
+    overflow: hidden; /* For border-radius on children */
+    border: 1px solid rgba(200, 100, 255, 0.2);
+    box-shadow: 0 0 10px rgba(160, 82, 201, 0.1);
+}
+
+.transaction-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08); /* Lighter separator */
+    transition: background-color 0.3s ease;
+}
+
+.transaction-item:last-child {
+    border-bottom: none;
+}
+
+.transaction-item:hover {
+    background-color: rgba(255, 255, 255, 0.06); /* Slightly more opaque on hover */
+}
+
+.transaction-details {
+    flex: 1;
+    text-align: left;
+}
+
+.transaction-description {
+    display: block;
+    font-weight: 600;
+    color: #ffffff;
+    font-size: 15px;
+    margin-bottom: 2px;
+}
+
+.transaction-account {
+    font-size: 12px;
+    color: #aaaaaa;
+}
+
+.transaction-amount-date {
+    text-align: right;
+    white-space: nowrap; /* Prevent wrapping for amount/date */
+}
+
+.transaction-amount {
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.transaction-amount.credit {
+    color: #90ee90; /* Green for credit */
+    text-shadow: 0 0 8px rgba(144, 238, 144, 0.5);
+}
+
+.transaction-amount.debit {
+    color: #ff6347; /* Tomato red for debit */
+    text-shadow: 0 0 8px rgba(255, 99, 71, 0.5);
+}
+
+.transaction-date {
+    font-size: 12px;
+    color: #bbbbbb;
+    margin-top: 2px;
+}
+
+.see-more-button {
+    display: block;
+    width: fit-content;
+    margin: 20px auto 0;
+    padding: 10px 25px;
+    background-color: rgba(160, 82, 201, 0.3); /* Transparent purple */
+    color: #e6b3ff;
+    border: 1px solid #a052c9;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+.see-more-button:hover {
+    background-color: rgba(160, 82, 201, 0.5);
+    box-shadow: 0 0 15px rgba(160, 82, 201, 0.6);
+    transform: translateY(-2px);
+}
+
+/* Transfer Modal Styling (for the "Choose Transfer Type" popup) */
+.transfer-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.transfer-modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.transfer-modal-content {
+    background: linear-gradient(135deg, #3a0050, #1a002a); /* Dark purple gradient */
+    border-radius: 15px;
+    padding: 40px;
+    width: 90%;
+    max-width: 550px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(160, 82, 201, 0.8), 0 0 60px rgba(255, 255, 255, 0.2); /* Stronger glow */
+    position: relative;
+    transform: translateY(-50px);
+    opacity: 0;
+    transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+    border: 1px solid rgba(200, 100, 255, 0.5);
+}
+
+.transfer-modal-overlay.active .transfer-modal-content {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.transfer-modal-content h3 {
+    color: #e6b3ff; /* Light purple for heading */
+    margin-top: 0;
+    font-size: 28px;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+    margin-bottom: 30px;
+}
+
+.transfer-options-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.transfer-option {
+    background-color: rgba(160, 82, 201, 0.1); /* Transparent purple for options */
+    border: 1px solid rgba(160, 82, 201, 0.4);
+    border-radius: 10px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 0 10px rgba(160, 82, 201, 0.2);
+}
+
+.transfer-option:hover {
+    background-color: rgba(160, 82, 201, 0.2);
+    transform: translateY(-5px);
+    box-shadow: 0 0 20px rgba(160, 82, 201, 0.5); /* Stronger glow on hover */
+}
+
+.transfer-option i {
+    font-size: 30px;
+    color: #e6b3ff; /* Light purple icon */
+    margin-bottom: 10px;
+    text-shadow: 0 0 8px rgba(230, 179, 255, 0.7);
+}
+
+.transfer-option p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: #ffffff;
+    line-height: 1.4;
+}
+
+.close-modal-button {
+    background: linear-gradient(45deg, #6a0dad, #a052c9); /* Purple gradient button */
+    color: #ffffff;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 17px;
+    font-weight: bold;
+    margin-top: 25px;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 5px 20px rgba(160, 82, 201, 0.4);
+}
+
+.close-modal-button:hover {
+    background: linear-gradient(45deg, #8a2be2, #b862e3); /* Lighter gradient on hover */
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(160, 82, 201, 0.6);
+}
+
+/* Sidebar Styling (from previous context, ensure consistency) */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    display: none; /* Hidden by default */
+    transition: opacity 0.3s ease;
+    opacity: 0;
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px; /* Start off-screen */
+    width: 260px;
+    height: 100%;
+    background: linear-gradient(180deg, #1a002a, #000000); /* Dark gradient for sidebar */
+    color: #ffffff;
+    box-shadow: 2px 0 15px rgba(0, 0, 0, 0.5);
+    z-index: 101;
+    transition: left 0.3s ease-out;
+    padding: 20px;
+    box-sizing: border-box; /* Include padding in width */
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar.active {
+    left: 0; /* Slide in */
+}
+
+.close-sidebar-button {
+    background: none;
+    border: none;
+    color: #e6b3ff; /* Light purple */
+    font-size: 24px;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.close-sidebar-button:hover {
+    color: #ffffff;
+}
+
+.sidebar-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-profile-pic {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border: 3px solid #a052c9; /* Purple border */
+}
+
+.sidebar-header h3 {
+    margin: 10px 0 5px;
+    color: #ffffff;
+    font-size: 20px;
+}
+
+.sidebar-header p {
+    color: #bbbbbb;
+    font-size: 14px;
+}
+
+.sidebar-nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1; /* Allows nav to take up remaining space */
+}
+
+.sidebar-nav ul li {
+    margin-bottom: 10px;
+}
+
+.sidebar-nav ul li a {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    color: #e0e0e0;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.sidebar-nav ul li a i {
+    margin-right: 15px;
+    font-size: 18px;
+    color: #c9a0dc; /* Purple icon */
+}
+
+.sidebar-nav ul li a:hover {
+    background-color: rgba(160, 82, 201, 0.2); /* Light purple hover background */
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(160, 82, 201, 0.4); /* Subtle glow on hover */
+}
+
+.sidebar-nav ul li a.active {
+    background-color: #a052c9; /* Stronger purple for active */
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(160, 82, 201, 0.6);
+    font-weight: bold;
+}
+
+.sidebar-nav ul li a.active i {
+    color: #ffffff; /* White icon for active */
+}
+
+.logout-button {
+    background: linear-gradient(45deg, #8a2be2, #a052c9); /* Purple gradient for logout */
+    color: #ffffff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 15px rgba(160, 82, 201, 0.4);
+}
+
+.logout-button:hover {
+    background: linear-gradient(45deg, #9933ff, #b862e3); /* Lighter gradient on hover */
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(160, 82, 201, 0.6);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header {
+        padding: 10px 15px;
+    }
+
+    .greeting h1 {
+        font-size: 20px;
+    }
+
+    .menu-icon {
+        font-size: 20px;
+    }
+
+    .profile-pic img {
+        width: 40px;
+        height: 40px;
+    }
+
+    section {
+        padding: 20px;
+        margin: 15px;
+    }
+
+    section h2 {
+        font-size: 20px;
+    }
+
+    /* Carousel adjustments for smaller screens */
+    .account-cards-container {
+        --cards-per-view: 1; /* Show 1 card per view on smaller screens */
+        --gap-reduction: 0px; /* No gap reduction needed as only 1 card is visible */
+        justify-content: flex-start; /* Align items to the start for smoother swiping */
+        overflow-x: scroll; /* Allow horizontal scrolling */
+        -webkit-overflow-scrolling: touch; /* For smoother scrolling on iOS */
+        scrollbar-width: none; /* Hide scrollbar for Firefox */
+        -ms-overflow-style: none;  /* Hide scrollbar for IE/Edge */
+    }
+
+    .account-cards-container::-webkit-scrollbar { /* Hide scrollbar for Chrome/Safari */
+        display: none;
+    }
+
+    .account-card {
+        flex: 0 0 calc(100% - 20px); /* 100% width minus the gap */
+        margin-right: 20px; /* Explicit margin for gap */
+    }
+    .account-card:last-child {
+        margin-right: 0; /* No margin on the last card */
+    }
+
+
+    .account-balance {
+        text-align: left;
+        margin-top: 10px;
+        width: 100%;
+    }
+
+    .actions-section {
+        grid-template-columns: repeat(2, 1fr); /* 2 columns on smaller screens */
+        gap: 15px;
+    }
+
+    .action-button {
+        padding: 15px 10px;
+        min-width: unset;
+        max-width: unset;
+    }
+
+    .action-button i {
+        font-size: 30px;
+    }
+
+    .action-button p {
+        font-size: 13px;
+    }
+
+    .transfer-modal-content {
+        padding: 30px;
+    }
+
+    .transfer-modal-content h3 {
+        font-size: 24px;
+    }
+
+    .transfer-option {
+        padding: 12px;
+    }
+
+    .transfer-option i {
+        font-size: 26px;
+    }
+
+    .transfer-option p {
+        font-size: 13px;
+    }
+
+    .close-modal-button {
+        padding: 10px 20px;
+        font-size: 15px;
+    }
+
+    .sidebar {
+        width: 230px;
+        left: -250px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header {
+        flex-wrap: wrap;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .greeting {
+        width: 100%;
+        order: 1; /* Move greeting below icons */
+        margin-top: 10px;
+    }
+
+    .menu-icon, .profile-pic {
+        order: 0; /* Keep icons at the top */
+        flex-basis: 50%;
+        text-align: center;
+    }
+    .profile-pic {
+        text-align: right;
+    }
+    .menu-icon {
+        text-align: left;
+    }
+
+    section {
+        padding: 15px;
+        margin: 10px;
+    }
+
+    section h2 {
+        font-size: 18px;
+    }
+
+    /* Account cards on very small screens (still carousel, but maybe slightly smaller minimums) */
+    .account-card {
+        min-width: 260px; /* Slightly smaller minimum width */
+    }
+
+    .transaction-item {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 10px 15px;
+    }
+
+    .transaction-amount-date {
+        margin-top: 5px;
+        text-align: left;
+        width: 100%;
+    }
+
+    .transfer-modal-content {
+        padding: 20px;
+    }
+
+    .transfer-modal-content h3 {
+        font-size: 20px;
+    }
+
+    .transfer-options-list {
+        grid-template-columns: 1fr; /* Single column for transfer options */
+    }
+
+    .transfer-option p {
+        font-size: 12px;
+    }
+}
