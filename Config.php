@@ -34,8 +34,8 @@ try {
 
 // MongoDB Settings - USE $_ENV INSTEAD OF GETENV()
 // Use null coalescing operator (??) for robustness if the variable might not exist
-define('MONGODB_CONNECTION_URI', $_ENV['MONGODB_URI'] ?? null);
-define('MONGODB_DB_NAME', $_ENV['MONGODB_DATABASE'] ?? 'HometownBankPA'); // Default if not set
+define('MONGODB_CONNECTION_URI', $_ENV['MONGODB_CONNECTION_URI'] ?? null);
+define('MONGODB_DB_NAME', $_ENV['MONGODB_DB_NAME'] ?? 'HometownBankPA'); // Default if not set
 
 define('TWO_FACTOR_CODE_LENGTH', 6); // Standard length for most authenticator apps
 define('TWO_FACTOR_CODE_EXPIRY_MINUTES', 5); // Example: Code valid for 5 minutes
