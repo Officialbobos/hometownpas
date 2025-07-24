@@ -36,8 +36,8 @@ try {
 $mongoClient = null; // Initialize to null
 try {
     // Assuming MONGO_URI and MONGO_DB are defined in Config.php
-    $mongoClient = new Client(MONGO_URI);
-    $database = $mongoClient->selectDatabase(MONGO_DB);
+    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);   
+    $database = $client->selectDatabase(MONGODB_DB_NAME);
     $accountsCollection = $database->selectCollection('accounts');
 
     $user_accounts = [];

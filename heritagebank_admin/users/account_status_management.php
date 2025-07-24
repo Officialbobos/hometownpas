@@ -15,7 +15,7 @@ use MongoDB\BSON\UTCDateTime;
 use MongoDB\Driver\Exception\Exception as MongoDBException; // Alias for MongoDB specific exceptions
 
 // Check if the admin is logged in
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
     header('Location: ../index.php'); // Redirect to admin login page
     exit; // Stop script execution after redirect
 }
@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
     $user_id_str = filter_input(INPUT_POST, 'user_id', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     $new_status = trim(filter_input(INPUT_POST, 'new_status', FILTER_SANITIZE_FULL_SPECIAL_CHARS));
     $reason = trim(filter_input(INPUT_POST, 'reason', FILTER_SANITIZE_FULL_SPECIAL_CHARS));
-    $admin_user_id_str = $_SESSION['admin_id'] ?? null; // Get admin ID from session (as string ObjectId)
+    $admin_user_id_str = $_SESSION['admin_user_id'] ?? null; // Get admin ID from session (as string ObjectId) - Corrected $_SESSION key
 
     $custom_change_date_str = trim(filter_input(INPUT_POST, 'change_date', FILTER_SANITIZE_FULL_SPECIAL_CHARS));
 
@@ -123,14 +123,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                 // Fetch the user's *current* status within the transaction
                 $current_user_data = $usersCollection->findOne(
                     ['_id' => $user_id_objectId],
-                    ['projection' => ['account_status' => 1]],
+                    ['projection' => ['status' => 1]], // Corrected: Using 'status' field
                     ['session' => $session]
                 );
 
-                if (!$current_user_data || !isset($current_user_data['account_status'])) {
+                if (!$current_user_data || !isset($current_user_data['status'])) { // Corrected: Using 'status' field
                     throw new Exception("User not found or current status unavailable for update (ID: $user_id_str).");
                 }
-                $old_status = $current_user_data['account_status'];
+                $old_status = $current_user_data['status']; // Corrected: Using 'status' field
 
                 // Check if the new status is different from the old status
                 if (strtolower($old_status) === strtolower($new_status)) {
@@ -138,10 +138,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                     $message_type = 'info';
                     $session->abortTransaction(); // Abort transaction as no change is needed
                 } else {
-                    // 1. Update user's account_status in the 'users' collection
+                    // 1. Update user's status in the 'users' collection
                     $updateResult = $usersCollection->updateOne(
                         ['_id' => $user_id_objectId],
-                        ['$set' => ['account_status' => $new_status]],
+                        ['$set' => ['status' => $new_status]], // Corrected: Updating 'status' field
                         ['session' => $session]
                     );
 
@@ -173,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                     $message_type = 'success';
 
                     // Update $user_to_manage with new status for immediate display on the page
-                    $user_to_manage['account_status'] = $new_status;
+                    $user_to_manage['status'] = $new_status; // Corrected: Updating 'status' field in user_to_manage object
 
                     // --- Email Notification to User ---
                     $status_color = '';
@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                         default: $status_color = '#333333'; break; // Default dark grey
                     }
 
-                    $user_subject = "Important: Your Heritage Bank Account Status Has Been Updated";
+                    $user_subject = "Important: Your HomeTown Bank Pa Account Status Has Been Updated";
                     $user_email_body = '
                     <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; background-color: #f4f4f4;">
                         <tr>
@@ -194,12 +194,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                                 <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
                                     <tr>
                                         <td align="center" style="padding: 20px 0; background-color:#E0E6EB;">
-                                            <img src="https://i.imgur.com/YEFKZlG.png" alt="Heritage Bank Logo" style="display: block; max-width: 120px; height: auto; margin: 0 auto; padding: 5px;">
+                                            <img src="https://i.imgur.com/UeqGGSn.png" alt="Heritage Bank Logo" style="display: block; max-width: 120px; height: auto; margin: 0 auto; padding: 5px;">
                                         </td>
                                     </tr>
                                     <tr>
                                         <td style="padding: 30px 40px;">
-                                            <p style="font-size: 16px; font-weight: bold; color: #004A7F; margin-bottom: 20px;">Dear ' . htmlspecialchars($user_to_manage['first_name']) . ',</p>
+                                            <p style="font-size: 16px; font-weight: bold; color: #120681ff; margin-bottom: 20px;">Dear ' . htmlspecialchars($user_to_manage['first_name']) . ',</p>
                                             <p style="margin-bottom: 20px;">We wish to inform you that the status of your Heritage Bank account has been updated.</p>
 
                                             <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 25px; border: 1px solid #dddddd; border-collapse: collapse;">
@@ -222,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                                             </table>
 
                                             <p style="margin-top: 20px;">If you have any questions or require further clarification, please do not hesitate to contact our customer support team.</p>
-                                            <p style="margin-top: 20px; font-weight: bold;">Sincerely,<br>Heritage Bank Administration</p>
+                                            <p style="margin-top: 20px; font-weight: bold;">Sincerely,<br>HomeTown Bank Pa Management</p>
 
                                             <p style="font-size: 11px; color: #888888; text-align: center; margin-top: 40px; border-top: 1px solid #eeeeee; padding-top: 20px;">
                                                 This is an automated email, please do not reply.
@@ -231,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                                     </tr>
                                     <tr>
                                         <td align="center" style="padding: 20px; background-color: #004A7F; color: #ffffff; font-size: 12px; border-radius: 0 0 8px 8px;">
-                                            &copy; ' . date("Y") . ' Heritage Bank. All rights reserved.
+                                            &copy; ' . date("Y") . ' HomeTown Bank Pa. All rights reserved.
                                         </td>
                                     </tr>
                                 </table>
@@ -383,7 +383,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                 <h3>User Details</h3>
                 <p><strong>Name:</strong> <?php echo htmlspecialchars($user_to_manage['first_name'] . ' ' . $user_to_manage['last_name']); ?></p>
                 <p><strong>Email:</strong> <?php echo htmlspecialchars($user_to_manage['email']); ?></p>
-                <p><strong>Current Status:</strong> <span class="status-<?php echo strtolower(htmlspecialchars($user_to_manage['account_status'])); ?>"><?php echo htmlspecialchars(ucfirst($user_to_manage['account_status'])); ?></span></p>
+                <p><strong>Current Status:</strong> <span class="status-<?php echo strtolower(htmlspecialchars($user_to_manage['status'])); ?>"><?php echo htmlspecialchars(ucfirst($user_to_manage['status'])); ?></span></p>
             </div>
 
             <form action="account_status_management.php" method="POST">
@@ -397,7 +397,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                         // Populate options dynamically from the allowed_statuses array
                         foreach ($allowed_statuses as $status) {
                             // Select the current status by default
-                            $selected = (strtolower($user_to_manage['account_status']) === $status) ? 'selected' : '';
+                            // Corrected: Using 'status' field for comparison
+                            $selected = (isset($user_to_manage['status']) && strtolower($user_to_manage['status']) === $status) ? 'selected' : '';
                             echo '<option value="' . htmlspecialchars($status) . '" ' . $selected . '>' . htmlspecialchars(ucfirst($status)) . '</option>';
                         }
                         ?>

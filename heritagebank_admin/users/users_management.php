@@ -5,9 +5,13 @@ error_reporting(E_ALL);
 session_start();
 
 require_once '../../Config.php'; // Adjust path based on your actual file structure
+require_once '../../functions.php'; // This is good to have for future database operations
 
 // Check if the admin is NOT logged in, redirect to login page
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+// *************************************************************************************
+// *** CRITICAL FIX: Update this line to match your dashboard.php and index.php login logic ***
+// *************************************************************************************
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
     header('Location: ../index.php'); // Corrected redirect to admin login page
     exit;
 }

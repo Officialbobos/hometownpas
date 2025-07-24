@@ -1,48 +1,52 @@
 <?php
+// C:\xampp_lite_8_4\www\phpfile-main\functions.php (REVISED AND FIXED)
 
-// Ensure Composer autoload is at the very top for PHPMailer
-require __DIR__ . '/vendor/autoload.php';
+// IMPORTANT: Do NOT include ini_set, error_reporting, or require statements for autoload.php or config.php here.
+// These should be handled in your main entry scripts (e.g., index.php, heritagebank_admin/index.php).
 
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-use PHPMailer\PHPMailer\SMTP;
-
-// Include the MongoDB configuration file.
-// It's crucial that this file is loaded before any functions attempt to connect to MongoDB.
-require_once __DIR__ . '/config.php'; // Adjust path if config.php is in a different directory
-
-// Include MongoDB Client and ObjectId for database operations
+// --- Keep these 'use' statements if they are used within functions ---
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
-use MongoDB\Driver\Exception\Exception as MongoDBDriverException; // Alias for specific exceptions
+use MongoDB\BSON\Decimal128; // Added for financial precision
+use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception as PHPMailerException; // Aliased to prevent conflict with generic PHP Exception
+use PHPMailer\PHPMailer\SMTP;
+// --- End 'use' statements ---
 
 
 /**
- * Global variable to hold the MongoDB database object.
- * This provides a simple way to access the database connection throughout your functions.
- * For larger applications, consider a more robust dependency injection pattern.
+ * Returns a MongoDB Client instance (singleton pattern).
+ * This ensures only one connection is made per request.
+ *
+ * @return MongoDB\Client
+ * @throws Exception If MONGODB_CONNECTION_URI is not defined or connection fails.
  */
-global $mongoDb;
+function getMongoDBClient(): Client
+{
+    static $mongoClient = null; // Use a static variable to store the client
 
-// 1. Establish MongoDB Connection (typically once per request)
-// This ensures that $mongoDb is available for all functions that need it.
-if (!isset($mongoDb)) {
-    try {
-        $mongoClient = new Client(MONGODB_CONNECTION_URI);
-        // Select the database using the name defined in config.php
-        $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME);
+    if ($mongoClient === null) {
+        // Ensure the MONGODB_CONNECTION_URI constant is defined
+        if (!defined('MONGODB_CONNECTION_URI') || !MONGODB_CONNECTION_URI) {
+            // Log this as a critical configuration error
+            error_log("FATAL ERROR: MONGODB_CONNECTION_URI not found. Ensure it's defined in Config.php and .env is loaded correctly.");
+            throw new Exception("Database configuration error. Please contact support.");
+        }
 
-        // Optional: Ping to verify connection. Remove in production if not needed.
-        // $mongoClient->admin->ping();
-        // error_log("MongoDB connected successfully to DB: " . MONGODB_DB_NAME);
-
-    } catch (MongoDBDriverException $e) {
-        // Log the error for debugging. These errors are critical.
-        error_log("FATAL ERROR in functions.php: Failed to connect to MongoDB. " . $e->getMessage());
-        // In a real application, you'd show a user-friendly error page or halt execution.
-        die("Database connection error. Please try again later. If the issue persists, contact support.");
+        try {
+            $mongoClient = new Client(MONGODB_CONNECTION_URI);
+            // Optional: Ping to verify connection. Remove in production if not needed for performance.
+            // Note: ping requires replica set or sharded cluster, may not work on standalone default XAMPP setup.
+            // $mongoClient->admin->command(['ping' => 1]);
+            // error_log("MongoDB connected successfully via getMongoDBClient().");
+        } catch (MongoDBDriverException $e) {
+            error_log("FATAL ERROR in getMongoDBClient(): Failed to connect to MongoDB. " . $e->getMessage());
+            throw new Exception("Database connection error. Please try again later. If the issue persists, contact support.");
+        }
     }
+    return $mongoClient;
 }
 
 /**
@@ -50,19 +54,47 @@ if (!isset($mongoDb)) {
  * @param string $collectionName The name of the MongoDB collection (e.g., 'users', 'transactions').
  * @return MongoDB\Collection
  */
-function getCollection(string $collectionName) {
-    global $mongoDb;
-    if (!isset($mongoDb)) {
-        // This indicates a critical error where the global $mongoDb object is not set.
-        // The connection logic above should prevent this, but it's a safeguard.
-        error_log("MongoDB connection not established when trying to get collection: " . $collectionName);
-        throw new Exception("Database connection not initialized.");
+function getCollection(string $collectionName): MongoDB\Collection
+{
+    $client = getMongoDBClient(); // Get the client from the shared instance
+
+    // Ensure the MONGODB_DB_NAME constant is defined
+    if (!defined('MONGODB_DB_NAME') || !MONGODB_DB_NAME) {
+        error_log("FATAL ERROR: MONGODB_DB_NAME not found. Ensure it's defined in Config.php and .env is loaded correctly.");
+        throw new Exception("Database configuration error. Please contact support.");
     }
-    return $mongoDb->$collectionName;
+
+    return $client->selectDatabase(MONGODB_DB_NAME)->selectCollection($collectionName);
 }
 
-// --- Helper Functions for Email (PHPMailer - NO DATABASE DEPENDENCY) ---
+/**
+ * Hides parts of an email address for privacy, showing only the first few characters
+ * and the domain.
+ * Example: "example@email.com" becomes "ex*****@email.com"
+ *
+ * @param string $email The email address to partially hide.
+ * @return string The partially hidden email address.
+ */
+function hideEmailPartially(string $email): string {
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return $email; // Return as is if not a valid email format
+    }
 
+    $parts = explode('@', $email);
+    $name = $parts[0];
+    $domain = $parts[1];
+
+    $nameLength = strlen($name);
+    if ($nameLength <= 3) {
+        // If name is 3 characters or less, show first char and mask the rest
+        return substr($name, 0, 1) . str_repeat('*', $nameLength - 1) . '@' . $domain;
+    } else {
+        // Show first 2 characters, mask the middle, show last char of the name part
+        return substr($name, 0, 2) . str_repeat('*', $nameLength - 3) . substr($name, -1) . '@' . $domain;
+    }
+}
+
+// --- Helper Functions for Email (PHPMailer) ---
 /**
  * Sends an email using PHPMailer.
  * Requires SMTP constants to be defined in Config.php (SMTP_HOST, SMTP_USERNAME, etc.).
@@ -109,14 +141,15 @@ function sendEmail(string $to, string $subject, string $body, ?string $altBody =
         $mail->send();
         error_log("Email sent successfully to $to. Subject: $subject");
         return true;
-    } catch (Exception $e) {
+    } catch (PHPMailerException $e) { // Use the aliased exception here
         // Log the error for debugging. These errors are critical for email delivery.
         error_log("Email could not be sent to $to. Mailer Error: {$mail->ErrorInfo}. Exception: {$e->getMessage()}");
         return false;
     }
 }
 
-// --- Helper Functions for Currency and Financial Math (bcmath - NO DATABASE DEPENDENCY) ---
+
+// --- Helper Functions for Currency and Financial Math (bcmath) ---
 
 /**
  * Returns the currency symbol for a given currency code.
@@ -186,7 +219,7 @@ function bcadd_precision(string $num1, string $num2, int $precision = 2): string
  *
  * @param string|null $data The input string to sanitize.
  * @return string The sanitized string.
- */
+*/
 function sanitize_input(?string $data): string {
     if ($data === null) {
         return '';
@@ -196,6 +229,9 @@ function sanitize_input(?string $data): string {
     $data = htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
     return $data;
 }
+
+
+// --- Database-dependent Helper Functions ---
 
 /**
  * Fetches user details (specifically email and full_name) from the database.
@@ -209,8 +245,17 @@ function get_user_details($user_id): ?array {
         // If the user_id is a string, convert it to ObjectId for lookup
         $filterId = (is_string($user_id) && strlen($user_id) === 24 && ctype_xdigit($user_id)) ? new ObjectId($user_id) : $user_id;
 
-        $user = $usersCollection->findOne(['_id' => $filterId], ['projection' => ['email' => 1, 'full_name' => 1]]);
-        return $user ? $user->toArray() : null;
+        $user = $usersCollection->findOne(['_id' => $filterId], ['projection' => ['email' => 1, 'full_name' => 1, 'last_name' => 1, 'first_name' => 1]]); // Added first_name and last_name
+        
+        if ($user) {
+            $userArray = $user->toArray();
+            // Ensure 'full_name' exists, create if not
+            if (!isset($userArray['full_name'])) {
+                $userArray['full_name'] = trim(($userArray['first_name'] ?? '') . ' ' . ($userArray['last_name'] ?? ''));
+            }
+            return $userArray;
+        }
+        return null;
     } catch (MongoDBDriverException $e) {
         error_log("Error fetching user details: " . $e->getMessage());
         return null;
@@ -228,7 +273,7 @@ function get_user_details($user_id): ?array {
  * @return array An associative array with 'success' (bool) and 'message' (string), and 'transaction_details' (array|null).
  */
 function complete_pending_transfer($transaction_id): array {
-    global $mongoClient; // Access the MongoDB Client for transactions
+    $client = getMongoDBClient(); // Get the client via the revised function
     $transactionsCollection = getCollection('transactions');
     $accountsCollection = getCollection('accounts');
 
@@ -245,7 +290,7 @@ function complete_pending_transfer($transaction_id): array {
     // Start a session for the transaction (requires a replica set or sharded cluster)
     // For local development on a standalone server, transactions might not be supported.
     // Ensure your MongoDB instance is a replica set for this to work.
-    $session = $mongoClient->startSession();
+    $session = $client->startSession(); // Use the client from getMongoDBClient()
     $session->startTransaction();
 
     try {
@@ -262,6 +307,7 @@ function complete_pending_transfer($transaction_id): array {
         $transaction_details = $transaction->toArray(); // Store for return
 
         // Determine the actual amount and currency to credit for the recipient (or for external reporting)
+        // Convert to string for bcmath operations, but fetch as Decimal128 if stored as such
         $credit_amount_str = (string)($transaction_details['converted_amount'] ?? $transaction_details['amount']);
         $credit_currency = (string)($transaction_details['converted_currency'] ?? $transaction_details['currency']);
 
@@ -291,12 +337,15 @@ function complete_pending_transfer($transaction_id): array {
             }
 
             $recipient_account_id = $recipient_account['_id']; // MongoDB _id
-            $new_recipient_balance_str = bcadd_precision((string)$recipient_account['balance'], $credit_amount_str, 2);
+            // Get current balance as string for bcmath, then convert result back to Decimal128
+            $current_recipient_balance_str = (string)$recipient_account['balance'];
+            $new_recipient_balance_str = bcadd_precision($current_recipient_balance_str, $credit_amount_str, 2);
 
             // Credit recipient's account
             $updateResult = $accountsCollection->updateOne(
                 ['_id' => $recipient_account_id],
-                ['$set' => ['balance' => $new_recipient_balance_str]],
+                // Store as Decimal128
+                ['$set' => ['balance' => new Decimal128($new_recipient_balance_str)]],
                 ['session' => $session] // Pass session for transactional write
             );
 
@@ -309,32 +358,32 @@ function complete_pending_transfer($transaction_id): array {
             $recipient_tx_type = (strpos($transaction_details['transaction_type'], 'SELF') !== false) ? 'INTERNAL_SELF_TRANSFER_IN' : 'INTERNAL_TRANSFER_IN';
 
             $recipientTransactionData = [
-                'user_id'                      => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
-                'account_id'                   => $recipient_account_id, // This should be ObjectId
-                'amount'                       => (float)$credit_amount_str, // Store as float or Decimal128
-                'currency'                     => $credit_currency,
-                'transaction_type'             => $recipient_tx_type,
-                'description'                  => $transaction_details['description'],
-                'status'                       => 'COMPLETED',
-                'initiated_at'                 => $transaction_details['initiated_at'], // Use original initiated_at
-                'transaction_reference'        => $transaction_details['transaction_reference'] . '_IN', // Unique ref for incoming
-                'recipient_name'               => $transaction_details['recipient_name'],
-                'recipient_account_number'     => $transaction_details['recipient_account_number'],
-                'recipient_iban'               => $transaction_details['recipient_iban'] ?? null,
-                'recipient_swift_bic'          => $transaction_details['recipient_swift_bic'] ?? null,
-                'recipient_sort_code'          => $transaction_details['recipient_sort_code'] ?? null,
+                'user_id'                       => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
+                'account_id'                    => $recipient_account_id, // This should be ObjectId
+                'amount'                        => new Decimal128($credit_amount_str), // Store as Decimal128
+                'currency'                      => $credit_currency,
+                'transaction_type'              => $recipient_tx_type,
+                'description'                   => $transaction_details['description'],
+                'status'                        => 'COMPLETED',
+                'initiated_at'                  => $transaction_details['initiated_at'], // Use original initiated_at
+                'transaction_reference'         => $transaction_details['transaction_reference'] . '_IN', // Unique ref for incoming
+                'recipient_name'                => $transaction_details['recipient_name'],
+                'recipient_account_number'      => $transaction_details['recipient_account_number'],
+                'recipient_iban'                => $transaction_details['recipient_iban'] ?? null,
+                'recipient_swift_bic'           => $transaction_details['recipient_swift_bic'] ?? null,
+                'recipient_sort_code'           => $transaction_details['recipient_sort_code'] ?? null,
                 'recipient_external_account_number' => $transaction_details['recipient_external_account_number'] ?? null,
-                'recipient_user_id'            => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
-                'recipient_bank_name'          => $transaction_details['recipient_bank_name'] ?? null,
-                'sender_name'                  => $transaction_details['sender_name'],
-                'sender_account_number'        => $transaction_details['sender_account_number'],
-                'sender_user_id'               => (is_string($transaction_details['sender_user_id']) && strlen($transaction_details['sender_user_id']) === 24 && ctype_xdigit($transaction_details['sender_user_id'])) ? new ObjectId($transaction_details['sender_user_id']) : $transaction_details['sender_user_id'],
-                'converted_amount'             => (float)$credit_amount_str,
-                'converted_currency'           => $credit_currency,
-                'exchange_rate'                => (float)($transaction_details['exchange_rate'] ?? 1.0),
-                'external_bank_details'        => $transaction_details['external_bank_details'] ?? null,
-                'transaction_date'             => new UTCDateTime(strtotime(date('Y-m-d')) * 1000), // Date without time
-                'completed_at'                 => new UTCDateTime(), // Current UTC timestamp
+                'recipient_user_id'             => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
+                'recipient_bank_name'           => $transaction_details['recipient_bank_name'] ?? null,
+                'sender_name'                   => $transaction_details['sender_name'],
+                'sender_account_number'         => $transaction_details['sender_account_number'],
+                'sender_user_id'                => (is_string($transaction_details['sender_user_id']) && strlen($transaction_details['sender_user_id']) === 24 && ctype_xdigit($transaction_details['sender_user_id'])) ? new ObjectId($transaction_details['sender_user_id']) : $transaction_details['sender_user_id'],
+                'converted_amount'              => new Decimal128($credit_amount_str), // Store as Decimal128
+                'converted_currency'            => $credit_currency,
+                'exchange_rate'                 => new Decimal128((string)($transaction_details['exchange_rate'] ?? 1.0)), // Store as Decimal128
+                'external_bank_details'         => $transaction_details['external_bank_details'] ?? null,
+                'transaction_date'              => new UTCDateTime(strtotime('today') * 1000), // Date without time
+                'completed_at'                  => new UTCDateTime(), // Current UTC timestamp
             ];
 
             $insertResult = $transactionsCollection->insertOne($recipientTransactionData, ['session' => $session]);
@@ -383,7 +432,7 @@ function complete_pending_transfer($transaction_id): array {
                         </tr>
                         <tr>
                             <td style="padding: 30px;">
-                                <p style="margin-bottom: 15px;">Dear ' . htmlspecialchars($sender_user['full_name']) . ',</p>
+                                <p style="margin-bottom: 15px;">Dear ' . htmlspecialchars($sender_user['full_name'] ?? ($sender_user['first_name'] . ' ' . $sender_user['last_name'])) . ',</p>
                                 <p style="margin-bottom: 15px;">Your transaction has been <strong style="color: #28a745;">successfully completed</strong>.</p>
                                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                                     <tr>
@@ -392,7 +441,7 @@ function complete_pending_transfer($transaction_id): array {
                                     </tr>
                                     <tr>
                                         <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #555;"><strong>Amount:</strong></td>
-                                        <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">' . get_currency_symbol($transaction_details['currency']) . number_format((float)$transaction_details['amount'], 2) . '</td>
+                                        <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">' . get_currency_symbol((string)$transaction_details['currency']) . number_format((float)(string)$transaction_details['amount'], 2) . '</td>
                                     </tr>
                                     <tr>
                                         <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #555;"><strong>Recipient:</strong></td>
@@ -439,7 +488,7 @@ function complete_pending_transfer($transaction_id): array {
                             </tr>
                             <tr>
                                 <td style="padding: 30px;">
-                                    <p style="margin-bottom: 15px;">Dear ' . htmlspecialchars($recipient_user['full_name']) . ',</p>
+                                    <p style="margin-bottom: 15px;">Dear ' . htmlspecialchars($recipient_user['full_name'] ?? ($recipient_user['first_name'] . ' ' . $recipient_user['last_name'])) . ',</p>
                                     <p style="margin-bottom: 15px;">You have received funds!</p>
                                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                                         <tr>
@@ -448,7 +497,7 @@ function complete_pending_transfer($transaction_id): array {
                                         </tr>
                                         <tr>
                                             <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #555;"><strong>Amount Received:</strong></td>
-                                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;"><strong style="color: #28a745;">' . get_currency_symbol($credit_currency) . number_format((float)$credit_amount_str, 2) . '</strong></td>
+                                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;"><strong style="color: #28a745;">' . get_currency_symbol((string)$credit_currency) . number_format((float)(string)$credit_amount_str, 2) . '</strong></td>
                                         </tr>
                                         <tr>
                                             <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #555;"><strong>From:</strong></td>
@@ -463,38 +512,38 @@ function complete_pending_transfer($transaction_id): array {
                                             <td style="padding: 8px 0; text-align: right;"><strong style="color: #28a745;">COMPLETED</strong></td>
                                         </tr>
                                     </table>
-                                        <p style="margin-bottom: 15px;">Your account balance has been updated accordingly.</p>
-                                        <p style="margin-top: 20px; font-size: 12px; color: #777;">Thank you for banking with ' . htmlspecialchars(SMTP_FROM_NAME) . '.</p>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 15px; text-align: center; font-size: 12px; color: #999; background-color: #f1f1f1; border-top: 1px solid #eee;">
-                                        &copy; ' . date("Y") . ' ' . htmlspecialchars(SMTP_FROM_NAME) . '. All rights reserved.
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-                    ';
-                    sendEmail($recipient_user['email'], $subject, $body);
-                } else {
-                    error_log("Could not send completion email for transaction ID {$transactionObjectId}: Recipient user details (email) not found.");
-                }
+                                    <p style="margin-bottom: 15px;">Your account balance has been updated accordingly.</p>
+                                    <p style="margin-top: 20px; font-size: 12px; color: #777;">Thank you for banking with ' . htmlspecialchars(SMTP_FROM_NAME) . '.</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 15px; text-align: center; font-size: 12px; color: #999; background-color: #f1f1f1; border-top: 1px solid #eee;">
+                                    &copy; ' . date("Y") . ' ' . htmlspecialchars(SMTP_FROM_NAME) . '. All rights reserved.
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                ';
+                sendEmail($recipient_user['email'], $subject, $body);
+            } else {
+                error_log("Could not send completion email for transaction ID {$transactionObjectId}: Recipient user details (email) not found.");
             }
-
-            return ['success' => true, 'message' => "Transaction {$transaction_details['transaction_reference']} (ID: {$transactionObjectId}) completed successfully.", 'transaction_details' => $transaction_details];
-
-        } catch (Exception $e) {
-            // Rollback the transaction on any error
-            if ($session->isInTransaction()) {
-                $session->abortTransaction();
-            }
-            // Log the error for debugging
-            error_log("Failed to complete transaction ID {$transactionObjectId}: " . $e->getMessage());
-            return ['success' => false, 'message' => "Transaction completion failed: " . $e->getMessage(), 'transaction_details' => null];
-        } finally {
-            $session->endSession(); // Always end the session
         }
+
+        return ['success' => true, 'message' => "Transaction {$transaction_details['transaction_reference']} (ID: {$transactionObjectId}) completed successfully.", 'transaction_details' => $transaction_details];
+
+    } catch (Exception $e) {
+        // Rollback the transaction on any error
+        if ($session->isInTransaction()) {
+            $session->abortTransaction();
+        }
+        // Log the error for debugging
+        error_log("Failed to complete transaction ID {$transactionObjectId}: " . $e->getMessage());
+        return ['success' => false, 'message' => "Transaction completion failed: " . $e->getMessage(), 'transaction_details' => null];
+    } finally {
+        $session->endSession(); // Always end the session
     }
+}
 
 /**
  * Rejects a pending transfer, crediting the original amount back to the sender's account.
@@ -505,7 +554,7 @@ function complete_pending_transfer($transaction_id): array {
  * @return array An associative array with 'success' (bool) and 'message' (string), and 'transaction_details' (array|null).
  */
 function reject_pending_transfer($transaction_id, string $reason = 'Rejected by Admin'): array {
-    global $mongoClient; // Access the MongoDB Client for transactions
+    $client = getMongoDBClient(); // Use the client from the revised function
     $transactionsCollection = getCollection('transactions');
     $accountsCollection = getCollection('accounts');
 
@@ -519,99 +568,100 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
         return ['success' => false, 'message' => "Invalid transaction ID format.", 'transaction_details' => null];
     }
 
-    // Start a session for the transaction
-    $session = $mongoClient->startSession();
+    $session = $client->startSession();
     $session->startTransaction();
 
     try {
         // 1. Fetch the pending transaction details
         $transaction = $transactionsCollection->findOne(
             ['_id' => $transactionObjectId, 'status' => 'PENDING'],
-            ['session' => $session] // Pass session for transactional read
+            ['session' => $session]
         );
 
         if (!$transaction) {
             $session->abortTransaction();
-            return ['success' => false, 'message' => "Pending transaction not found or already processed for rejection.", 'transaction_details' => null];
+            return ['success' => false, 'message' => "Pending transaction not found or already processed.", 'transaction_details' => null];
         }
-        $transaction_details = $transaction->toArray(); // Store for return
+        $transaction_details = $transaction->toArray();
 
-        // 2. Credit the amount back to the sender's account
-        // Assuming sender_user_id and sender_account_id are stored in transaction document
+        // 2. Credit the original amount back to the sender's account
+        // Ensure account_id and sender_user_id are ObjectId types for queries
+        $sender_account_id = (is_string($transaction_details['account_id']) && strlen($transaction_details['account_id']) === 24 && ctype_xdigit($transaction_details['account_id'])) ? new ObjectId($transaction_details['account_id']) : $transaction_details['account_id'];
+        $sender_user_id_obj = (is_string($transaction_details['sender_user_id']) && strlen($transaction_details['sender_user_id']) === 24 && ctype_xdigit($transaction_details['sender_user_id'])) ? new ObjectId($transaction_details['sender_user_id']) : $transaction_details['sender_user_id'];
+
+
         $sender_account = $accountsCollection->findOne(
-            [
-                'user_id' => (is_string($transaction_details['sender_user_id']) && strlen($transaction_details['sender_user_id']) === 24 && ctype_xdigit($transaction_details['sender_user_id'])) ? new ObjectId($transaction_details['sender_user_id']) : $transaction_details['sender_user_id'],
-                'account_number' => $transaction_details['sender_account_number'],
-                'status' => 'active'
-            ],
-            ['session' => $session] // Pass session for transactional read
+            ['_id' => $sender_account_id, 'user_id' => $sender_user_id_obj],
+            ['session' => $session]
         );
 
         if (!$sender_account) {
             $session->abortTransaction();
-            throw new Exception("Sender account not found or is inactive for transaction {$transactionObjectId}. Funds cannot be returned.");
+            throw new Exception("Sender account not found or does not belong to the sender for transaction {$transactionObjectId}.");
         }
 
-        // CRITICAL CHECK: Ensure sender's account currency matches the original transaction currency for refund
-        if (strtoupper($sender_account['currency']) !== strtoupper($transaction_details['currency'])) {
+        // Use the original amount and currency from the transaction for the refund
+        // Convert to string for bcmath operations, but fetch as Decimal128 if stored as such
+        $refund_amount_str = (string)$transaction_details['amount'];
+        $refund_currency = (string)$transaction_details['currency'];
+
+        // CRITICAL CHECK: Ensure sender's account currency matches the transaction's original currency for refund
+        if (strtoupper($sender_account['currency']) !== strtoupper($refund_currency)) {
             $session->abortTransaction();
-            throw new Exception("Currency mismatch for refund during rejection. Expected " . $transaction_details['currency'] . ", got " . ($sender_account['currency'] ?? 'NULL/EMPTY') . " for transaction {$transactionObjectId}.");
+            throw new Exception("Currency mismatch for refund. Expected " . $refund_currency . ", got " . $sender_account['currency'] . " for transaction {$transactionObjectId}.");
         }
-
-        $new_sender_balance_str = bcadd_precision((string)$sender_account['balance'], (string)$transaction_details['amount'], 2);
+        
+        // Get current balance as string for bcmath, then convert result back to Decimal128
+        $current_sender_balance_str = (string)$sender_account['balance'];
+        $new_sender_balance_str = bcadd_precision($current_sender_balance_str, $refund_amount_str, 2);
 
         $updateResult = $accountsCollection->updateOne(
-            ['_id' => $sender_account['_id']], // Use sender account's _id for update
-            ['$set' => ['balance' => $new_sender_balance_str]],
-            ['session' => $session] // Pass session for transactional write
+            ['_id' => $sender_account_id],
+            // Store as Decimal128
+            ['$set' => ['balance' => new Decimal128($new_sender_balance_str)]],
+            ['session' => $session]
         );
 
         if ($updateResult->getModifiedCount() === 0) {
             $session->abortTransaction();
-            throw new Exception("Sender account update failed during rejection for transaction {$transactionObjectId}.");
+            throw new Exception("Failed to credit sender account during rejection for transaction {$transactionObjectId}. Possible concurrency issue or invalid account ID.");
         }
 
-        // 3. Update the status of the original pending transaction to 'DECLINED'
+        // 3. Update the status of the original pending transaction to 'REJECTED'
         $updateOriginalTxResult = $transactionsCollection->updateOne(
             ['_id' => $transactionObjectId, 'status' => 'PENDING'],
-            ['$set' => ['status' => 'DECLINED', 'HometownBank_comment' => $reason, 'completed_at' => new UTCDateTime()]],
-            ['session' => $session] // Pass session for transactional write
+            ['$set' => ['status' => 'REJECTED', 'rejected_at' => new UTCDateTime(), 'rejection_reason' => $reason]],
+            ['session' => $session]
         );
 
         if ($updateOriginalTxResult->getModifiedCount() === 0) {
             $session->abortTransaction();
-            throw new Exception("Transaction status update failed for transaction {$transactionObjectId}. Transaction might no longer be PENDING or ID is incorrect.");
+            throw new Exception("Transaction status update to REJECTED failed for transaction {$transactionObjectId}. Transaction might no longer be PENDING or ID is incorrect.");
         }
 
         // If all operations succeed, commit the transaction
         $session->commitTransaction();
 
-        // --- Email Notification for Sender (Transaction Rejected) ---
-        // Assuming get_user_details can now handle MongoDB _id for users if updated.
+        // --- Email Notification for Sender (Rejection) ---
         $sender_user = get_user_details($transaction_details['sender_user_id']);
-
         if ($sender_user && $sender_user['email']) {
             $subject = "Transaction Rejected - Reference: {$transaction_details['transaction_reference']}";
             $body = '
                 <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; background-color: #f8f8f8; padding: 20px;">
                     <table style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
                         <tr>
-                            <td style="padding: 20px; text-align: center; background-color: #dc3545; color: #ffffff;">
+                            <td style="padding: 20px; text-align: center; background-color: #cc0000; color: #ffffff;">
                                 <h2 style="margin: 0; color: #ffffff; font-weight: normal;">' . htmlspecialchars(SMTP_FROM_NAME) . ' Notification</h2>
                             </td>
                         </tr>
                         <tr>
                             <td style="padding: 30px;">
-                                <p style="margin-bottom: 15px;">Dear ' . htmlspecialchars($sender_user['full_name']) . ',</p>
-                                <p style="margin-bottom: 15px;">Your transaction has been <strong style="color: #dc3545;">rejected</strong> and the funds have been returned to your account.</p>
+                                <p style="margin-bottom: 15px;">Dear ' . htmlspecialchars($sender_user['full_name'] ?? ($sender_user['first_name'] . ' ' . $sender_user['last_name'])) . ',</p>
+                                <p style="margin-bottom: 15px;">Your transaction with reference <strong style="color: #cc0000;">' . htmlspecialchars($transaction_details['transaction_reference']) . '</strong> has been <strong style="color: #cc0000;">rejected</strong>.</p>
                                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                                     <tr>
-                                        <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #555;"><strong>Transaction Reference:</strong></td>
-                                        <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">' . htmlspecialchars($transaction_details['transaction_reference']) . '</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #555;"><strong>Amount Refunded:</strong></td>
-                                        <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;"><strong style="color: #28a745;">' . get_currency_symbol($transaction_details['currency']) . number_format((float)$transaction_details['amount'], 2) . '</strong></td>
+                                        <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #555;"><strong>Amount:</strong></td>
+                                        <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">' . get_currency_symbol((string)$transaction_details['currency']) . number_format((float)(string)$transaction_details['amount'], 2) . '</td>
                                     </tr>
                                     <tr>
                                         <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #555;"><strong>Recipient:</strong></td>
@@ -622,11 +672,12 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
                                         <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">' . htmlspecialchars($reason) . '</td>
                                     </tr>
                                     <tr>
-                                        <td style="padding: 8px 0; color: #555;"><strong>Date & Time:</strong></td>
-                                        <td style="padding: 8px 0; text-align: right;">' . date('Y-m-d H:i:s') . '</td>
+                                        <td style="padding: 8px 0; color: #555;"><strong>Status:</strong></td>
+                                        <td style="padding: 8px 0; text-align: right;"><strong style="color: #cc0000;">REJECTED</strong></td>
                                     </tr>
                                 </table>
-                                <p style="margin-bottom: 15px;">If you have any questions, please contact us.</p>
+                                <p style="margin-bottom: 15px;">The amount of ' . get_currency_symbol((string)$transaction_details['currency']) . number_format((float)(string)$transaction_details['amount'], 2) . ' has been credited back to your account.</p>
+                                <p style="margin-top: 20px; font-size: 12px; color: #777;">If you have any questions, please contact us.</p>
                                 <p style="margin-top: 20px; font-size: 12px; color: #777;">Thank you for banking with ' . htmlspecialchars(SMTP_FROM_NAME) . '.</p>
                             </td>
                         </tr>
@@ -643,12 +694,14 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
             error_log("Could not send rejection email for transaction ID {$transactionObjectId}: Sender user details (email) not found.");
         }
 
-        return ['success' => true, 'message' => "Transaction {$transaction_details['transaction_reference']} (ID: {$transactionObjectId}) successfully declined. Funds returned to sender.", 'transaction_details' => $transaction_details];
+        return ['success' => true, 'message' => "Transaction {$transaction_details['transaction_reference']} (ID: {$transactionObjectId}) rejected successfully. Amount refunded to sender.", 'transaction_details' => $transaction_details];
 
     } catch (Exception $e) {
+        // Rollback the transaction on any error
         if ($session->isInTransaction()) {
             $session->abortTransaction();
         }
+        // Log the error for debugging
         error_log("Failed to reject transaction ID {$transactionObjectId}: " . $e->getMessage());
         return ['success' => false, 'message' => "Transaction rejection failed: " . $e->getMessage(), 'transaction_details' => null];
     } finally {

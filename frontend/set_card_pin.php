@@ -1,0 +1,246 @@
+<?php
+session_start();
+require_once '../../Config.php'; // Adjust path
+require_once '../../functions.php';
+use MongoDB\Client;
+use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\UTCDateTime;
+
+// Check if the user is NOT logged in
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../index.php');
+    exit;
+}
+
+$message = '';
+$message_type = '';
+$card_id = $_GET['card_id'] ?? ''; // Get card ID from URL
+
+// Establish MongoDB connection
+$mongoClient = null;
+try {
+    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);
+    $database = $client->selectDatabase(MONGODB_DB_NAME);
+    $bankCardsCollection = $database->selectCollection('bank_cards');
+} catch (Exception $e) {
+    error_log("ERROR: Could not connect to MongoDB. " . $e->getMessage());
+    die("Database connection error. Please try again later.");
+}
+
+$card = null;
+$userObjectId = new ObjectId($_SESSION['user_id']); // User's ObjectId
+
+try {
+    if (!empty($card_id)) {
+        $cardObjectId = new ObjectId($card_id);
+        // Fetch the card, ensuring it belongs to the logged-in user and PIN is not set
+        $card = $bankCardsCollection->findOne([
+            '_id' => $cardObjectId,
+            'user_id' => $userObjectId, // Crucial for security!
+            'pin' => null // Only allow setting PIN if it's currently null
+        ]);
+
+        if (!$card) {
+            $message = 'Card not found, or PIN has already been set, or it does not belong to your account.';
+            $message_type = 'error';
+            // Redirect or prevent form display if card is invalid/PIN set
+            // header('Location: my_cards.php?message=' . urlencode($message) . '&type=' . urlencode($message_type));
+            // exit;
+        }
+    } else {
+        $message = 'No card ID provided.';
+        $message_type = 'error';
+    }
+} catch (MongoDB\Driver\Exception\InvalidArgumentException $e) {
+    $message = 'Invalid card ID format.';
+    $message_type = 'error';
+} catch (Exception $e) {
+    error_log("Error fetching card: " . $e->getMessage());
+    $message = 'Error fetching card details.';
+    $message_type = 'error';
+}
+
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_pin'])) {
+    if (!$card) {
+        $message = 'Invalid card operation. Please go back to My Cards.';
+        $message_type = 'error';
+    } else {
+        $new_pin = trim($_POST['new_pin'] ?? '');
+        $confirm_pin = trim($_POST['confirm_pin'] ?? '');
+
+        if (empty($new_pin) || empty($confirm_pin)) {
+            $message = 'Please enter and confirm your new PIN.';
+            $message_type = 'error';
+        } elseif ($new_pin !== $confirm_pin) {
+            $message = 'PINs do not match.';
+            $message_type = 'error';
+        } elseif (!preg_match('/^\d{4}$/', $new_pin)) { // Assuming 4-digit PIN
+            $message = 'PIN must be exactly 4 digits.';
+            $message_type = 'error';
+        } else {
+            try {
+                // Hash the PIN before storing!
+                $hashed_pin = password_hash($new_pin, PASSWORD_DEFAULT);
+
+                $updateResult = $bankCardsCollection->updateOne(
+                    ['_id' => $cardObjectId, 'user_id' => $userObjectId], // Double-check ownership
+                    ['$set' => ['pin' => $hashed_pin, 'updated_at' => new UTCDateTime(time() * 1000)]]
+                );
+
+                if ($updateResult->getModifiedCount() === 1) {
+                    $message = 'Your card PIN has been set successfully!';
+                    $message_type = 'success';
+                    // Redirect to my_cards page after successful PIN set
+                    header('Location: my_cards.php?message=' . urlencode($message) . '&type=' . urlencode($message_type));
+                    exit;
+                } else {
+                    $message = 'Failed to set PIN. It might already be set or an error occurred.';
+                    $message_type = 'error';
+                }
+            } catch (Exception $e) {
+                error_log("Error setting card PIN: " . $e->getMessage());
+                $message = 'Database error while setting PIN: ' . $e->getMessage();
+                $message_type = 'error';
+            }
+        }
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set Card PIN - HomeTown Bank</title>
+    <link rel="stylesheet" href="../style.css"> <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Basic styling for the PIN form */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .user-header { /* Example user header */
+            background-color: #004494; /* Darker blue */
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            width: 100%;
+        }
+        .user-header .logo { height: 40px; }
+        .user-header h2 { margin: 0; font-size: 1.8em; }
+        .user-header .logout-button {
+            background-color: #ffcc29;
+            color: #004494;
+            padding: 8px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+        .user-header .logout-button:hover { background-color: #e0b821; }
+
+        .dashboard-content {
+            padding: 30px;
+            width: 100%;
+            max-width: 600px; /* Smaller max-width for PIN form */
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+            box-sizing: border-box;
+        }
+        .section-header {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .form-standard .form-group {
+            margin-bottom: 15px;
+        }
+        .form-standard label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        .form-standard input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+        .form-standard button.button-primary {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+        .form-standard button.button-primary:hover {
+            background-color: #0056b3;
+        }
+        .message.success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: 10px; border-radius: 5px; margin-bottom: 15px; }
+        .message.error { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; padding: 10px; border-radius: 5px; margin-bottom: 15px; }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #004494;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+        .back-link:hover {
+            color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="user-dashboard-container">
+        <div class="user-header">
+            <img src="../../images/logo.png" alt="HomeTown Bank Logo" class="logo">
+            <h2>Set Card PIN</h2>
+            <a href="../logout.php" class="logout-button">Logout</a>
+        </div>
+
+        <div class="dashboard-content">
+            <h2 class="section-header">Set Your Bank Card PIN</h2>
+            <?php if (!empty($message)): ?>
+                <p class="message <?php echo $message_type; ?>"><?php echo htmlspecialchars($message); ?></p>
+            <?php endif; ?>
+
+            <?php if ($card): // Only show form if a valid card is found and PIN is null ?>
+                <form action="set_card_pin.php?card_id=<?php echo htmlspecialchars($card_id); ?>" method="POST" class="form-standard">
+                    <input type="hidden" name="set_pin" value="1">
+                    <div class="form-group">
+                        <label for="new_pin">New 4-Digit PIN</label>
+                        <input type="password" id="new_pin" name="new_pin" pattern="\d{4}" maxlength="4" required title="PIN must be exactly 4 digits" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm_pin">Confirm New PIN</label>
+                        <input type="password" id="confirm_pin" name="confirm_pin" pattern="\d{4}" maxlength="4" required title="PIN must be exactly 4 digits" autocomplete="off">
+                    </div>
+                    <button type="submit" class="button-primary">Set PIN</button>
+                </form>
+            <?php endif; ?>
+            <p><a href="my_cards.php" class="back-link">&larr; Back to My Cards</a></p>
+        </div>
+    </div>
+</body>
+</html>

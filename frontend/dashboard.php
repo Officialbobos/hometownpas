@@ -4,13 +4,23 @@
 
 session_start();
 
-// Assuming Config.php and functions.php are in the parent directory of frontend/
-require_once '../Config.php';
-require_once '../functions.php'; // For sanitize_input, and potentially other utilities
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
-// Include the MongoDB PHP Library (if not autoloaded)
-// You might need to adjust this path based on how you installed the driver
-require_once '../vendor/autoload.php'; // Assuming you use Composer for MongoDB driver
+// Load Composer's autoloader FIRST.
+// This is crucial because Dotenv and other libraries are loaded through it.
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// Load .env variables. This must happen AFTER autoload.php and BEFORE Config.php if Config.php uses $_ENV.
+$dotenv = Dotenv\Dotenv::createImmutable(dirname(__DIR__)); // Go up two levels from frontend/ to phpfile-main/
+$dotenv->load();
+
+// Now load your Config.php and functions.php files.
+// Config.php can now safely access $_ENV variables if they're defined in your .env file.
+require_once __DIR__ . '/../Config.php';
+require_once __DIR__ . '/../functions.php'; // For sanitize_input, and potentially other utilities
+
 
 // Check if the user is logged in. If not, redirect to login page.
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
@@ -35,10 +45,9 @@ if (empty($full_name)) {
 $mongoClient = null;
 try {
     // Connect to MongoDB
-    // Make sure your MongoDB connection string is correctly defined in Config.php
-    // Example in Config.php: define('MONGO_URI', 'mongodb://localhost:27017');
-    $mongoClient = new MongoDB\Client(MONGO_URI);
-    $mongoDb = $mongoClient->selectDatabase(DB_NAME); // DB_NAME should be your MongoDB database name
+    // *** CORRECTED: Use the constant names defined in Config.php ***
+    $mongoClient = new MongoDB\Client(MONGODB_CONNECTION_URI); // Use MONGODB_CONNECTION_URI
+    $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME); // Use MONGODB_DB_NAME
 
     $accountsCollection = $mongoDb->accounts;
     $transactionsCollection = $mongoDb->transactions;
@@ -57,9 +66,9 @@ if ($mongoClient) {
     try {
         // MongoDB stores _id as ObjectId by default. If your user_id is an integer or string, adjust the query.
         // Assuming user_id in accounts collection matches $_SESSION['user_id'] directly (e.g., an integer or string)
-        $filter = ['user_id' => (int)$user_id]; // Cast to int if user_id is stored as int in MongoDB
-        // If user_id is stored as a string: $filter = ['user_id' => (string)$user_id];
-        // If user_id is stored as a MongoDB ObjectId: $filter = ['user_id' => new MongoDB\BSON\ObjectId($user_id)];
+        // You mentioned the _id was '6881f2fa549401e932055a2d' in the error stack, which is an ObjectId.
+        // So, use new MongoDB\BSON\ObjectId($user_id);
+        $filter = ['user_id' => new MongoDB\BSON\ObjectId($user_id)];
 
         $accounts_cursor = $accountsCollection->find($filter);
         foreach ($accounts_cursor as $account_data) {
@@ -75,7 +84,8 @@ if ($mongoClient) {
     // 2. Fetch recent transactions for the user from MongoDB
     try {
         // Query for transactions where user_id matches
-        $filter_transactions = ['user_id' => (int)$user_id]; // Cast to int if user_id is stored as int in MongoDB
+        // Also use ObjectId for user_id in transactions if consistent with users collection
+        $filter_transactions = ['user_id' => new MongoDB\BSON\ObjectId($user_id)];
         // Sort by 'initiated_at' in descending order and limit to 10
         $options_transactions = [
             'sort' => ['initiated_at' => -1],
@@ -104,7 +114,7 @@ if ($mongoClient) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WestStar Credit Union - Dashboard</title>
+    <title>HomeTown Bank Pa - Dashboard</title>
     <link rel="stylesheet" href="dashboard.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>

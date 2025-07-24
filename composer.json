@@ -2,7 +2,10 @@
     "require": {
         "php": "^8.3",
         "phpmailer/phpmailer": "*",
-        "mongodb/mongodb": "^2.1"
+        "mongodb/mongodb": "^2.1",
+        "vlucas/phpdotenv": "^5.0",
+        "spomky-labs/otphp": "^11.3",
+        "bacon/bacon-qr-code": "^3.0"  
     },
     "config": {
         "platform": {
