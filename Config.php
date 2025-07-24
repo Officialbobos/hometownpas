@@ -1,4 +1,10 @@
 <?php
+echo "CONFIG_LOADED_V_FINAL"; // <-- ADD THIS LINE
+
+// C:\xampp_lite_8_4\www\phpfile-main\Config.php
+
+// IMPORTANT: This file is the SINGLE SOURCE OF TRUTH for loading .env and defining constants.
+// ... rest of your Config.php content
 // C:\xampp_lite_8_4\www\phpfile-main\Config.php
 
 // IMPORTANT: This file is the SINGLE SOURCE OF TRUTH for loading .env and defining constants.

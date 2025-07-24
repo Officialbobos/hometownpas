@@ -1,4 +1,5 @@
 <?php
+echo "INDEX_LOADED_V_FINAL"; // Add this line
 session_start();
 
 // Enable error reporting for development (remove/adjust for production)
@@ -16,8 +17,8 @@ require_once 'Config.php'; // Config.php handles Dotenv loading and constant def
 
 // Check if critical constants are defined after Config.php is included
 if (!defined('MONGODB_CONNECTION_URI') || !defined('MONGODB_DB_NAME')) {
-    error_log("FATAL ERROR: MongoDB configuration constants are not defined after Config.php inclusion.");
-    die("System error: Database configuration missing. Please contact support.");
+    error_log("FATAL ERROR: MongoDB configuration constants are not defined after Config.php inclusion.");
+    die("System error: Database configuration missing. Please contact support.");
 }
 
 // 3. Include your functions file.
