@@ -1,5 +1,5 @@
 # Use an official PHP image with Apache
-FROM php:8.2-apache
+FROM php:8.3-apache
 
 # Install necessary system dependencies for the MongoDB PHP extension
 # and other utilities like git and unzip
