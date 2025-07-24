@@ -1,38 +1,50 @@
 <?php
-// C:\xampp_lite_8_4\www\phpfile-main\Config.php (FINAL CORRECTED VERSION)
+// C:\xampp_lite_8_4\www\phpfile-main\Config.php
 
 // IMPORTANT: This file is the SINGLE SOURCE OF TRUTH for loading .env and defining constants.
 // Do NOT load Dotenv directly in other entry scripts (e.g., index.php, admin/index.php).
 
-// Load environment variables from .env file FIRST!
-// This requires the 'vlucas/phpdotenv' Composer package.
-// Ensure 'vendor/autoload.php' path is correct relative to Config.php.
+// Load Composer autoloader
 require_once __DIR__ . '/vendor/autoload.php';
 
-$dotenvDir = __DIR__;
-try {
-    $dotenv = Dotenv\Dotenv::createImmutable($dotenvDir);
-    $dotenv->load();
+// Define the directory where your .env file might be located.
+// If Config.php is in 'phpfile-main', and .env is also in 'phpfile-main', then $dotenvDir should be __DIR__.
+// If .env is one level up (e.g., in the parent of phpfile-main), use __DIR__ . '/../'.
+// Based on typical project structure, if Config.php is at project_root/Config.php
+// and .env is at project_root/.env, then __DIR__ is correct.
+// If your .env is in the main directory 'phpfile-main', and Config.php is in the same directory.
+// Original: $dotenvDir = __DIR__;
+// Assuming Config.php and .env are in the root where your Dockerfile is.
+$dotenvDir = __DIR__; 
 
-    // Configure Dotenv to also load into $_ENV and $_SERVER superglobals
-    // This is often default, but explicitly setting it is good.
-    // However, if getenv() isn't working, relying on $_ENV directly is the way to go.
-    // $dotenv->safeLoad(); // Consider safeLoad() if you want to avoid overwriting existing env vars
-} catch (Dotenv\Exception\InvalidPathException $e) {
-    error_log("FATAL CONFIG ERROR: .env file not found or not readable in " . $dotenvDir . ". Error: " . $e->getMessage());
-    die("Application configuration error. Please contact support. (Ref: ENV_LOAD_FAIL)");
-} catch (Exception $e) {
-    error_log("FATAL CONFIG ERROR: Unexpected error during .env load: " . $e->getMessage());
-    die("Application configuration error: Unexpected .env load error. Please check server logs.");
+// Load environment variables using phpdotenv ONLY if a .env file exists.
+// On hosting platforms like Render, environment variables are often injected directly
+// into the process environment (e.g., $_ENV, $_SERVER, getenv()),
+// and a physical .env file is not present or needed.
+if (file_exists($dotenvDir . '/.env')) { // Added / before .env for clarity
+    try {
+        $dotenv = Dotenv\Dotenv::createImmutable($dotenvDir);
+        $dotenv->load();
+    } catch (Dotenv\Exception\InvalidPathException $e) {
+        // This should ideally not happen if file_exists is true, but good for robust logging.
+        error_log("WARNING: .env file found but not readable or path invalid in " . $dotenvDir . ". Error: " . $e->getMessage());
+        // Do NOT die, as variables might still be loaded from the system environment.
+    } catch (Exception $e) {
+        error_log("WARNING: Unexpected error during .env file load: " . $e->getMessage());
+        // Do NOT die, as variables might still be loaded from the system environment.
+    }
+} else {
+    // If .env file doesn't exist (e.g., on Render), variables are expected to be
+    // already loaded into the environment by the hosting platform.
+    error_log("NOTICE: .env file not found at " . $dotenvDir . "/.env. Assuming environment variables are pre-loaded by the system.");
 }
 
 
 /**
  * MongoDB Database Configuration File for HeritageBanking Admin Panel
- * ... (rest of the comments) ...
  */
 
-// MongoDB Settings - USE $_ENV INSTEAD OF GETENV()
+// MongoDB Settings - USE $_ENV
 // Use null coalescing operator (??) for robustness if the variable might not exist
 define('MONGODB_CONNECTION_URI', $_ENV['MONGODB_CONNECTION_URI'] ?? null);
 define('MONGODB_DB_NAME', $_ENV['MONGODB_DB_NAME'] ?? 'HometownBankPA'); // Default if not set
@@ -42,8 +54,8 @@ define('TWO_FACTOR_CODE_EXPIRY_MINUTES', 5); // Example: Code valid for 5 minute
 
 // Add a final check to ensure the URI is actually set after trying to define it
 if (!defined('MONGODB_CONNECTION_URI') || empty(MONGODB_CONNECTION_URI)) {
-    error_log("FATAL ERROR: MONGODB_CONNECTION_URI constant is still empty after Config.php execution. Check .env and access via _ENV.");
-    die("Critical configuration error. MongoDB connection string missing.");
+    error_log("FATAL ERROR: MONGODB_CONNECTION_URI constant is still empty after Config.php execution. Check environment variables (e.g., on Render dashboard).");
+    die("Critical configuration error. MongoDB connection string missing. Please contact support.");
 }
 
 // --- END MongoDB Database Configuration (Only constants defined here) ---
@@ -54,6 +66,7 @@ if (!defined('MONGODB_CONNECTION_URI') || empty(MONGODB_CONNECTION_URI)) {
 define('ADMIN_EMAIL', $_ENV['ADMIN_EMAIL'] ?? 'hometownbankpa@gmail.com');
 
 // Base URL of your project - Get from environment variable BASE_URL or platform specific env vars.
+// This should be set in Render dashboard to https://hometownpas.onrender.com
 define('BASE_URL', $_ENV['BASE_URL'] ?? 'http://localhost/phpfile-main');
 
 // SMTP Settings for Email Sending (using Gmail)
