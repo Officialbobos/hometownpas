@@ -29,7 +29,8 @@ require_once __DIR__ . '/../functions.php'; // If you have a sanitize_input func
 
 // Check if the user is logged in. If not, redirect to login page.
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: ../indx.php'); // Redirect to the main login page (e.g., indx.php)
+    // Corrected: Use BASE_URL for redirect to login page
+    header('Location: ' . BASE_URL . '/index.php'); // Assuming index.php is your login page
     exit;
 }
 
@@ -114,8 +115,9 @@ if (!function_exists('formatCurrency')) {
         switch (strtoupper($currency_code)) {
             case 'GBP': $symbol = '£'; break;
             case 'USD': $symbol = '$'; break;
-            case 'EUR':
-            default: $symbol = '€'; break;
+            case 'EUR': $symbol = '€'; break; // Added EUR symbol explicitly
+            case 'NGN': $symbol = '₦'; break; // Added NGN symbol explicitly
+            default: $symbol = ''; // Default to no symbol if unknown
         }
         return $symbol . number_format($amount, 2);
     }
@@ -128,8 +130,8 @@ if (!function_exists('formatCurrency')) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Accounts - Heritage Bank</title>
-    <link rel="stylesheet" href="style.css">
+    <title>My Accounts - HomeTown Bank Pa</title>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/frontend/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         /* Specific styles for the accounts page */
@@ -343,25 +345,26 @@ if (!function_exists('formatCurrency')) {
 <body class="dashboard-page">
     <header class="dashboard-header">
         <div class="logo">
-            <img src="<?php echo htmlspecialchars(BASE_URL); ?>/images/logo.png" alt="Heritage Bank Logo" class="logo-barclays">
+            <img src="<?php echo htmlspecialchars(BASE_URL); ?>/images/logo.png" alt="HomeTown Bank Pa Logo" class="logo-barclays">
         </div>
         <div class="user-info">
             <i class="fa-solid fa-user profile-icon"></i>
             <span><?php echo htmlspecialchars($full_name); ?></span>
-            <a href="../logout.php">Logout</a> </div>
+            <a href="<?php echo BASE_URL; ?>/logout">Logout</a> </div>
     </header>
 
     <div class="dashboard-container">
         <aside class="sidebar">
             <ul>
-                <li><a href="dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
-                <li class="active"><a href="accounts.php"><i class="fas fa-wallet"></i> <span>My Accounts</span></a></li>
-                <li><a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a></li>
-                <li><a href="statements.php"><i class="fas fa-file-alt"></i> <span>Statements</span></a></li>
-                <li><a href="transfer.php"><i class="fas fa-exchange-alt"></i> <span>Transfers</span></a></li>
-                <li><a href="transactions.php"><i class="fas fa-history"></i> <span>Transaction History</span></a></li>
-                <li><a href="#"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
-                <li><a href="../logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li> </ul>
+                <li><a href="<?php echo BASE_URL; ?>/dashboard"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+                <li class="active"><a href="<?php echo BASE_URL; ?>/accounts"><i class="fas fa-wallet"></i> <span>My Accounts</span></a></li>
+                <li><a href="<?php echo BASE_URL; ?>/profile"><i class="fas fa-user-circle"></i> <span>Profile</span></a></li>
+                <li><a href="<?php echo BASE_URL; ?>/statements"><i class="fas fa-file-alt"></i> <span>Statements</span></a></li>
+                <li><a href="<?php echo BASE_URL; ?>/transfer"><i class="fas fa-exchange-alt"></i> <span>Transfers</span></a></li>
+                <li><a href="<?php echo BASE_URL; ?>/transactions"><i class="fas fa-history"></i> <span>Transaction History</span></a></li>
+                <li><a href="<?php echo BASE_URL; ?>/settings"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
+                <li><a href="<?php echo BASE_URL; ?>/logout"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
+            </ul>
         </aside>
 
         <main class="accounts-content">
@@ -418,6 +421,6 @@ if (!function_exists('formatCurrency')) {
             </div>
         </main>
     </div>
-    <script src="script.js"></script>
+    <script src="<?php echo BASE_URL; ?>/frontend/script.js"></script>
 </body>
 </html>

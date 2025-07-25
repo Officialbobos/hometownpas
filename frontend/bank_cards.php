@@ -1,23 +1,12 @@
 <?php
-// Remove session_start() here if Config.php handles it.
-// If Config.php does NOT handle it, keep this session_start().
-// Based on your Config.php, it DOES handle it conditionally.
-// So, removing this line and relying on Config.php is the correct approach.
-
-// 1. Include Config.php FIRST. This ensures all constants (including MongoDB, BASE_URL)
-// and Dotenv are loaded BEFORE anything else that relies on them.
-// It also handles session_start() now.
-require_once '../Config.php';
-
-// Remove this line - Config.php already handles Composer autoloader
-// require_once '../vendor/autoload.php';
+// Config.php should be included first to ensure session and constants are available.
+require_once '../Config.php'; // This now handles session_start() and Composer autoloader.
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
-
-// The session should now be active due to Config.php
+// Check if the user is logged in. If not, redirect to login page.
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . '/index.php'); // Use BASE_URL for redirects
     exit;
@@ -48,38 +37,47 @@ try {
     $userObjectId = new ObjectId($user_id);
 
     // Fetch user's full name and email from the database if not already in session
+    // This provides a fallback if session data is somehow lost or incomplete.
     if (empty($user_full_name) || empty($user_email)) {
         $user_doc = $usersCollection->findOne(['_id' => $userObjectId]);
         if ($user_doc) {
             $user_full_name = trim(($user_doc['first_name'] ?? '') . ' ' . ($user_doc['last_name'] ?? ''));
             $user_email = $user_doc['email'] ?? '';
+            // Update session with fetched data for future requests
             $_SESSION['user_full_name'] = $user_full_name;
             $_SESSION['user_email'] = $user_email;
+        } else {
+            // Log error if user not found, but allow page to load with generic name
+            error_log("User with ID " . $user_id . " not found in database for bank_cards.php.");
+            $user_full_name = 'Bank Customer'; // Fallback if DB lookup fails
+            $user_email = 'default@example.com';
         }
     }
 } catch (MongoDBDriverException $e) {
     error_log("MongoDB connection or initial data fetch error in bank_cards.php: " . $e->getMessage());
-    $message = "Database connection error. Please try again later.";
+    $message = "Database connection error. Please try again later. (Code: MDB_INIT)";
     $message_type = 'error';
     // If we can't connect, no point proceeding with any DB ops
+    // For AJAX requests, return JSON; otherwise, die with an HTML message.
     if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
-        die(json_encode(['success' => false, 'message' => $message])); // For AJAX
+        die(json_encode(['success' => false, 'message' => $message]));
     } else {
-        die("<h1>" . htmlspecialchars($message) . "</h1><p>Please check application logs for details.</p>"); // For HTML page load
+        die("<h1>" . htmlspecialchars($message) . "</h1><p>Please check application logs for details.</p>");
     }
 } catch (Exception $e) { // Catch for ObjectId conversion or other general errors
-    error_log("General error in bank_cards.php: " . $e->getMessage());
-    $message = "An unexpected error occurred. Please try again later.";
+    error_log("General error during initial setup in bank_cards.php: " . $e->getMessage());
+    $message = "An unexpected error occurred during page setup. Please try again later.";
     $message_type = 'error';
-    // If user_id is invalid, we might want to log out or redirect
+    // If user_id is invalid, it's safer to redirect to login
     if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
-        die(json_encode(['success' => false, 'message' => $message])); // For AJAX
+        die(json_encode(['success' => false, 'message' => $message]));
     } else {
-        header('Location: ' . BASE_URL . '/index.php'); // Redirect if user_id from session is bad
+        header('Location: ' . BASE_URL . '/index.php?error=invalid_user_session'); // Redirect with an error indicator
         exit;
     }
 }
 
+// Ensure full name and email are set for display, even if database lookup failed
 $user_full_name = $user_full_name ?: 'Bank Customer';
 $user_email = $user_email ?: 'default@example.com';
 
@@ -98,10 +96,16 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 $row_arr['display_card_number'] = '**** **** **** ' . substr($row_arr['card_number'] ?? '', -4);
                 $row_arr['card_holder_name'] = strtoupper($user_full_name);
                 $row_arr['display_expiry'] = str_pad($row_arr['expiry_month'] ?? '', 2, '0', STR_PAD_LEFT) . '/' . substr($row_arr['expiry_year'] ?? '', 2, 2);
-                $row_arr['display_cvv'] = $row_arr['cvv'] ?? '***'; // DANGER: For mock only - DO NOT DO THIS IN PRODUCTION
-                unset($row_arr['card_number']); // Remove raw card number
-                unset($row_arr['cvv']); // Remove raw CVV before sending to frontend
+                // DANGER: For mock only - DO NOT send real CVV/PIN to frontend in production
+                // For a real application, remove this line entirely or mock it with '***' from backend.
+                // $row_arr['display_cvv'] = $row_arr['cvv'] ?? '***'; // Keep for now as per original code, but strongly advise against.
+
+                // Unset sensitive data before sending to frontend
+                unset($row_arr['card_number']);
+                unset($row_arr['cvv']);
+                unset($row_arr['pin']); // Assuming 'pin' field might exist
                 unset($row_arr['_id']); // Remove internal MongoDB ID from frontend
+
                 $bank_cards[] = $row_arr;
             }
             echo json_encode(['success' => true, 'cards' => $bank_cards]);
@@ -128,6 +132,7 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             exit;
         }
 
+        // Generate mock card details
         $prefix = '';
         if ($cardNetwork === 'Visa') {
             $prefix = '4';
@@ -154,7 +159,7 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
         $mock_expiry_year = date('Y') + mt_rand(3, 7);
         $mock_cvv = str_pad(mt_rand(0, ($cardNetwork === 'Amex' ? 9999 : 999)), ($cardNetwork === 'Amex' ? 4 : 3), '0', STR_PAD_LEFT);
         $mock_card_holder_name = strtoupper($user_full_name);
-        $initial_pin_hash = null; // Stored as null in MongoDB
+        $initial_pin_hash = null; // Stored as null in MongoDB, PIN set on activation
 
         try {
             // Verify the linked account belongs to the user
@@ -179,12 +184,12 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 'card_type' => $cardType,
                 'expiry_month' => $mock_expiry_month,
                 'expiry_year' => $mock_expiry_year,
-                'cvv' => $mock_cvv, // DANGER: Remove in production
+                'cvv' => $mock_cvv, // DANGER: Remove in production or encrypt. Only for mock purposes.
                 'card_holder_name' => $mock_card_holder_name,
-                'is_active' => false, // MongoDB uses boolean for true/false
+                'is_active' => false, // New cards are inactive until activated by user
                 'card_network' => $cardNetwork,
                 'shipping_address' => $shippingAddress,
-                'pin' => $initial_pin_hash, // Will be null
+                'pin' => $initial_pin_hash, // Will be null initially
                 'created_at' => new MongoDB\BSON\UTCDateTime(), // Timestamp
                 'updated_at' => new MongoDB\BSON\UTCDateTime()  // Timestamp
             ]);
@@ -192,6 +197,7 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             if ($insertOneResult->getInsertedCount() === 1) {
                 $inserted_card_id = (string) $insertOneResult->getInsertedId(); // Get string representation of new ObjectId
 
+                // Email sending logic
                 $subject = "Your HomeTown Bank Card Order Confirmation";
                 $body = "Dear " . htmlspecialchars($user_full_name) . ",\n\n"
                         . "Thank you for ordering a new " . htmlspecialchars($cardNetwork) . " " . htmlspecialchars($cardType) . " card linked to your " . htmlspecialchars($linked_account_type) . " account (" . htmlspecialchars($linked_account_number) . ") from HomeTown Bank PA.\n\n"
@@ -206,13 +212,11 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                         . "Sincerely,\n"
                         . "The HomeTown Bank PA Team";
 
-                $headers = "From: " . SMTP_FROM_NAME . " <" . SMTP_FROM_EMAIL . ">\r\n"; // CORRECTED: Using constants
-                $headers .= "Reply-To: " . SMTP_FROM_EMAIL . "\r\n"; // CORRECTED: Using constants
+                $headers = "From: " . SMTP_FROM_NAME . " <" . SMTP_FROM_EMAIL . ">\r\n";
+                $headers .= "Reply-To: " . SMTP_FROM_EMAIL . "\r\n";
                 $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-                $headers .= "X-Mailer: PHP/" . phpversion(); // Added X-Mailer
+                $headers .= "X-Mailer: PHP/" . phpversion();
 
-                // This mail function assumes your PHP setup can send mail directly or through sendmail/SMTP configured in php.ini
-                // For robust email sending, use PHPMailer or a similar library with SMTP authentication.
                 if (mail($user_email, $subject, $body, $headers)) {
                     $email_status = "Email sent successfully.";
                 } else {
@@ -264,7 +268,6 @@ try {
     $message_type = 'error';
 }
 
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -272,10 +275,25 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hometown Bank PA - Manage Cards</title>
-    <link rel="stylesheet" href="bank_cards.css">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/frontend/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         /* Your inline CSS remains here */
+        /* It's generally better to move this to an external CSS file for maintainability */
+        /* For this task, keeping it inline as per your original provided code. */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f7f6; color: #333; }
+        .header { background-color: #007bff; color: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .header .logo img { height: 40px; }
+        .header h1 { margin: 0; font-size: 1.8em; }
+        .header-nav a { color: white; text-decoration: none; background-color: #0056b3; padding: 8px 15px; border-radius: 5px; transition: background-color 0.3s ease; display: inline-flex; align-items: center; }
+        .header-nav a:hover { background-color: #004085; }
+        .header-nav i { margin-right: 8px; }
+
+        .main-content { padding: 20px; max-width: 1200px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        .main-content h2 { color: #007bff; margin-top: 0; margin-bottom: 25px; font-size: 1.8em; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+
+        .cards-section, .order-card-section, .manage-pin-section { margin-bottom: 40px; }
+
         .card-item { background: linear-gradient(45deg, #004d40, #00796b); color: white; padding: 25px; border-radius: 15px; width: 350px; margin: 20px auto; box-shadow: 0 10px 20px rgba(0,0,0,0.2); position: relative; font-family: 'Roboto Mono', monospace; display: flex; flex-direction: column; justify-content: space-between; min-height: 200px; }
         .card-item.visa { background: linear-gradient(45deg, #2a4b8d, #3f60a9); }
         .card-item.mastercard { background: linear-gradient(45deg, #eb001b, #ff5f00); }
@@ -293,7 +311,7 @@ try {
         .card-status.inactive { color: #f8d7da; }
         .loading-message, .no-data-message { text-align: center; padding: 20px; color: #555; font-size: 1.1em; }
         .card-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; padding: 20px 0; }
-        /* Add basic form and button styling if not in bank_cards.css */
+        /* Form and button styling */
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
         .form-group input[type="text"],
@@ -304,6 +322,7 @@ try {
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 1em;
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
         }
         .submit-button {
             background-color: #007bff;
@@ -320,25 +339,11 @@ try {
             width: auto;
             min-width: 200px;
         }
-        .submit-button:hover {
-            background-color: #0056b3;
-        }
-        .message {
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            text-align: center;
-        }
-        .message.success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .message.error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
+        .submit-button:hover { background-color: #0056b3; }
+        .message { padding: 10px; margin-bottom: 20px; border-radius: 5px; text-align: center; }
+        .message.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        /* Message box overlay */
         .message-box-overlay {
             position: fixed;
             top: 0;
@@ -354,10 +359,7 @@ try {
             visibility: hidden;
             transition: opacity 0.3s ease, visibility 0.3s ease;
         }
-        .message-box-overlay.show {
-            opacity: 1;
-            visibility: visible;
-        }
+        .message-box-overlay.show { opacity: 1; visibility: visible; }
         .message-box-content {
             background: white;
             padding: 30px;
@@ -368,14 +370,8 @@ try {
             transform: translateY(-20px);
             transition: transform 0.3s ease;
         }
-        .message-box-overlay.show .message-box-content {
-            transform: translateY(0);
-        }
-        .message-box-content p {
-            font-size: 1.1em;
-            margin-bottom: 20px;
-            color: #333;
-        }
+        .message-box-overlay.show .message-box-content { transform: translateY(0); }
+        .message-box-content p { font-size: 1.1em; margin-bottom: 20px; color: #333; }
         .message-box-content button {
             background-color: #007bff;
             color: white;
@@ -386,21 +382,21 @@ try {
             font-size: 1em;
             transition: background-color 0.3s ease;
         }
-        .message-box-content button:hover {
-            background-color: #0056b3;
-        }
+        .message-box-content button:hover { background-color: #0056b3; }
     </style>
 </head>
 <body>
 
     <header class="header">
         <div class="logo">
-            <a href="dashboard.php"> <img src="<?php echo htmlspecialchars(BASE_URL); ?>/frontend/images/hometown_bank_logo.png" alt="Hometown Bank PA Logo">
+            <a href="<?php echo BASE_URL; ?>/dashboard">
+                <img src="<?php echo htmlspecialchars(BASE_URL); ?>/images/hometown_bank_logo.png" alt="Hometown Bank PA Logo">
             </a>
         </div>
         <h1>Manage My Cards</h1>
         <nav class="header-nav">
-            <a href="dashboard.php" class="back-to-dashboard"> <i class="fas fa-arrow-left"></i> Back to Dashboard
+            <a href="<?php echo BASE_URL; ?>/dashboard">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
             </a>
         </nav>
     </header>
@@ -469,7 +465,7 @@ try {
 
         <section class="manage-pin-section">
             <h2>Manage Card PIN & Activation</h2>
-            <p>To activate a new card or set/change your existing card's PIN, please visit the <a href="activate_card.php">Card Activation & PIN Management page</a>.</p>
+            <p>To activate a new card or set/change your existing card's PIN, please visit the <a href="<?php echo BASE_URL; ?>/activate_card">Card Activation & PIN Management page</a>.</p>
         </section>
     </main>
 
@@ -481,11 +477,21 @@ try {
     </div>
 
     <script>
+        // Ensure BASE_URL is correctly passed to JavaScript for AJAX requests and paths.
+        // It's better to get the true BASE_URL from the PHP constant, not deduce from path.
+        const BASE_URL_JS = <?php echo json_encode(BASE_URL); ?>;
         const currentUserId = <?php echo json_encode($user_id); ?>; // Still the string ObjectId
         const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
-        const PHP_BASE_URL = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
-        const FRONTEND_BASE_URL = '/frontend/';
+        // FRONTEND_BASE_URL is generally not needed if BASE_URL_JS handles all root-relative paths.
+        // If 'cards.js' specifically relies on a relative path from the current directory, keep this or adjust cards.js
+        // For Render, it's often best to make all JS paths root-relative as well.
+        // const FRONTEND_BASE_URL = '/frontend/'; // May not be necessary if paths in JS are adjusted to use BASE_URL_JS
+
+        // Adjust cards.js to use BASE_URL_JS for its AJAX requests and any other internal paths.
+        // For example, if cards.js makes an AJAX call to 'bank_cards.php?action=fetch_cards',
+        // it should be changed to `${BASE_URL_JS}/frontend/bank_cards.php?action=fetch_cards`
+        // or just `bank_cards.php?action=fetch_cards` if the script itself is already at the correct path for AJAX.
     </script>
-    <script src="cards.js"></script>
+    <script src="<?php echo BASE_URL; ?>/frontend/cards.js"></script>
 </body>
 </html>

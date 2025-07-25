@@ -228,7 +228,7 @@
 
     <header class="header">
         <div class="logo">
-            <img src="https://i.imgur.com/YmC3kg3.png" alt="Hometown Bank PA Logo">
+            <img src="/images/hometown_bank_logo.png" alt="Hometown Bank PA Logo">
         </div>
         <h1>Customer Service</h1>
     </header>
@@ -250,7 +250,7 @@
             <a href="tel:+12544007639" class="contact-button phone">
                 <i class="fas fa-phone-alt"></i> Call Us: +1 254-400-7639
             </a>
-            <a href="dashboard.php" class="contact-button homepage">
+            <a href="/dashboard" class="contact-button homepage">
                 <i class="fas fa-home"></i> Back to Homepage
             </a>
         </div>

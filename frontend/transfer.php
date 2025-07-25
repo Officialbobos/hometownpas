@@ -12,7 +12,8 @@ use MongoDB\Exception\Exception as MongoDBException; // Add this line based on y
 
 // Check login, etc.
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: ../indx.php'); // Redirect to login page if not logged in
+    // Corrected: Use BASE_URL for redirect to login page
+    header('Location: ' . BASE_URL . '/index.php'); // Assuming index.php is your login page
     exit;
 }
 
@@ -33,9 +34,11 @@ try {
     $db = $client->selectDatabase(MONGODB_DB_NAME); // Use MONGODB_DB_NAME
     $accountsCollection = $db->accounts;
 } catch (MongoDBException $e) { // Catch specific MongoDB exceptions
-    die("ERROR: Could not connect to MongoDB. " . $e->getMessage());
+    error_log("MongoDB connection error in transfer.php: " . $e->getMessage()); // Log error
+    die("ERROR: Could not connect to MongoDB. Please try again later. " . $e->getMessage()); // Display a user-friendly message
 } catch (Exception $e) { // Catch any other general exceptions
-    die("ERROR: An unexpected error occurred during database connection. " . $e->getMessage());
+    error_log("General database connection error in transfer.php: " . $e->getMessage()); // Log error
+    die("ERROR: An unexpected error occurred during database connection. Please try again later. " . $e->getMessage()); // Display user-friendly message
 }
 
 
@@ -54,10 +57,10 @@ try {
         $user_accounts[] = $account;
     }
 } catch (MongoDBException $e) {
-    error_log("MongoDB error fetching account data: " . $e->getMessage());
+    error_log("MongoDB error fetching account data in transfer.php: " . $e->getMessage());
     // You might want to display a user-friendly message here too
 } catch (Exception $e) {
-    error_log("General error fetching account data: " . $e->getMessage());
+    error_log("General error fetching account data in transfer.php: " . $e->getMessage());
 }
 
 
@@ -78,7 +81,7 @@ $form_data = $_SESSION['form_data'] ?? [];
 unset($_SESSION['form_data']);
 
 // Determine the active transfer method for UI display
-$active_transfer_method = $form_data['transfer_method'] ?? 'internal_self'; // Default to 'internal_self' for initial load
+$active_transfer_method = $_GET['type'] ?? ($form_data['transfer_method'] ?? 'internal_self'); // Use GET 'type' first, then form data, then default
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -86,7 +89,7 @@ $active_transfer_method = $form_data['transfer_method'] ?? 'internal_self'; // D
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeTown Bank Pa - Transfer</title>
-    <link rel="stylesheet" href="transfer.css">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/frontend/transfer.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -106,7 +109,7 @@ $active_transfer_method = $form_data['transfer_method'] ?? 'internal_self'; // D
                 <h1>Make a Transfer</h1>
             </div>
             <div class="profile-pic">
-                <img src="/heritagebank/images/default-profile.png" alt="Profile Picture" id="headerProfilePic">
+                <img src="<?php echo BASE_URL; ?>/images/default-profile.png" alt="Profile Picture" id="headerProfilePic">
             </div>
         </header>
 
@@ -118,18 +121,18 @@ $active_transfer_method = $form_data['transfer_method'] ?? 'internal_self'; // D
                     <p class="message <?php echo htmlspecialchars($message_type); ?>"><?php echo htmlspecialchars($message); ?></p>
                 <?php endif; ?>
 
-                <form action="make_transfer.php" method="POST" id="transferForm">
+                <form action="<?php echo BASE_URL; ?>/make_transfer" method="POST" id="transferForm">
                     <input type="hidden" name="initiate_transfer" value="1">
 
                     <div class="form-group">
                         <label for="transfer_method">Select Transfer Method:</label>
                         <select id="transfer_method" name="transfer_method" required>
                             <option value="">-- Choose Transfer Type --</option>
-                            <option value="internal_self" <?php echo ($active_transfer_method === 'internal_self' ? 'selected' : ''); ?>>Between My Accounts</option>
-                            <option value="internal_heritage" <?php echo ($active_transfer_method === 'internal_heritage' ? 'selected' : ''); ?>>To Another HomeTown Bank Pa Account</option>
-                            <option value="external_iban" <?php echo ($active_transfer_method === 'external_iban' ? 'selected' : ''); ?>>International Bank Transfer (IBAN/SWIFT)</option>
-                            <option value="external_sort_code" <?php echo ($active_transfer_method === 'external_sort_code' ? 'selected' : ''); ?>>UK Bank Transfer (Sort Code/Account No)</option>
-                            <option value="external_usa_account" <?php echo ($active_transfer_method === 'external_usa_account' ? 'selected' : ''); ?>>USA Bank Transfer (Routing/Account No)</option>
+                            <option value="internal_self" <?php echo ($active_transfer_method === 'own_account' || $active_transfer_method === 'internal_self' ? 'selected' : ''); ?>>Between My Accounts</option>
+                            <option value="internal_heritage" <?php echo ($active_transfer_method === 'bank_to_bank' || $active_transfer_method === 'internal_heritage' ? 'selected' : ''); ?>>To Another HomeTown Bank Pa Account</option>
+                            <option value="external_iban" <?php echo ($active_transfer_method === 'international_bank' || $active_transfer_method === 'external_iban' ? 'selected' : ''); ?>>International Bank Transfer (IBAN/SWIFT)</option>
+                            <option value="external_sort_code" <?php echo ($active_transfer_method === 'uk_bank' || $active_transfer_method === 'external_sort_code' ? 'selected' : ''); ?>>UK Bank Transfer (Sort Code/Account No)</option>
+                            <option value="external_usa_account" <?php echo ($active_transfer_method === 'ach' || $active_transfer_method === 'wire' || $active_transfer_method === 'domestic_wire' || $active_transfer_method === 'external_usa_account' ? 'selected' : ''); ?>>USA Bank Transfer (Routing/Account No)</option>
                         </select>
                     </div>
 
@@ -162,7 +165,7 @@ $active_transfer_method = $form_data['transfer_method'] ?? 'internal_self'; // D
                                 <?php foreach ($user_accounts as $account): ?>
                                     <option value="<?php echo htmlspecialchars($account['id']); ?>"
                                         <?php echo ((string)($form_data['destination_account_id_self'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo htmlspecialchars($account['currency']); ?> <?php echo number_format($account['balance'], 2); ?>
+                                        <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo htmlspecialchars($account['balance'], 2); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -262,7 +265,7 @@ $active_transfer_method = $form_data['transfer_method'] ?? 'internal_self'; // D
                     <button type="submit" class="button-primary">Initiate Transfer</button>
                 </form>
             </div>
-            <p style="text-align: center; margin-top: 20px;"><a href="dashboard.php" class="back-link">&larr; Back to Dashboard</a></p>
+            <p style="text-align: center; margin-top: 20px;"><a href="<?php echo BASE_URL; ?>/dashboard" class="back-link">&larr; Back to Dashboard</a></p>
         </main>
     </div>
 
@@ -273,23 +276,23 @@ $active_transfer_method = $form_data['transfer_method'] ?? 'internal_self'; // D
                 <i class="fas fa-times"></i>
             </button>
             <div class="sidebar-profile">
-                <img src="/heritagebank/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
+                <img src="<?php echo BASE_URL; ?>/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
                 <h3><span id="sidebarUserName"><?php echo htmlspecialchars($full_name); ?></span></h3>
                 <p><span id="sidebarUserEmail"><?php echo htmlspecialchars($user_email); ?></span></p>
             </div>
         </div>
         <nav class="sidebar-nav">
             <ul>
-                <li><a href="dashboard.php"><i class="fas fa-home"></i> Dashboard</a></li>
-                <li><a href="accounts.php"><i class="fas fa-wallet"></i> Accounts</a></li>
-                <li><a href="transfer.php" class="active"><i class="fas fa-exchange-alt"></i> Transfers</a></li>
-                <li><a href="statements.php"><i class="fas fa-file-invoice"></i> Statements</a></li>
-                <li><a href="profile.php"><i class="fas fa-user"></i> Profile</a></li>
-                <li><a href="#"><i class="fas fa-cog"></i> Settings</a></li>
-                <li><a href="bank_cards.php"><i class="fas fa-credit-card"></i> Bank Cards</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/dashboard"><i class="fas fa-home"></i> Dashboard</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/accounts"><i class="fas fa-wallet"></i> Accounts</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/transfer" class="active"><i class="fas fa-exchange-alt"></i> Transfers</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/statements"><i class="fas fa-file-invoice"></i> Statements</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/profile"><i class="fas fa-user"></i> Profile</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/settings"><i class="fas fa-cog"></i> Settings</a></li>
+                <li><a href="<?php echo BASE_URL; ?>/bank_cards"><i class="fas fa-credit-card"></i> Bank Cards</a></li>
             </ul>
         </nav>
-        <button class="logout-button" id="logoutButton" onclick="window.location.href='../logout.php'">
+        <button class="logout-button" id="logoutButton" onclick="window.location.href='<?php echo BASE_URL; ?>/logout'">
             <i class="fas fa-sign-out-alt"></i> Logout
         </button>
     </div>
@@ -312,11 +315,28 @@ $active_transfer_method = $form_data['transfer_method'] ?? 'internal_self'; // D
         window.APP_DATA = {
             userAccountsData: <?php echo json_encode($user_accounts); ?>,
             initialSelectedFromAccount: '<?php echo htmlspecialchars($form_data['source_account_id'] ?? ''); ?>',
-            initialTransferMethod: '<?php echo htmlspecialchars($active_transfer_method); ?>',
+            // Corrected: Map the incoming GET 'type' to the internal transfer method names for JS
+            initialTransferMethod: '<?php
+                $js_transfer_method = 'internal_self'; // Default
+                if (isset($_GET['type'])) {
+                    switch ($_GET['type']) {
+                        case 'own_account': $js_transfer_method = 'internal_self'; break;
+                        case 'bank_to_bank': $js_transfer_method = 'internal_heritage'; break;
+                        case 'international_bank': $js_transfer_method = 'external_iban'; break;
+                        case 'ach':
+                        case 'wire':
+                        case 'domestic_wire': $js_transfer_method = 'external_usa_account'; break; // Assuming these map to USA transfer
+                        default: $js_transfer_method = 'internal_self'; break;
+                    }
+                } else if (isset($form_data['transfer_method'])) {
+                    $js_transfer_method = $form_data['transfer_method'];
+                }
+                echo htmlspecialchars($js_transfer_method);
+            ?>',
             showModal: <?php echo $show_modal_on_load ? 'true' : 'false'; ?>,
             modalDetails: <?php echo json_encode($transfer_success_details); ?>
         };
     </script>
-    <script src="transfer.js"></script>
+    <script src="<?php echo BASE_URL; ?>/frontend/transfer.js"></script>
 </body>
 </html>
