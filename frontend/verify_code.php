@@ -85,7 +85,8 @@ try {
         $user_full_name = htmlspecialchars(trim($first_name . ' ' . $last_name));
         $masked_user_email = hideEmailPartially($user_email); // Use the helper function
         // Assign role to session before handling requests to use in routing decision
-        $_SESSION['role'] = $user_data['is_admin'] ? 'admin' : 'user';
+        // Use null coalescing operator to safely access 'is_admin'
+        $_SESSION['role'] = ($user_data['is_admin'] ?? false) ? 'admin' : 'user';
 
     } else {
         // User not found in DB for the session temp_user_id
@@ -329,14 +330,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
                     $_SESSION['first_name'] = $user_data_for_verification['first_name'] ?? '';
                     $_SESSION['last_name'] = $user_data_for_verification['last_name'] ?? '';
                     $_SESSION['full_name'] = $user_data_for_verification['full_name'] ?? trim(($user_data_for_verification['first_name'] ?? '') . ' ' . ($user_data_for_verification['last_name'] ?? ''));
-                    $_SESSION['email'] = $user_data_for_verification['email'] ?? '';
+                    // Use null coalescing operator to safely access 'is_admin'
                     $_SESSION['is_admin'] = $user_data_for_verification['is_admin'] ?? false;
                     $_SESSION['two_factor_enabled'] = $two_factor_enabled; // Keep 2FA status in session
                     $_SESSION['two_factor_method'] = $two_factor_method_current; // Keep 2FA method in session
-                    $_SESSION['role'] = $user_data_for_verification['is_admin'] ? 'admin' : 'user'; // Ensure role is set for general routing
+                    // Ensure role is set for general routing, using safe access
+                    $_SESSION['role'] = ($user_data_for_verification['is_admin'] ?? false) ? 'admin' : 'user'; 
 
                     // CRITICAL: Set 2FA as verified in session
-                    $_SESSION['2fa_verified'] = true; // <--- ADDED/CONFIRMED THIS LINE
+                    $_SESSION['2fa_verified'] = true;
 
                     // Clear 2FA specific temporary session variables
                     unset($_SESSION['auth_step']);
