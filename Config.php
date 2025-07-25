@@ -1,7 +1,4 @@
 <?php
-echo "CONFIG_LOADED_V_FINAL"; // <-- CONFIRMATION LINE
-// CONFIRM_CHANGE_CONFIG_20250724 // <-- CONFIRMATION LINE
-
 // IMPORTANT: This file is the SINGLE SOURCE OF TRUTH for loading .env and defining constants.
 // Do NOT load Dotenv directly in other entry scripts (e.g., index.php, admin/index.php).
 
