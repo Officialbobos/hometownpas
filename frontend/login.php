@@ -1,6 +1,35 @@
 <?php
 // This is frontend/login.php
 
+session_start(); // Start the session at the very beginning
+
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+require_once __DIR__ . '/../vendor/autoload.php'; // Correct path to autoload.php
+
+// --- Start Dotenv loading (conditional for deployment) ---
+// This block attempts to load .env files only if they exist.
+// On Render, environment variables should be set directly in the dashboard,
+// so a physical .env file won't be present.
+$dotenvPath = dirname(__DIR__);
+if (file_exists($dotenvPath . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
+    try {
+        $dotenv->load(); // This will only run if .env file exists
+    } catch (Dotenv\Exception\InvalidPathException $e) {
+        // This catch is mostly for local dev if .env is missing.
+        error_log("Dotenv load error locally on path " . $dotenvPath . ": " . $e->getMessage());
+    }
+}
+// If .env doesn't exist (like on Render), the variables are assumed to be pre-loaded
+// into the environment by the hosting platform (e.g., Render's Config Vars).
+// --- End Dotenv loading ---
+
+require_once __DIR__ . '/../Config.php';       // Path from frontend/ to project root
+require_once __DIR__ . '/../functions.php';     // Path from frontend/ to project root
+
 // Initialize message and message type variables
 $message = '';
 $message_type = '';
@@ -8,8 +37,8 @@ $message_type = '';
 // Check if the login form was submitted via POST request
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     // Sanitize and retrieve input data
-    $lastName = trim($_POST['last_name'] ?? '');
-    $membershipNumber = trim($_POST['membership_number'] ?? '');
+    $lastName = sanitize_input(trim($_POST['last_name'] ?? '')); // Using sanitize_input from functions.php
+    $membershipNumber = sanitize_input(trim($_POST['membership_number'] ?? ''));
 
     // Basic validation (can be expanded)
     if (empty($lastName) || empty($membershipNumber)) {
@@ -34,10 +63,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                 $twoFactorEnabled = $user['two_factor_enabled'] ?? false;
                 $twoFactorMethod = $user['two_factor_method'] ?? 'email'; // Default to 'email' if not set
 
+                // Set user-related session variables that are safe to set even before 2FA
+                $_SESSION['user_id'] = (string) $user['_id']; // Store ObjectId as string
+                $_SESSION['role'] = $user['role'] ?? 'user';
+                $_SESSION['first_name'] = $user['first_name'] ?? '';
+                $_SESSION['last_name'] = $user['last_name'] ?? '';
+                $_SESSION['full_name'] = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
+                $_SESSION['email'] = $user['email'] ?? '';
+                $_SESSION['is_admin'] = $user['is_admin'] ?? false; // Assuming 'is_admin' field exists
+
                 if ($twoFactorEnabled && $twoFactorMethod !== 'none') {
                     // 2FA is enabled for this user. Redirect to verification page.
                     $_SESSION['auth_step'] = 'awaiting_2fa';
-                    $_SESSION['temp_user_id'] = (string) $user['_id']; // Store ObjectId as string
+                    // temp_user_id is already set as user_id above, but explicitly setting for clarity in 2FA flow.
+                    // This is for verify_code.php to pick up the user.
+                    $_SESSION['temp_user_id'] = (string) $user['_id'];
 
                     // If 2FA method is email, generate and send code
                     if ($twoFactorMethod === 'email') {
@@ -93,13 +133,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
                 } else {
                     // No 2FA enabled for this user or method is 'none', log them in directly
-                    $_SESSION['user_id'] = (string) $user['_id'];
-                    $_SESSION['role'] = $user['role'] ?? 'user';
-                    $_SESSION['first_name'] = $user['first_name'] ?? '';
-                    $_SESSION['last_name'] = $user['last_name'] ?? '';
-                    $_SESSION['full_name'] = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
-                    $_SESSION['email'] = $user['email'] ?? '';
-                    $_SESSION['is_admin'] = $user['is_admin'] ?? false; // Assuming 'is_admin' field exists
+                    $_SESSION['user_logged_in'] = true; // Mark as fully logged in
+                    $_SESSION['2fa_verified'] = true; // No 2FA, so consider it verified immediately
 
                     header('Location: ' . BASE_URL . '/dashboard');
                     exit;
@@ -151,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                 <div id="login-message" class="message-box" style="display: none;"></div>
             <?php endif; ?>
 
-            <form class="login-form" id="loginForm" action="/" method="POST">
+            <form class="login-form" id="loginForm" action="<?php echo BASE_URL; ?>/login" method="POST">
                 <div class="form-group username-group">
                     <label for="last_name" class="sr-only">Last Name</label>
                     <p class="input-label">Last Name</p>

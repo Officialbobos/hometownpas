@@ -27,8 +27,8 @@ if (file_exists($dotenvPath . '/.env')) {
 // into the environment by the hosting platform (e.g., Render's Config Vars).
 // --- End Dotenv loading ---
 
-require_once __DIR__ . '/../Config.php';          // Path from frontend/ to project root
-require_once __DIR__ . '/../functions.php';       // Path from frontend/ to project root
+require_once __DIR__ . '/../Config.php';           // Path from frontend/ to project root
+require_once __DIR__ . '/../functions.php';        // Path from frontend/ to project root
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId; // Ensure ObjectId is used
@@ -43,10 +43,12 @@ $message_type = '';
 
 // Check if 2FA process is pending and temporary user ID exists
 // Ensure consistent session state: 'auth_step' should be set in login.php
+// If these conditions are NOT met, means the user is not in the correct 2FA flow.
 if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' || !isset($_SESSION['temp_user_id'])) {
     session_unset();
     session_destroy();
-    header('Location: ../index.php'); // Redirect to your main login page
+    // Redirect to the /login route handled by index.php
+    header('Location: ' . BASE_URL . '/login');
     exit;
 }
 
@@ -64,7 +66,7 @@ try {
     $message_type = 'error';
     session_unset();
     session_destroy();
-    header('Location: ../index.php');
+    header('Location: ' . BASE_URL . '/login'); // Redirect to /login
     exit;
 }
 
@@ -89,7 +91,7 @@ try {
         $message_type = 'error';
         session_unset();
         session_destroy();
-        header('Location: ../index.php'); // Redirect to login if user data isn't found
+        header('Location: ' . BASE_URL . '/login'); // Redirect to /login if user data isn't found
         exit;
     }
 } catch (MongoDBDriverException $e) {
@@ -271,7 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
             $message = "Missing user information for verification. Please try logging in again.";
             $message_type = 'error';
             // Potentially redirect if critical data is missing
-            // header('Location: ../index.php'); exit;
+            // header('Location: ' . BASE_URL . '/login'); exit; // Added for clarity
         } else {
             try {
                 // Re-fetch user data to ensure we have the absolute latest 2FA state (especially for secret/temp_code)
@@ -281,7 +283,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
                 if (!$user_data_for_verification) {
                     $message = "User account not found for verification. Please try logging in again.";
                     $message_type = 'error';
-                    session_unset(); session_destroy(); header('Location: ../index.php'); exit;
+                    session_unset(); session_destroy(); header('Location: ' . BASE_URL . '/login'); exit; // Redirect to /login
                 }
 
                 $two_factor_method_current = $user_data_for_verification['two_factor_method'] ?? 'email'; // Get current method from DB
@@ -329,6 +331,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
                     $_SESSION['two_factor_enabled'] = $two_factor_enabled; // Keep 2FA status in session
                     $_SESSION['two_factor_method'] = $two_factor_method_current; // Keep 2FA method in session
 
+                    // CRITICAL: Set 2FA as verified in session
+                    $_SESSION['2fa_verified'] = true; // <--- ADD THIS LINE
+
                     // Clear 2FA specific temporary session variables
                     unset($_SESSION['auth_step']);
                     unset($_SESSION['temp_user_id']);
@@ -349,11 +354,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
                         }
                     }
 
-                    // Redirect to dashboard based on role
+                    // Redirect to dashboard based on role using BASE_URL
                     if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) {
-                        header('Location: ../admin/dashboard.php'); // Admin dashboard
+                        header('Location: ' . BASE_URL . '/admin'); // Admin dashboard route
                     } else {
-                        header('Location: dashboard.php'); // User dashboard in frontend/
+                        header('Location: ' . BASE_URL . '/dashboard'); // User dashboard route
                     }
                     exit;
 
@@ -592,8 +597,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
         <?php endif; ?>
 
         <div class="resend-link" style="margin-top: 25px;">
-            <a href="../index.php">Return to Login</a>
-        </div>
+            <a href="<?php echo BASE_URL; ?>/login">Return to Login</a> </div>
     </div>
 </body>
 </html>

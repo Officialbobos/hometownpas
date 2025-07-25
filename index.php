@@ -13,25 +13,31 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Check if the user is logged in
-$isLoggedIn = isset($_SESSION['user_id']);
+$isLoggedIn = isset($_SESSION['user_id']) && isset($_SESSION['user_logged_in']) && $_SESSION['user_logged_in'] === true;
 $userRole = $_SESSION['role'] ?? 'guest'; // Default to 'guest' if not set
-
-// Define the base path for routing
-// This is relative to the document root (e.g., / for example.com, or /my_app/ for example.com/my_app)
-$basePath = '/'; // Assuming the app is at the root of the domain/subdomain on Render
 
 // Get the requested URL path (e.g., /login, /dashboard, /admin/users)
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// Remove the basePath if the app is not at the root (e.g., for localhost/phpfile-main)
-// On Render, BASE_URL might be different from $requestUri prefix.
-// This handles cases where BASE_URL has a subfolder path like /phpfile-main
-if (BASE_URL !== 'http://localhost/phpfile-main' && strpos($requestUri, $basePath) === 0) {
-    $requestUri = substr($requestUri, strlen($basePath));
+// Determine the base path of the application from BASE_URL constant
+// This ensures routing works whether the app is at the root or in a subfolder (e.g., /phpfile-main)
+$baseUrlPath = parse_url(BASE_URL, PHP_URL_PATH);
+// Ensure $baseUrlPath ends with a slash if it's not just '/'
+if ($baseUrlPath !== '/' && substr($baseUrlPath, -1) !== '/') {
+    $baseUrlPath .= '/';
+}
+
+// Remove the BASE_URL_PATH from the request URI
+// This effectively gives us the clean route like 'login', 'dashboard', 'admin/users/create_user'
+if (strpos($requestUri, $baseUrlPath) === 0) {
+    $route = substr($requestUri, strlen($baseUrlPath));
+} else {
+    // Fallback if BASE_URL_PATH is not found at the beginning (shouldn't happen with correct config)
+    $route = $requestUri;
 }
 
 // Remove leading/trailing slashes for consistent routing
-$requestUri = trim($requestUri, '/');
+$route = trim($route, '/');
 
 // Default page for logged-in users is the dashboard
 if ($isLoggedIn) {
@@ -41,8 +47,8 @@ if ($isLoggedIn) {
     $defaultPage = 'login';
 }
 
-// Determine the requested route, defaulting based on login status
-$route = $requestUri === '' ? $defaultPage : $requestUri;
+// If the route is empty, use the default page based on login status
+$route = $route === '' ? $defaultPage : $route;
 
 // --- Routing Logic ---
 switch ($route) {
@@ -109,7 +115,7 @@ switch ($route) {
             echo json_encode(['success' => false, 'message' => 'Unauthorized access.']);
             exit;
         }
-        include 'heritagebank_admin/users/fetch_user_acounts.php'; // Adjusted filename
+        include 'heritagebank_admin/users/fetch_user_accounts.php'; // Adjusted filename from fetch_user_acounts
         break;
     
     // Frontend user routes
@@ -130,7 +136,10 @@ switch ($route) {
         break;
 
     case 'verify_code':
-        if (!$isLoggedIn) {
+        // This page is for 2FA verification. It's a "half-logged-in" state.
+        // The user_id might be set in session but user_logged_in and 2fa_verified won't be true yet.
+        // We only require user_id to be set to access this page.
+        if (!isset($_SESSION['user_id'])) {
             header('Location: ' . BASE_URL . '/login');
             exit;
         }
@@ -152,22 +161,65 @@ switch ($route) {
         }
         include 'frontend/set_card_pin.php';
         break;
+    
+    case 'transfer': // Route for transfers
+        if (!$isLoggedIn) {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'frontend/transfer.php';
+        break;
+
+    case 'statements': // Route for statements
+        if (!$isLoggedIn) {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'frontend/statements.php';
+        break;
+    
+    case 'profile': // Route for user profile
+        if (!$isLoggedIn) {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'frontend/profile.php';
+        break;
+    
+    case 'settings': // Route for user settings
+        if (!$isLoggedIn) {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'frontend/settings.php';
+        break;
+
+    case 'customer-service': // Route for customer service
+        if (!$isLoggedIn) {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'frontend/customer_service.php';
+        break;
 
 
     // --- API Endpoints ---
     case 'api/send_two_factor_code':
-        if (!$isLoggedIn) {
+        // This API endpoint is part of the login flow, so it doesn't require full login,
+        // but it does require `temp_user_id` to be set to indicate a login attempt is in progress.
+        if (!isset($_SESSION['temp_user_id'])) { // Check for temp_user_id from login.php
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized. No active login attempt.']);
             exit;
         }
         include 'api/send_two_factor_code.php';
         break;
 
     case 'api/verify_two_factor_code':
-        if (!$isLoggedIn) {
+        // Similar to send_two_factor_code, requires temp_user_id, not full login.
+        if (!isset($_SESSION['temp_user_id'])) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized. No active login attempt.']);
             exit;
         }
         include 'api/verify_two_factor_code.php';
@@ -183,6 +235,7 @@ switch ($route) {
         break;
     
     case 'api/get_exchange_rate':
+        // This might be accessed by AJAX on transfer page.
         if (!$isLoggedIn) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -192,6 +245,7 @@ switch ($route) {
         break;
 
     case 'api/transfer_history':
+        // This might be accessed by AJAX on statements or dashboard.
         if (!$isLoggedIn) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -201,6 +255,7 @@ switch ($route) {
         break;
     
     case 'api/get_account_balance':
+        // This might be accessed by AJAX on dashboard or accounts page.
         if (!$isLoggedIn) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Unauthorized']);
