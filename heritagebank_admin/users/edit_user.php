@@ -3,12 +3,12 @@ session_start();
 require_once '../../Config.php'; // Ensure Config.php has MongoDB connection details
 
 // Use MongoDB PHP Library
-require_once __DIR__ . '/vendor/autoload.php'; // Adjust path if Composer's autoload is elsewhere
+require_once '../../functions.php'; // This is good to have for future database operations
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId; // For working with MongoDB's unique IDs
 
 // Check if admin is logged in
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
     header('Location: ../index.php'); // Corrected redirect to admin login page
     exit;
 }
@@ -29,8 +29,8 @@ if (isset($_GET['message']) && isset($_GET['type'])) {
 // Establish MongoDB connection
 try {
     // Assuming MONGO_URI and MONGO_DB are defined in Config.php
-    $mongoClient = new Client(MONGO_URI);
-    $database = $mongoClient->selectDatabase(MONGO_DB);
+    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);   
+    $database = $client->selectDatabase(MONGODB_DB_NAME);
     $usersCollection = $database->selectCollection('users');
     $accountsCollection = $database->selectCollection('accounts');
 } catch (Exception $e) {
@@ -235,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
                     try {
                         // Start a session for multi-document transaction (requires MongoDB replica set/sharded cluster)
                         // If not in a replica set/sharded cluster, this will silently not use transactions.
-                        $session = $mongoClient->startSession();
+                       $session = $client->startSession(); // Use the correctly initialized $client variable
                         $session->startTransaction();
 
                         // 1. Update User Details

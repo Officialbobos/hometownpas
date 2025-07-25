@@ -1,10 +1,10 @@
 <?php
 session_start();
 require_once '../../Config.php'; // Adjust path based on your actual file structure
-require_once '../../vendor/autoload.php'; // Assumes you've installed MongoDB PHP Library via Composer
+require_once '../../functions.php'; // This is good to have for future database operations
 
 // Check if the admin is NOT logged in, redirect to login page
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
     header('Location: ../index.php'); // Corrected redirect to admin login page
     exit;
 }
@@ -14,9 +14,9 @@ $message_type = ''; // Will be 'success', 'error', 'credit', or 'debit' for styl
 
 // MongoDB Connection
 try {
-    // MONGO_URI and MONGO_DB_NAME should be defined in Config.php
-    $client = new MongoDB\Client(MONGO_URI);
-    $database = $client->selectDatabase(MONGO_DB_NAME);
+    // MONGO_URI and MONGO_DB_NAME should be defined in Config.php  
+    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);    
+    $database = $client->selectDatabase(MONGODB_DB_NAME);
     $accountsCollection = $database->selectCollection('accounts');
     $usersCollection = $database->selectCollection('users'); // Need users collection to fetch user details
     $transactionsCollection = $database->selectCollection('transactions');

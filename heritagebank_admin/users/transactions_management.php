@@ -4,11 +4,16 @@
 session_start();
 require_once '../../Config.php'; // Contains database credentials and SMTP settings
 require_once '../../functions.php'; // Contains helper functions including sendEmail, complete_pending_transfer, reject_pending_transfer
-require_once '../../vendor/autoload.php'; // Include Composer's autoloader for MongoDB
+
+// Ensure MongoDB classes are available
+use MongoDB\Client;
+use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\UTCDateTime;
+use MongoDB\Driver\Exception\Exception as MongoDBException; // Alias for clarity
 
 // Admin authentication check
 // Redirects to admin login page if not authenticated
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
     header('Location: admin_login.php');
     exit;
 }
@@ -21,14 +26,21 @@ $usersCollection = null;
 
 try {
     // MONGO_URI and MONGO_DB_NAME should be defined in Config.php
-    $client = new MongoDB\Client(MONGO_URI);
-    $database = $client->selectDatabase(MONGO_DB_NAME);
+    // Added driver options for potential ECONNRESET troubleshooting
+    $client = new Client(MONGODB_CONNECTION_URI, [], [
+        'connectTimeoutMS' => 10000, // 10 seconds to establish connection
+        'socketTimeoutMS' => 30000   // 30 seconds for socket read/write operations
+    ]);
+    
+    $database = $client->selectDatabase(MONGODB_DB_NAME);
     $transactionsCollection = $database->selectCollection('transactions');
-    $usersCollection = $database->selectCollection('users'); // Assuming 'users' collection for user details
-} catch (MongoDB\Driver\Exception\Exception $e) {
+    $usersCollection = $database->selectCollection('users'); 
+} catch (MongoDBException $e) {
     error_log("MongoDB connection error: " . $e->getMessage());
-    $_SESSION['error_message'] = "ERROR: Could not connect to database. Please try again later.";
-    // Potentially redirect or display error page if DB connection fails critical operations
+    $_SESSION['error_message'] = "ERROR: Could not connect to the database. Please try again later.";
+    // Immediately exit or redirect if DB connection is critical
+    header('Location: admin_dashboard.php'); // Or a dedicated error page
+    exit;
 }
 
 // Define allowed transaction statuses for validation and display
@@ -37,7 +49,7 @@ $allowed_filters = ['approved', 'declined', 'completed', 'pending', 'restricted'
 $settable_statuses = ['pending', 'approved', 'completed', 'declined', 'restricted', 'failed', 'refunded', 'on hold'];
 
 // Define recommended currencies
-$recommended_currencies = ['GBP', 'EUR'];
+$recommended_currencies = ['GBP', 'EUR', 'USD'];
 
 // Determine the current status filter from GET request, default to 'pending'
 $status_filter = $_GET['status_filter'] ?? 'pending';
@@ -55,6 +67,13 @@ if (!in_array($status_filter, $allowed_filters)) {
  * @return bool True on success, false on failure.
  */
 function send_transaction_update_email_notification($user_email, $tx_details, $new_status, $admin_comment) {
+    // Ensure the sendEmail function is accessible and works correctly.
+    // This assumes sendEmail function is defined in functions.php
+    if (!function_exists('sendEmail')) {
+        error_log("sendEmail function not found. Cannot send transaction update email.");
+        return false;
+    }
+
     if (!$user_email) {
         error_log("Attempted to send email but user_email was empty for transaction ID: " . ($tx_details['_id'] ?? 'N/A'));
         return false;
@@ -68,7 +87,7 @@ function send_transaction_update_email_notification($user_email, $tx_details, $n
 
     $body = "
         <p>Dear Customer,</p>
-        <p>This is to inform you about an update regarding your recent transaction with Heritage Bank.</p>
+        <p>This is to inform you about an update regarding your recent transaction with HomeTwon Bank Pa.</p>
         <p><strong>Transaction Reference:</strong> {$transaction_ref_display}</p>
         <p><strong>Amount:</strong> {$amount_display}</p>
         <p><strong>Recipient:</strong> {$recipient_name_display}</p>
@@ -102,7 +121,7 @@ function send_transaction_update_email_notification($user_email, $tx_details, $n
         <p>If you have any questions, please do not hesitate to contact our support team.</p>
         <p>Thank you for banking with Heritage Bank.</p>
         <p>Sincerely,</p>
-        <p>The Heritage Bank Team</p>
+        <p>HomeTown Bank Pa.Management</p>
     ";
 
     $altBody = strip_tags($body); // Simple plain text version
@@ -120,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
     }
 
     // Sanitize and validate input from the form
-    $transaction_id_str = filter_var($_POST['transaction_id'], FILTER_SANITIZE_FULL_SPECIAL_CHARS); // Keep as string for ObjectId conversion
+    $transaction_id_str = filter_var($_POST['transaction_id'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     $new_status = filter_var($_POST['new_status'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     $admin_comment_message = filter_var($_POST['message'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     
@@ -135,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
     } else {
         try {
             // Convert transaction_id_str to MongoDB\BSON\ObjectId
-            $transaction_objectId = new MongoDB\BSON\ObjectId($transaction_id_str);
+            $transaction_objectId = new ObjectId($transaction_id_str);
 
             // Fetch original transaction details and user email for notification BEFORE any updates
             $original_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
@@ -146,7 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                 $original_tx_details = (array) $original_tx_details; // Convert to array for consistent access
 
                 // Fetch user email
-                $user_doc = $usersCollection->findOne(['_id' => new MongoDB\BSON\ObjectId($original_tx_details['user_id'])]);
+                $user_doc = $usersCollection->findOne(['_id' => new ObjectId($original_tx_details['user_id'])]);
                 $user_email = $user_doc['email'] ?? null;
                 
                 $current_db_status = $original_tx_details['status']; // The status currently in the DB
@@ -157,18 +176,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                 // Add a warning if the transaction currency is not recommended
                 if (!in_array(strtoupper($transaction_currency), $recommended_currencies)) {
                     $_SESSION['info_message'] = (isset($_SESSION['info_message']) ? $_SESSION['info_message'] . ' ' : '') . 
-                                                "Warning: This transaction's currency (" . htmlspecialchars($transaction_currency) . ") is not one of the recommended currencies (GBP, EUR).";
+                                                 "Warning: This transaction's currency (" . htmlspecialchars($transaction_currency) . ") is not one of the recommended currencies (GBP, EUR, USD).";
                 }
 
                 // Decide which helper function to call based on the new_status
-                // These functions (complete_pending_transfer, reject_pending_transfer)
-                // must be updated to use MongoDB operations and accept the collection objects.
                 if ($new_status === 'completed' && $current_db_status === 'pending') {
-                    // Assuming complete_pending_transfer function is updated to take MongoDB collection
-                    $result_action = complete_pending_transfer($transactionsCollection, $transaction_objectId);
+                    // Pass collections to the helper functions
+                    $result_action = complete_pending_transfer($transactionsCollection, $usersCollection, $transaction_objectId);
                 } elseif ($new_status === 'declined' && $current_db_status === 'pending') {
-                    // Assuming reject_pending_transfer function is updated to take MongoDB collection
-                    $result_action = reject_pending_transfer($transactionsCollection, $transaction_objectId, $admin_comment_message);
+                    // Pass collections to the helper functions
+                    $result_action = reject_pending_transfer($transactionsCollection, $usersCollection, $transaction_objectId, $admin_comment_message);
                 } else {
                     // For other status changes (e.g., pending -> approved, approved -> restricted, etc.)
                     // or if changing from/to 'completed'/'declined' when it wasn't pending
@@ -179,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                                 'status' => $new_status,
                                 'Heritage_comment' => $admin_comment_message,
                                 'admin_action_by' => $admin_username,
-                                'action_at' => new MongoDB\BSON\UTCDateTime() // Set current UTC date/time
+                                'action_at' => new UTCDateTime() // Set current UTC date/time
                             ]
                         ]
                     );
@@ -213,7 +230,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                     $_SESSION['error_message'] = (isset($_SESSION['error_message']) ? $_SESSION['error_message'] . ' ' : '') . $result_action['message']; // Append error messages
                 }
             }
-        } catch (MongoDB\Driver\Exception\Exception $e) {
+        } catch (MongoDBException $e) { // Catch MongoDB specific exceptions
             $_SESSION['error_message'] = "Database error during update: " . $e->getMessage();
             error_log("MongoDB update error: " . $e->getMessage());
         } catch (Exception $e) { // Catch for ObjectId conversion or other general errors
@@ -246,7 +263,7 @@ if ($transactionsCollection && $usersCollection) {
 
             // Fetch sender's first_name, last_name, and email from the users collection
             $sender_details = $usersCollection->findOne(
-                ['_id' => new MongoDB\BSON\ObjectId($tx['user_id'])], // Assuming user_id is stored as ObjectId
+                ['_id' => new ObjectId($tx['user_id'])], // Assuming user_id is stored as ObjectId
                 ['projection' => ['first_name' => 1, 'last_name' => 1, 'email' => 1]]
             );
 
@@ -261,16 +278,16 @@ if ($transactionsCollection && $usersCollection) {
             }
 
             // Convert MongoDB\BSON\UTCDateTime objects to formatted strings for display
-            if (isset($tx['initiated_at']) && $tx['initiated_at'] instanceof MongoDB\BSON\UTCDateTime) {
+            if (isset($tx['initiated_at']) && $tx['initiated_at'] instanceof UTCDateTime) {
                 $tx['initiated_at'] = $tx['initiated_at']->toDateTime()->format('Y-m-d H:i:s');
             }
-            if (isset($tx['action_at']) && $tx['action_at'] instanceof MongoDB\BSON\UTCDateTime) {
+            if (isset($tx['action_at']) && $tx['action_at'] instanceof UTCDateTime) {
                 $tx['action_at'] = $tx['action_at']->toDateTime()->format('Y-m-d H:i:s');
             }
 
             $transactions[] = $tx;
         }
-    } catch (MongoDB\Driver\Exception\Exception $e) {
+    } catch (MongoDBException $e) {
         $_SESSION['error_message'] = "Failed to fetch transactions from database: " . $e->getMessage();
         error_log("MongoDB fetch error: " . $e->getMessage());
     }
@@ -287,323 +304,15 @@ if ($transactionsCollection && $usersCollection) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - Transaction Management</title>
-    <link rel="stylesheet" href="admin_style.css"> 
+    <link rel="stylesheet" href="admin_style.css">
+    <link rel="stylesheet" href="transaction.css"> 
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
-    <style>
-        /* --- General Admin Panel Styles (Can be moved to admin_style.css) --- */
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: #f4f7f6;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-        .admin-header {
-            background-color: #2c3e50; /* Dark blue-grey */
-            color: white;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .admin-header .logo {
-            height: 35px;
-            filter: brightness(0) invert(1); /* Makes logo white if it's dark */
-        }
-        .admin-header .admin-info {
-            font-size: 1.1em;
-        }
-        .admin-header .admin-info a {
-            color: white;
-            text-decoration: none;
-            margin-left: 20px;
-            padding: 8px 15px;
-            border: 1px solid rgba(255,255,255,0.5);
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
-        }
-        .admin-header .admin-info a:hover {
-            background-color: rgba(255,255,255,0.2);
-        }
-        .admin-container {
-            display: flex;
-            flex-grow: 1;
-        }
-        .admin-sidebar {
-            width: 250px;
-            background-color: #34495e; /* Slightly lighter dark blue-grey */
-            color: white;
-            padding-top: 20px;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
-        }
-        .admin-sidebar ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .admin-sidebar ul li a {
-            display: block;
-            padding: 15px 30px;
-            color: white;
-            text-decoration: none;
-            font-size: 1.05em;
-            border-left: 5px solid transparent;
-            transition: background-color 0.3s ease, border-left-color 0.3s ease;
-        }
-        .admin-sidebar ul li a:hover,
-        .admin-sidebar ul li a.active {
-            background-color: #4a667f; /* Darker hover */
-            border-left-color: #3498db; /* Bright blue highlight */
-        }
-        .admin-sidebar ul li a i {
-            margin-right: 10px;
-            width: 20px;
-            text-align: center;
-        }
-        .admin-main-content {
-            flex-grow: 1;
-            padding: 30px;
-            background-color: #f4f7f6;
-        }
-        .section-header {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 1.8em;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 10px;
-        }
-        /* Message styles */
-        .message {
-            padding: 10px 20px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            font-size: 1em;
-            display: flex;
-            align-items: center;
-        }
-        .message.success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .message.error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .message.info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        /* Table styles */
-        .transaction-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            background-color: white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-            border-radius: 8px;
-            overflow: hidden; /* Ensures rounded corners apply to content */
-        }
-        .transaction-table th,
-        .transaction-table td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-            vertical-align: top; /* Align content to top */
-        }
-        .transaction-table th {
-            background-color: #f2f2f2;
-            color: #333;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 0.9em;
-        }
-        .transaction-table tbody tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        .transaction-table tbody tr:hover {
-            background-color: #e6f0fa;
-        }
-
-        /* Button styles */
-        .button-small {
-            padding: 6px 12px;
-            font-size: 0.9em;
-            border-radius: 4px;
-            cursor: pointer;
-            border: none;
-            transition: background-color 0.3s ease;
-        }
-        .button-edit {
-            background-color: #3498db; /* Blue */
-            color: white;
-        }
-        .button-edit:hover {
-            background-color: #217dbb;
-        }
-
-        /* --- Status-Specific Styling (NEW and Existing) --- */
-        .status-pending { 
-            color: orange; 
-            font-weight: bold; 
-            background-color: #FFF8E1;
-            padding: 3px 8px;
-            border-radius: 4px;
-        }
-        .status-approved { 
-            color: green; 
-            font-weight: bold; 
-            background-color: #E8F5E9;
-            padding: 3px 8px;
-            border-radius: 4px;
-        }
-        .status-completed { 
-            color: darkgreen; 
-            font-weight: bold; 
-            background-color: #E0F2F1;
-            padding: 3px 8px;
-            border-radius: 4px;
-        }
-        .status-declined { 
-            color: red; 
-            font-weight: bold; 
-            background-color: #FFEBEE;
-            padding: 3px 8px;
-            border-radius: 4px;
-        }
-        .status-restricted { 
-            color: #8B0000; /* Dark red */
-            font-weight: bold; 
-            background-color: #FBE9E7;
-            padding: 3px 8px;
-            border-radius: 4px;
-        }
-        /* NEW Status Styles */
-        .status-failed {
-            color: #DC3545; /* Red */
-            font-weight: bold;
-            background-color: #FADBD8; /* Light red background */
-            padding: 3px 8px;
-            border-radius: 4px;
-        }
-        .status-on-hold {
-            color: #FFC107; /* Yellow/Orange */
-            font-weight: bold;
-            background-color: #FFF3CD; /* Light yellow background */
-            padding: 3px 8px;
-            border-radius: 4px;
-        }
-        .status-refunded {
-            color: #17A2B8; /* Teal/Cyan */
-            font-weight: bold;
-            background-color: #D1ECF1; /* Light blue background */
-            padding: 3px 8px;
-            border-radius: 4px;
-        }
-
-        /* Styles for currency recommendation */
-        .currency-warning {
-            color: #E6B300; /* Darker yellow/orange for warning */
-            font-weight: bold;
-            font-size: 0.85em;
-            margin-left: 5px;
-            white-space: nowrap; /* Prevent wrapping */
-            background-color: #FFFDE7; /* Very light yellow background */
-            padding: 2px 6px;
-            border-radius: 3px;
-            border: 1px solid #FFECB3; /* Light orange border */
-        }
-
-        /* --- Responsive Adjustments --- */
-        @media (max-width: 992px) {
-            .admin-container {
-                flex-direction: column;
-            }
-            .admin-sidebar {
-                width: 100%;
-                padding-top: 10px;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            }
-            .admin-sidebar ul {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: space-around;
-            }
-            .admin-sidebar ul li {
-                flex: 1 1 auto;
-                text-align: center;
-            }
-            .admin-sidebar ul li a {
-                border-left: none;
-                border-bottom: 3px solid transparent;
-                padding: 10px 15px;
-            }
-            .admin-sidebar ul li a:hover,
-            .admin-sidebar ul li a.active {
-                border-left-color: transparent;
-                border-bottom-color: #3498db;
-            }
-            .admin-main-content {
-                padding: 20px;
-            }
-        }
-        @media (max-width: 768px) {
-            .admin-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .admin-header .admin-info {
-                margin-top: 10px;
-            }
-            .transaction-table th,
-            .transaction-table td {
-                padding: 8px 10px;
-                font-size: 0.9em;
-            }
-            .transaction-table thead {
-                display: none; /* Hide table headers on small screens */
-            }
-            .transaction-table, .transaction-table tbody, .transaction-table tr, .transaction-table td {
-                display: block; /* Make table elements act as blocks */
-                width: 100%;
-            }
-            .transaction-table tr {
-                margin-bottom: 15px;
-                border: 1px solid #eee;
-                border-radius: 8px;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            }
-            .transaction-table td {
-                text-align: right;
-                padding-left: 50%;
-                position: relative;
-                border: none;
-            }
-            .transaction-table td::before {
-                content: attr(data-label); /* Use data-label for pseudo-elements */
-                position: absolute;
-                left: 10px;
-                width: calc(50% - 20px);
-                padding-right: 10px;
-                white-space: nowrap;
-                text-align: left;
-                font-weight: bold;
-                color: #555;
-            }
-        }
-    </style>
 </head>
 <body>
     <header class="admin-header">
-        <img src="../../images/logo.png" alt="Heritage Bank Admin Logo" class="logo">
+        <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo" class="logo">
         <div class="admin-info">
             <span>Welcome, Admin!</span> <a href="admin_logout.php">Logout</a>
         </div>
@@ -650,7 +359,7 @@ if ($transactionsCollection && $usersCollection) {
                     <option value="declined" <?php echo ($status_filter == 'declined') ? 'selected' : ''; ?>>Declined</option>
                     <option value="completed" <?php echo ($status_filter == 'completed') ? 'selected' : ''; ?>>Completed</option>
                     <option value="restricted" <?php echo ($status_filter == 'restricted') ? 'selected' : ''; ?>>Restricted</option>
-                    <option value="failed" <?php echo ($status_filter == 'failed') ? 'selected' : ''; ?>>Failed</option>    <option value="on hold" <?php echo ($status_filter == 'on hold') ? 'selected' : ''; ?>>On Hold</option>   <option value="refunded" <?php echo ($status_filter == 'refunded') ? 'selected' : ''; ?>>Refunded</option> </select>
+                    <option value="failed" <?php echo ($status_filter == 'failed') ? 'selected' : ''; ?>>Failed</option>    <option value="on hold" <?php echo ($status_filter == 'on hold') ? 'selected' : ''; ?>>On Hold</option>    <option value="refunded" <?php echo ($status_filter == 'refunded') ? 'selected' : ''; ?>>Refunded</option> </select>
             </form>
 
             <div class="table-responsive" style="overflow-x: auto;">

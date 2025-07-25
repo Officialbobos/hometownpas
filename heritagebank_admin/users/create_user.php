@@ -1,7 +1,9 @@
 <?php
 session_start();
 // Ensure Config.php is correctly included. It should be one level up from admin/users/
-require_once __DIR__ . '/../../Config.php'; 
+require_once __DIR__ . '/../../Config.php';
+require_once '../../functions.php'; // This is good to have for future database operations
+
 
 // Use the MongoDB Client class
 use MongoDB\Client;
@@ -9,7 +11,7 @@ use MongoDB\Exception\Exception as MongoDBException; // Catch general MongoDB ex
 use MongoDB\Driver\Exception\BulkWriteException; // Specific exception for write errors (e.g., duplicate key)
 
 // Check if admin is logged in
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
     header('Location: ../index.php'); // Correct path from users folder to HERITAGEBANK_ADMIN/index.php
     exit;
 }
@@ -80,7 +82,7 @@ function generateUniqueNumericId($collection, $field, $length) {
             }
         } catch (MongoDBException $e) {
             error_log("MongoDB Error during unique ID check ($collection->getCollectionName().$field): " . $e->getMessage());
-            return false; // Indicate an error
+            return false; // Indicate an F:\xampp\htdocs\phpfile-main\admin\users\create_user.php
         }
     }
 
@@ -388,7 +390,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Establish MongoDB connection
             $mongoClient = new Client(MONGODB_CONNECTION_URI);
             $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME);
-            
+
             // Get collections
             $usersCollection = $mongoDb->users;
             $accountsCollection = $mongoDb->accounts;
@@ -443,7 +445,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'status' => 'active', // Default status for new users
                 'last_login' => null,
                 'email_verified' => false,
-                'kyc_status' => 'pending'
+                'kyc_status' => 'pending',
+                'two_factor_enabled' => true // <-- ADDED THIS LINE: 2FA is enabled by default for new users
             ];
 
             // Insert user document
@@ -556,7 +559,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // If you want a *different* routing number per account, then you would use $usd_iban_details_savings['routing_number'].
                     // Your original logic implies reuse by assigning $common_routing_number for checking.
                     // If common_routing_number is set, use it, otherwise use the one just generated for savings (shouldn't happen if checking succeeded)
-                    $savings_routing_number = $common_routing_number ?? $usd_iban_details_savings['routing_number']; 
+                    $savings_routing_number = $common_routing_number ?? $usd_iban_details_savings['routing_number'];
                 } else {
                     throw new Exception("Failed to generate unique USD 'IBAN' for Savings account.");
                 }
@@ -613,22 +616,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message_type = 'error';
             $transaction_success = false;
             error_log("MongoDB General Error: " . $e->getMessage());
-        } catch (Exception $e) {
+           } catch (Exception $e) {
             // Catch any other general PHP exceptions (e.g., from our helper functions)
             $message = "An unexpected error occurred: " . $e->getMessage();
             $message_type = 'error';
             $transaction_success = false;
             error_log("General Exception: " . $e->getMessage());
-        } finally {
-            // Always abort transaction if it was started and not committed
-            if ($session && $session->inTransaction()) {
+
+            // Abort transaction here on general error if it was started
+            if (isset($session)) { // Ensure $session object was created
                 try {
                     $session->abortTransaction();
-                    error_log("MongoDB Transaction Aborted.");
-                } catch (MongoDBException $e) {
-                    error_log("Error aborting transaction: " . $e->getMessage());
+                    error_log("MongoDB Transaction Aborted due to general error.");
+                } catch (MongoDBException $abortE) {
+                    error_log("Error during transaction abort (general error catch): " . $abortE->getMessage());
                 }
             }
+        } finally {
+            // Always end the session, whether committed, aborted, or an error occurred before transaction start
+            if (isset($session)) { // Ensure $session object was created
+                $session->endSession();
+            }
+        }
             // If profile image was uploaded and transaction failed, delete it
             if (!$transaction_success && $uploaded_file_full_path && file_exists($uploaded_file_full_path)) {
                 unlink($uploaded_file_full_path);
@@ -638,7 +647,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     end_of_post_processing:; // Label for goto statement
-}
 ?>
 
 <!DOCTYPE html>

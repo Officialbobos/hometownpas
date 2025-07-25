@@ -1,10 +1,10 @@
 <?php
 session_start();
 require_once '../../Config.php'; // Assuming Config.php contains MongoDB connection details
-require_once '../../vendor/autoload.php'; // Assuming you've installed MongoDB PHP Library via Composer
+require_once '../../functions.php'; // This is good to have for future database operations
 
 // Check if the admin is NOT logged in, redirect to login page
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
     header('Location: ../../index.php');
     exit;
 }
@@ -15,8 +15,8 @@ $user_currency_symbol = '€'; // Default to Euro symbol for display in form if 
 
 // MongoDB Connection
 try {
-    $client = new MongoDB\Client(MONGO_URI); // MONGO_URI should be defined in Config.php
-    $database = $client->selectDatabase(MONGO_DB_NAME); // MONGO_DB_NAME in Config.php
+    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);   
+    $database = $client->selectDatabase(MONGODB_DB_NAME);
     $usersCollection = $database->selectCollection('users');
     $accountsCollection = $database->selectCollection('accounts');
     $transactionsCollection = $database->selectCollection('transactions');

@@ -18,8 +18,8 @@ $message_type = '';
 // --- MongoDB Connection ---
 try {
     // MONGO_URI and MONGO_DB_NAME should be defined in Config.php
-    $client = new MongoDB\Client(MONGO_URI);
-    $database = $client->selectDatabase(MONGO_DB_NAME);
+    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);   
+    $database = $client->selectDatabase(MONGODB_DB_NAME);
     $bankCardsCollection = $database->selectCollection('bank_cards');
 } catch (MongoDB\Driver\Exception\Exception $e) {
     error_log("MongoDB connection error: " . $e->getMessage());

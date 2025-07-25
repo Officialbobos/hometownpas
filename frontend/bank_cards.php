@@ -1,15 +1,25 @@
 <?php
-session_start();
-require_once '../Config.php'; // Your database configuration (will need MONGO_URI and MONGO_DB_NAME)
-require_once '../vendor/autoload.php'; // Include Composer's autoloader for MongoDB
+// Remove session_start() here if Config.php handles it.
+// If Config.php does NOT handle it, keep this session_start().
+// Based on your Config.php, it DOES handle it conditionally.
+// So, removing this line and relying on Config.php is the correct approach.
+
+// 1. Include Config.php FIRST. This ensures all constants (including MongoDB, BASE_URL)
+// and Dotenv are loaded BEFORE anything else that relies on them.
+// It also handles session_start() now.
+require_once '../Config.php';
+
+// Remove this line - Config.php already handles Composer autoloader
+// require_once '../vendor/autoload.php';
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 
+// The session should now be active due to Config.php
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: ../index.php');
+    header('Location: ' . BASE_URL . '/index.php'); // Use BASE_URL for redirects
     exit;
 }
 
@@ -27,9 +37,9 @@ $accountsCollection = null;
 $bankCardsCollection = null;
 
 try {
-    // Establish MongoDB connection
-    $client = new Client(MONGO_URI);
-    $database = $client->selectDatabase(MONGO_DB_NAME);
+    // Establish MongoDB connection using the CORRECTED CONSTANTS
+    $client = new Client(MONGODB_CONNECTION_URI); // CORRECTED CONSTANT
+    $database = $client->selectDatabase(MONGODB_DB_NAME); // CORRECTED CONSTANT
     $usersCollection = $database->selectCollection('users');
     $accountsCollection = $database->selectCollection('accounts');
     $bankCardsCollection = $database->selectCollection('bank_cards');
@@ -48,18 +58,26 @@ try {
         }
     }
 } catch (MongoDBDriverException $e) {
-    error_log("MongoDB connection or initial data fetch error: " . $e->getMessage());
+    error_log("MongoDB connection or initial data fetch error in bank_cards.php: " . $e->getMessage());
     $message = "Database connection error. Please try again later.";
     $message_type = 'error';
     // If we can't connect, no point proceeding with any DB ops
-    die(json_encode(['success' => false, 'message' => $message])); // For AJAX, or just die for HTML
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        die(json_encode(['success' => false, 'message' => $message])); // For AJAX
+    } else {
+        die("<h1>" . htmlspecialchars($message) . "</h1><p>Please check application logs for details.</p>"); // For HTML page load
+    }
 } catch (Exception $e) { // Catch for ObjectId conversion or other general errors
-    error_log("General error: " . $e->getMessage());
+    error_log("General error in bank_cards.php: " . $e->getMessage());
     $message = "An unexpected error occurred. Please try again later.";
     $message_type = 'error';
     // If user_id is invalid, we might want to log out or redirect
-    header('Location: ../index.php'); // Redirect if user_id from session is bad
-    exit;
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        die(json_encode(['success' => false, 'message' => $message])); // For AJAX
+    } else {
+        header('Location: ' . BASE_URL . '/index.php'); // Redirect if user_id from session is bad
+        exit;
+    }
 }
 
 $user_full_name = $user_full_name ?: 'Bank Customer';
@@ -77,10 +95,10 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             foreach ($cursor as $row) {
                 $row_arr = (array) $row; // Convert BSON document to PHP array
                 $row_arr['id'] = (string) $row_arr['_id']; // Convert MongoDB _id to string for consistency
-                $row_arr['display_card_number'] = '**** **** **** ' . substr($row_arr['card_number'], -4);
+                $row_arr['display_card_number'] = '**** **** **** ' . substr($row_arr['card_number'] ?? '', -4);
                 $row_arr['card_holder_name'] = strtoupper($user_full_name);
-                $row_arr['display_expiry'] = str_pad($row_arr['expiry_month'], 2, '0', STR_PAD_LEFT) . '/' . substr($row_arr['expiry_year'], 2, 2);
-                $row_arr['display_cvv'] = $row_arr['cvv']; // DANGER: For mock only - DO NOT DO THIS IN PRODUCTION
+                $row_arr['display_expiry'] = str_pad($row_arr['expiry_month'] ?? '', 2, '0', STR_PAD_LEFT) . '/' . substr($row_arr['expiry_year'] ?? '', 2, 2);
+                $row_arr['display_cvv'] = $row_arr['cvv'] ?? '***'; // DANGER: For mock only - DO NOT DO THIS IN PRODUCTION
                 unset($row_arr['card_number']); // Remove raw card number
                 unset($row_arr['cvv']); // Remove raw CVV before sending to frontend
                 unset($row_arr['_id']); // Remove internal MongoDB ID from frontend
@@ -176,22 +194,25 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
 
                 $subject = "Your HomeTown Bank Card Order Confirmation";
                 $body = "Dear " . htmlspecialchars($user_full_name) . ",\n\n"
-                      . "Thank you for ordering a new " . htmlspecialchars($cardNetwork) . " " . htmlspecialchars($cardType) . " card linked to your " . htmlspecialchars($linked_account_type) . " account (" . htmlspecialchars($linked_account_number) . ") from HomeTown Bank PA.\n\n"
-                      . "Your order for a new card (ID: " . $inserted_card_id . ") has been successfully placed.\n"
-                      . "Card Type: " . htmlspecialchars($cardType) . "\n"
-                      . "Card Network: " . htmlspecialchars($cardNetwork) . "\n"
-                      . "Linked Account: " . htmlspecialchars($linked_account_type) . " (No: " . htmlspecialchars($linked_account_number) . ")\n"
-                      . "Shipping Address: " . htmlspecialchars($shippingAddress) . "\n\n"
-                      . "Your card is currently being processed and will be shipped to the address provided. You will receive it within 5-7 business days.\n\n"
-                      . "Once you receive your card, please log in to your dashboard to activate it and set your PIN.\n\n"
-                      . "If you have any questions, please contact our customer support.\n\n"
-                      . "Sincerely,\n"
-                      . "The HomeTown Bank PA Team";
+                        . "Thank you for ordering a new " . htmlspecialchars($cardNetwork) . " " . htmlspecialchars($cardType) . " card linked to your " . htmlspecialchars($linked_account_type) . " account (" . htmlspecialchars($linked_account_number) . ") from HomeTown Bank PA.\n\n"
+                        . "Your order for a new card (ID: " . $inserted_card_id . ") has been successfully placed.\n"
+                        . "Card Type: " . htmlspecialchars($cardType) . "\n"
+                        . "Card Network: " . htmlspecialchars($cardNetwork) . "\n"
+                        . "Linked Account: " . htmlspecialchars($linked_account_type) . " (No: " . htmlspecialchars($linked_account_number) . ")\n"
+                        . "Shipping Address: " . htmlspecialchars($shippingAddress) . "\n\n"
+                        . "Your card is currently being processed and will be shipped to the address provided. You will receive it within 5-7 business days.\n\n"
+                        . "Once you receive your card, please log in to your dashboard to activate it and set your PIN.\n\n"
+                        . "If you have any questions, please contact our customer support.\n\n"
+                        . "Sincerely,\n"
+                        . "The HomeTown Bank PA Team";
 
-                $headers = "From: hometownbankpa@gmail.com\r\n";
-                $headers .= "Reply-To: support@hometownbankpa.com\r\n";
+                $headers = "From: " . SMTP_FROM_NAME . " <" . SMTP_FROM_EMAIL . ">\r\n"; // CORRECTED: Using constants
+                $headers .= "Reply-To: " . SMTP_FROM_EMAIL . "\r\n"; // CORRECTED: Using constants
                 $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+                $headers .= "X-Mailer: PHP/" . phpversion(); // Added X-Mailer
 
+                // This mail function assumes your PHP setup can send mail directly or through sendmail/SMTP configured in php.ini
+                // For robust email sending, use PHPMailer or a similar library with SMTP authentication.
                 if (mail($user_email, $subject, $body, $headers)) {
                     $email_status = "Email sent successfully.";
                 } else {
@@ -222,7 +243,7 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
 // We need to fetch the accounts for the dropdown in the form
 $user_accounts_for_dropdown = [];
 try {
-    $userObjectId = new ObjectId($user_id); // Re-convert for non-AJAX path if necessary
+    // Re-use $userObjectId from the initial connection block
     $cursor = $accountsCollection->find(
         ['user_id' => $userObjectId],
         ['projection' => ['account_number' => 1, 'account_type' => 1]]
@@ -374,7 +395,7 @@ try {
 
     <header class="header">
         <div class="logo">
-            <a href="dashboard.php"> <img src="/frontend/images/hometown_bank_logo.png" alt="Hometown Bank PA Logo">
+            <a href="dashboard.php"> <img src="<?php echo htmlspecialchars(BASE_URL); ?>/frontend/images/hometown_bank_logo.png" alt="Hometown Bank PA Logo">
             </a>
         </div>
         <h1>Manage My Cards</h1>
@@ -432,7 +453,7 @@ try {
                                 <?php echo htmlspecialchars($account['display_name']); ?>
                             </option>
                         <?php endforeach; ?>
-                        </select>
+                    </select>
                 </div>
 
                 <div class="form-group">

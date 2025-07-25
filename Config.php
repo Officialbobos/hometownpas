@@ -1,104 +1,113 @@
 <?php
-echo "CONFIG_LOADED_V_FINAL"; // <-- ADD THIS LINE
+echo "CONFIG_LOADED_V_FINAL"; // <-- CONFIRMATION LINE
+// CONFIRM_CHANGE_CONFIG_20250724 // <-- CONFIRMATION LINE
+
+// IMPORTANT: This file is the SINGLE SOURCE OF TRUTH for loading .env and defining constants.
+// Do NOT load Dotenv directly in other entry scripts (e.g., index.php, admin/index.php).
+
+// Load Composer autoloader
+require_once __DIR__ . '/vendor/autoload.php';
+
+// Define the directory where your .env file might be located.
+// Assuming Config.php and .env are in the root where your Dockerfile is.
+$dotenvDir = __DIR__;
+
+// Load environment variables using phpdotenv ONLY if a .env file exists.
+// On hosting platforms like Render, environment variables are often injected directly
+// into the process environment (e.g., $_ENV, $_SERVER, getenv()),
+// and a physical .env file is not present or needed.
+if (file_exists($dotenvDir . '/.env')) {
+    try {
+        $dotenv = Dotenv\Dotenv::createImmutable($dotenvDir);
+        $dotenv->load();
+    } catch (Dotenv\Exception\InvalidPathException $e) {
+        // This should ideally not happen if file_exists is true, but good for robust logging.
+        error_log("WARNING: .env file found but not readable or path invalid in " . $dotenvDir . ". Error: " . $e->getMessage());
+        // Do NOT die, as variables might still be loaded from the system environment.
+    } catch (Exception $e) {
+        error_log("WARNING: Unexpected error during .env file load: " . $e->getMessage());
+        // Do NOT die, as variables might still be loaded from the system environment.
+    }
+} else {
+    // If .env file doesn't exist (e.g., on Render), variables are expected to be
+    // already loaded into the environment by the hosting platform.
+    error_log("NOTICE: .env file not found at " . $dotenvDir . "/.env. Assuming environment variables are pre-loaded by the system.");
+}
 
 /**
  * MongoDB Database Configuration File for HeritageBanking Admin Panel
- *
- * This file contains the MongoDB connection parameters.
- *
- * IMPORTANT:
- * 1. For PRODUCTION and secure local development: NEVER hardcode sensitive information
- * (like database passwords, Gmail App Passwords, API Keys) directly into this file
- * or commit them to version control.
- * 2. Instead, always set them as ENVIRONMENT VARIABLES.
- * - For local development: Use a `.env` file (which is ignored by Git).
- * - For live deployment: Set them in your hosting platform's dashboard (e.g., Railway, Render).
- * 3. The `getenv()` calls are already set up to read from these environment variables.
- * 4. Ensure this file is not directly accessible via the web server (e.g., place it outside the web root
- * or configure your web server to deny direct access).
  */
 
-// --- MongoDB Database Configuration ---
-// MONGODB_URI should be set as an environment variable (in .env locally, or hosting platform).
-define('MONGODB_CONNECTION_URI', getenv('MONGODB_URI'));
+// MongoDB Settings - USE $_ENV
+// Use null coalescing operator (??) for robustness if the variable might not exist
+define('MONGODB_CONNECTION_URI', $_ENV['MONGODB_CONNECTION_URI'] ?? null);
+define('MONGODB_DB_NAME', $_ENV['MONGODB_DB_NAME'] ?? 'HometownBankPA'); // Default if not set
 
-// The default database name your application will use within the MongoDB cluster.
-// This can be overridden by an environment variable 'MONGODB_DATABASE'.
-// It defaults to 'HometownBankPA' if not explicitly set in the environment.
-define('MONGODB_DB_NAME', getenv('MONGODB_DATABASE') ?: 'HometownBankPA');
+define('TWO_FACTOR_CODE_LENGTH', 6); // Standard length for most authenticator apps
+define('TWO_FACTOR_CODE_EXPIRY_MINUTES', 5); // Example: Code valid for 5 minutes
 
-
-// Ensure the MongoDB PHP driver is installed and enabled in your php.ini.
-// Composer's autoloader needs to be included in your main application entry point (e.g., indx.php).
-// For .env files to work locally, 'vlucas/phpdotenv' should be installed and loaded early.
-use MongoDB\Client;
-use MongoDB\Exception\Exception as MongoDBException;
-
-try {
-    // Create a new MongoDB client instance using the URI from environment variables.
-    $mongoClient = new Client(MONGODB_CONNECTION_URI);
-
-    // Select the database using the defined database name.
-    $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME);
-
-    // Optional: Ping the server to verify the connection.
-    $mongoClient->admin->ping();
-    // echo "Successfully connected to MongoDB database: " . MONGODB_DB_NAME . "<br>"; // For debugging, remove for production
-
-} catch (MongoDBException $e) {
-    error_log("FATAL ERROR: Failed to connect to MongoDB. " . $e->getMessage());
-    die("Database connection error. Please try again later. If the issue persists, contact support.");
-} catch (Exception $e) {
-    error_log("FATAL ERROR: An unexpected error occurred during MongoDB connection. " . $e->getMessage());
-    die("An unexpected database error occurred. Please try again later.");
+// Add a final check to ensure the URI is actually set after trying to define it
+if (!defined('MONGODB_CONNECTION_URI') || empty(MONGODB_CONNECTION_URI)) {
+    error_log("FATAL ERROR: MONGODB_CONNECTION_URI constant is still empty after Config.php execution. Check environment variables (e.g., on Render dashboard).");
+    die("Critical configuration error. MongoDB connection string missing. Please contact support.");
 }
 
-// --- END MongoDB Database Configuration ---
+// --- END MongoDB Database Configuration (Only constants defined here) ---
 
 
 // --- START: Required for Email and Admin Notifications ---
 // Admin Email for notifications - Get from environment variable ADMIN_EMAIL or default.
-define('ADMIN_EMAIL', getenv('ADMIN_EMAIL') ?: 'hometownbankpa@gmail.com');
+define('ADMIN_EMAIL', $_ENV['ADMIN_EMAIL'] ?? 'hometownbankpa@gmail.com');
 
 // Base URL of your project - Get from environment variable BASE_URL or platform specific env vars.
-define('BASE_URL', getenv('RAILWAY_PUBLIC_DOMAIN') ? 'https://' . getenv('RAILWAY_PUBLIC_DOMAIN') : (getenv('BASE_URL') ?: 'http://localhost/heritagebank'));
+// This should be set in Render dashboard to https://hometownpas.onrender.com
+define('BASE_URL', $_ENV['BASE_URL'] ?? 'http://localhost/phpfile-main');
 
 // SMTP Settings for Email Sending (using Gmail)
-// IMPORTANT: Store these in environment variables for production and local .env file!
-define('SMTP_HOST', getenv('SMTP_HOST') ?: 'smtp.gmail.com'); // Can default for common services like Gmail
-define('SMTP_USERNAME', getenv('SMTP_USERNAME')); // Your full Gmail address - MUST be from env
-define('SMTP_PASSWORD', getenv('SMTP_PASSWORD')); // Your Gmail App Password - MUST be from env
-define('SMTP_PORT', getenv('SMTP_PORT') ?: 587); // Default to 587 for TLS
-define('SMTP_ENCRYPTION', getenv('SMTP_ENCRYPTION') ?: 'tls'); // Default to 'tls'
-define('SMTP_FROM_EMAIL', getenv('SMTP_FROM_EMAIL') ?: getenv('SMTP_USERNAME')); // Fallback to SMTP_USERNAME
-define('SMTP_FROM_NAME', getenv('SMTP_FROM_NAME') ?: 'HomeTown Bank PA');
+define('SMTP_HOST', $_ENV['SMTP_HOST'] ?? 'smtp.gmail.com');
+define('SMTP_USERNAME', $_ENV['SMTP_USERNAME'] ?? null);
+define('SMTP_PASSWORD', $_ENV['SMTP_PASSWORD'] ?? null);
+define('SMTP_PORT', (int)($_ENV['SMTP_PORT'] ?? 587));
+define('SMTP_ENCRYPTION', $_ENV['SMTP_ENCRYPTION'] ?? 'tls');
+define('SMTP_FROM_EMAIL', $_ENV['SMTP_FROM_EMAIL'] ?? ($_ENV['SMTP_USERNAME'] ?? null));
+define('SMTP_FROM_NAME', $_ENV['SMTP_FROM_NAME'] ?? 'HomeTown Bank PA');
 // --- END: Required for Email and Admin Notifications ---
 
 
-// Optional: Error Reporting (adjust for production)
-// Control via APP_DEBUG environment variable: set to 'true' for full errors, or 'false'
-ini_set('display_errors', getenv('APP_DEBUG') ? 1 : 0);
-ini_set('display_startup_errors', getenv('APP_DEBUG') ? 1 : 0);
-error_reporting(getenv('APP_DEBUG') ? E_ALL : 0);
+// Control application debugging via APP_DEBUG environment variable: set to 'true' for full errors, or 'false'
+define('APP_DEBUG', ($_ENV['APP_DEBUG'] ?? 'false') === 'true'); // Default to false if not set
 
-// For production: it's highly recommended to disable display errors and log errors instead
-// ini_set('display_errors', 'Off');
-// ini_set('log_errors', 'On');
-// ini_set('error_log', '/path/to/your/php-error.log'); // Specify your error log file path on server
+// Set PHP error reporting based on APP_DEBUG
+if (APP_DEBUG) {
+    ini_set('display_errors', '1');
+    ini_set('display_startup_errors', '1');
+    error_reporting(E_ALL);
+} else {
+    ini_set('display_errors', '0');
+    error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+}
+
 
 // --- START: Required for Currency Exchange and Transfer Rules ---
-
 // Currency Exchange Rate API Configuration
-// IMPORTANT: Get API key from environment variable for production and local .env file!
-define('EXCHANGE_RATE_API_BASE_URL', getenv('EXCHANGE_RATE_API_BASE_URL') ?: 'https://v6.exchangerate-api.com/v6/');
-define('EXCHANGE_RATE_API_KEY', getenv('EXCHANGE_RATE_API_KEY')); // This MUST be from env
+define('EXCHANGE_RATE_API_BASE_URL', $_ENV['EXCHANGE_RATE_API_BASE_URL'] ?? 'https://v6.exchangerate-api.com/v6/');
+define('EXCHANGE_RATE_API_KEY', $_ENV['EXCHANGE_RATE_API_KEY'] ?? null);
 
-// --- IMPORTANT CHANGE: Define explicitly the allowed currencies for ALL transfers. ---
-// This enforces that all transfers (internal and external) can ONLY be made in GBP or EUR.
+// IMPORTANT CHANGE: Define explicitly the allowed currencies for ALL transfers.
 define('ALLOWED_TRANSFER_CURRENCIES', ['GBP', 'EUR', 'USD']);
 
 // Optional: Define a list of all currencies your bank internally supports for accounts.
-// This can be useful for dropdowns or validation across your application.
-define('SUPPORTED_CURRENCIES', ['EUR', 'USD', 'GBP', 'CAD', 'AUD', 'JPY']);
+define('SUPPORTED_CURRENCIES', ['EUR', 'USD', 'GBP', 'CAD', 'AUD', 'JPY', 'NGN']);
+
+// Session settings (important for login) - Ensure session_start() is called once per request
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.use_strict_mode', 1);
+    ini_set('session.cookie_samesite', 'Lax'); // Or 'Strict' for higher security
+    session_start();
+}
+
+// Set default timezone - from .env or default
+date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? 'Africa/Lagos');
 
 // --- END: Required for Currency Exchange and Transfer Rules ---

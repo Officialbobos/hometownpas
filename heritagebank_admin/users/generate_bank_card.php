@@ -3,13 +3,13 @@ session_start();
 require_once '../../Config.php'; // Adjust path if necessary, depending on file location
 
 // Use MongoDB PHP Library
-require_once __DIR__ . '/vendor/autoload.php'; // Adjust path if Composer's autoload is elsewhere
+require_once '../../functions.php'; // This is good to have for future database operations
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId; // For working with MongoDB's unique IDs
 use MongoDB\BSON\UTCDateTime; // For handling dates
 
 // Check if the admin is NOT logged in, redirect to login page
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
     header('Location: ../index.php'); // Corrected logout redirect, assuming ../index.php is your login
     exit;
 }
@@ -24,8 +24,8 @@ $accounts_for_card_generation = []; // Stores accounts for the selected user
 // Establish MongoDB connection
 $mongoClient = null;
 try {
-    $mongoClient = new Client(MONGO_URI);
-    $database = $mongoClient->selectDatabase(MONGO_DB);
+   $client = new MongoDB\Client(MONGODB_CONNECTION_URI);   
+    $database = $client->selectDatabase(MONGODB_DB_NAME);
     $usersCollection = $database->selectCollection('users');
     $accountsCollection = $database->selectCollection('accounts');
     $bankCardsCollection = $database->selectCollection('bank_cards'); // New collection for cards
@@ -417,11 +417,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: linear-gradient(45deg, #006633, #009933); /* Green tones for Verve */
         }
 
+        /* **UPDATED**: HomeTown Bank text/logo on card */
         .card-display h4 {
             margin-top: 0;
-            font-size: 1.1em;
-            color: rgba(255,255,255,0.8);
+            font-size: 1.2em; /* Slightly larger for prominence */
+            color: white; /* Ensure it stands out on dark backgrounds */
+            text-transform: uppercase; /* Common for bank names */
+            font-weight: 700; /* Make it bold */
+            letter-spacing: 1px; /* Add some spacing */
+            margin-bottom: 20px; /* Provide space below it */
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3); /* Subtle shadow for depth */
+            /* If you want to use an image logo, you might remove this h4 or hide it */
+            /* If keeping as text, its current flow placement is fine, or you can absolutely position it: */
+            /* position: absolute; top: 25px; left: 25px; */
         }
+
+        /* New: Styles for an actual bank logo image if you decide to use one */
+        .bank-logo-on-card {
+            position: absolute;
+            top: 25px;   /* Distance from the top */
+            left: 25px;  /* Distance from the left */
+            height: 35px; /* Adjust size to fit well */
+            object-fit: contain; /* Ensures logo scales without distortion */
+            /* Uncomment the next line if your logo is dark and needs to be white on the card */
+            /* filter: brightness(0) invert(1); */
+        }
+
+
         .card-display .chip {
             width: 50px;
             height: 35px;
@@ -448,11 +470,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .card-display .card-footer .value {
             font-weight: bold;
         }
+        /* **UPDATED**: Network card logo placement */
         .card-logo {
             position: absolute;
-            bottom: 25px;
-            right: 25px;
-            height: 40px; /* Adjust size as needed */
+            bottom: 20px; /* Slightly adjusted for more clear space */
+            right: 20px; /* Slightly adjusted for more clear space */
+            height: 45px; /* Slightly larger for prominence */
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2)); /* Add a subtle shadow */
+            object-fit: contain; /* Ensure the logo scales properly */
         }
         /* Styles for the two-step form sections */
         .form-section {
@@ -489,7 +514,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="dashboard-container">
         <div class="dashboard-header">
-            <img src="../../images/logo.png" alt="HomeTown Bank Logo" class="logo">
+            <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo" class="logo">
             <h2>Generate Bank Card</h2>
             <a href="../logout.php" class="logout-button">Logout</a>
         </div>
@@ -573,11 +598,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php
                         $card_logo_path = '';
                         if (strtolower($generated_card_info['card_type']) === 'visa') {
-                            $card_logo_path = '../../images/visa_logo.png';
+                            $card_logo_path = 'https://i.imgur.com/x69sY3k.png';
                         } elseif (strtolower($generated_card_info['card_type']) === 'mastercard') {
-                            $card_logo_path = '../../images/mastercard_logo.png';
+                            $card_logo_path = 'https://i.imgur.com/139Suh3.png';
                         } elseif (strtolower($generated_card_info['card_type']) === 'verve') {
-                            $card_logo_path = '../../images/verve_logo.png';
+                            $card_logo_path = 'https://i.imgur.com/dhW5pdv.png';
                         }
                     ?>
                     <?php if ($card_logo_path): ?>
