@@ -323,8 +323,7 @@ switch ($route) {
                 <div id="login-message" class="message-box" style="display: none;"></div>
             <?php endif; ?>
 
-            <form class="login-form" id="loginForm" action="index.php" method="POST">
-                <div class="form-group username-group">
+            <form class="login-form" id="loginForm" action="/" method="POST">                <div class="form-group username-group">
                     <label for="last_name" class="sr-only">Last Name</label>
                     <p class="input-label">Last Name</p>
                     <div class="input-wrapper">
