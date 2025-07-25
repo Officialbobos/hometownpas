@@ -1,4 +1,5 @@
 <?php
+echo "CONFIG_LOADED_V_FINAL"; // <-- ADD THIS LINE
 
 /**
  * MongoDB Database Configuration File for HeritageBanking Admin Panel

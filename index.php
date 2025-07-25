@@ -1,6 +1,11 @@
 <?php
+echo "INDEX_LOADED_V_FINAL"; // Add this line
+
 // C:\xampp\htdocs\heritagebank\index.php
 session_start();
+
+require_once __DIR__ . '/vendor/autoload.php'; // This loads all Composer-installed classes
+
 // Include your database configuration and functions file
 require_once 'Config.php'; // Path from project root
 require_once 'functions.php'; // Path from project root
