@@ -27,7 +27,7 @@ if (file_exists($dotenvPath . '/.env')) {
 // into the environment by the hosting platform (e.g., Render's Config Vars).
 // --- End Dotenv loading ---
 
-require_once __DIR__ . '/../Config.php';           // Path from frontend/ to project root
+require_once __DIR__ . '/../Config.php';          // Path from frontend/ to project root
 require_once __DIR__ . '/../functions.php';        // Path from frontend/ to project root
 
 use MongoDB\Client;
@@ -84,6 +84,9 @@ try {
         $last_name = $user_data['last_name'] ?? '';
         $user_full_name = htmlspecialchars(trim($first_name . ' ' . $last_name));
         $masked_user_email = hideEmailPartially($user_email); // Use the helper function
+        // Assign role to session before handling requests to use in routing decision
+        $_SESSION['role'] = $user_data['is_admin'] ? 'admin' : 'user';
+
     } else {
         // User not found in DB for the session temp_user_id
         error_log("User data not found for temp_user_id: " . $temp_user_id_str . ". Possible session mismatch or DB issue.");
@@ -330,9 +333,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
                     $_SESSION['is_admin'] = $user_data_for_verification['is_admin'] ?? false;
                     $_SESSION['two_factor_enabled'] = $two_factor_enabled; // Keep 2FA status in session
                     $_SESSION['two_factor_method'] = $two_factor_method_current; // Keep 2FA method in session
+                    $_SESSION['role'] = $user_data_for_verification['is_admin'] ? 'admin' : 'user'; // Ensure role is set for general routing
 
                     // CRITICAL: Set 2FA as verified in session
-                    $_SESSION['2fa_verified'] = true; // <--- ADD THIS LINE
+                    $_SESSION['2fa_verified'] = true; // <--- ADDED/CONFIRMED THIS LINE
 
                     // Clear 2FA specific temporary session variables
                     unset($_SESSION['auth_step']);
@@ -387,7 +391,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeTown Bank - Verify Code</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/frontend/style.css"> 
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         /* Specific styles for the verify code page, extending from style.css */
@@ -579,7 +583,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
             <p>Please enter the code below to complete your login.</p>
         <?php endif; ?>
 
-        <form action="verify_code.php" method="POST">
+        <form action="<?php echo BASE_URL; ?>/verify_code" method="POST">
             <div class="form-group">
                 <label for="verification_code">Verification Code</label>
                 <input type="text" id="verification_code" name="verification_code" required maxlength="6" pattern="\d{6}" title="Please enter the 6-digit code.">
@@ -590,7 +594,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
         <?php if ($two_factor_method === 'email' && !$show_authenticator_setup): ?>
             <div class="resend-link">
                 Didn't receive the code?
-                <form action="verify_code.php" method="POST" style="display:inline;">
+                <form action="<?php echo BASE_URL; ?>/verify_code" method="POST" style="display:inline;">
                     <button type="submit" name="resend_code">Resend Code</button>
                 </form>
             </div>
