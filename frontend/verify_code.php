@@ -41,8 +41,6 @@ use BaconQrCode\Renderer\Image\Png; // For rendering QR code as PNG
 $message = '';
 $message_type = '';
 
-// Removed: $g = new GoogleAuthenticator(); // This class does not exist with spomky-labs/otphp
-
 // Check if 2FA process is pending and temporary user ID exists
 // Ensure consistent session state: 'auth_step' should be set in login.php
 if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' || !isset($_SESSION['temp_user_id'])) {
