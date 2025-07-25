@@ -3,46 +3,14 @@
 
 session_start();
 
-ini_set('display_errors', 1); // Enable error display for debugging (turn off in production)
+// Enable error display for debugging. Config.php also sets this based on APP_DEBUG,
+// but keeping it here temporarily ensures errors are visible if Config.php itself fails.
+ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// --- START DEBUGGING SNIPPET ---
-echo "<pre>";
-echo "<h2>Debugging File Paths in transfer.php</h2>";
-echo "Current __DIR__: " . __DIR__ . "<br>";
-
-$expectedConfigPath = __DIR__ . '/../Config.php';
-echo "Expected Config.php path: " . $expectedConfigPath . "<br>";
-echo "Config.php file_exists: " . (file_exists($expectedConfigPath) ? 'TRUE' : 'FALSE') . "<br>";
-echo "Config.php is_readable: " . (is_readable($expectedConfigPath) ? 'TRUE' : 'FALSE') . "<br>";
-
-$parentDir = dirname(__DIR__);
-echo "Parent directory (for .env): " . $parentDir . "<br>";
-echo ".env file_exists in parent: " . (file_exists($parentDir . '/.env') ? 'TRUE' : 'FALSE') . "<br>";
-
-echo "<h3>Listing contents of /var/www/html/</h3>";
-$htmlDir = '/var/www/html/';
-if (is_dir($htmlDir)) {
-    $files = scandir($htmlDir);
-    echo implode("<br>", $files);
-} else {
-    echo "/var/www/html/ is not a directory or does not exist.<br>";
-}
-
-echo "<h3>Listing contents of /var/www/html/frontend/</h3>";
-$frontendDir = '/var/www/html/frontend/';
-if (is_dir($frontendDir)) {
-    $files = scandir($frontendDir);
-    echo implode("<br>", $files);
-} else {
-    echo "/var/www/html/frontend/ is not a directory or does not exist.<br>";
-}
-
-echo "</pre>";
-// --- END DEBUGGING SNIPPET ---
-
 // Ensure these two lines are now using __DIR__ . '/../'
+// These are relative to the current file (transfer.php in /frontend/)
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../Config.php';
 require_once __DIR__ . '/../functions.php';
@@ -53,6 +21,7 @@ use MongoDB\Exception\Exception as MongoDBException;
 
 
 // Check login, etc.
+// Use defined BASE_URL constant for redirection
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . '/login');
     exit;
@@ -69,12 +38,20 @@ if (empty($full_name)) {
 
 // Establish MongoDB connection
 try {
+    // Check if constants are defined before using them
+    if (!defined('MONGODB_CONNECTION_URI') || empty(MONGODB_CONNECTION_URI)) {
+        throw new Exception("MONGODB_CONNECTION_URI is not defined or empty.");
+    }
+    if (!defined('MONGODB_DB_NAME') || empty(MONGODB_DB_NAME)) {
+        throw new Exception("MONGODB_DB_NAME is not defined or empty.");
+    }
+
     $client = new Client(MONGODB_CONNECTION_URI);
     $db = $client->selectDatabase(MONGODB_DB_NAME);
     $accountsCollection = $db->accounts;
 } catch (MongoDBException $e) {
     error_log("MongoDB connection error in transfer.php: " . $e->getMessage());
-    die("ERROR: Could not connect to MongoDB. Please try again later. Detail: " . $e->getMessage()); // Keep detail for now for debugging on Render
+    die("ERROR: Could not connect to MongoDB. Please try again later. Detail: " . $e->getMessage());
 } catch (Exception $e) {
     error_log("General database connection error in transfer.php: " . $e->getMessage());
     die("ERROR: An unexpected error occurred during database connection. Please try again later. Detail: " . $e->getMessage());

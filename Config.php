@@ -31,14 +31,56 @@ if (file_exists($dotenvDir . '/.env')) {
     error_log("NOTICE: .env file not found at " . $dotenvDir . "/.env. Assuming environment variables are pre-loaded by the system.");
 }
 
+// --- START: DEBUGGING ENVIRONMENT VARIABLES ---
+// This block will help you see what's actually in $_ENV and getenv() on Render.
+error_log("--- PHP Environment Variable Debug Start ---");
+error_log("Listing contents of \$_ENV:");
+foreach ($_ENV as $key => $value) {
+    // Sanitize sensitive values for logs
+    if (strpos($key, 'PASS') !== false || strpos($key, 'URI') !== false || strpos($key, 'KEY') !== false) {
+        error_log("  _ENV: " . $key . " = [SENSITIVE VALUE]");
+    } else {
+        error_log("  _ENV: " . $key . " = " . $value);
+    }
+}
+
+error_log("Listing selected variables via getenv():");
+$varsToCheck = [
+    'MONGODB_CONNECTION_URI',
+    'MONGODB_DB_NAME',
+    'BASE_URL',
+    'ADMIN_EMAIL',
+    'SMTP_USERNAME',
+    'SMTP_PASSWORD',
+    'EXCHANGE_RATE_API_KEY',
+    'APP_DEBUG',
+    'APP_TIMEZONE'
+];
+foreach ($varsToCheck as $varName) {
+    $value = getenv($varName);
+    if ($value !== false) {
+        if (strpos($varName, 'PASS') !== false || strpos($varName, 'URI') !== false || strpos($varName, 'KEY') !== false) {
+            error_log("  getenv(): " . $varName . " = [SENSITIVE VALUE]");
+        } else {
+            error_log("  getenv(): " . $varName . " = " . $value);
+        }
+    } else {
+        error_log("  getenv(): " . $varName . " = NOT SET");
+    }
+}
+error_log("--- PHP Environment Variable Debug End ---");
+// --- END: DEBUGGING ENVIRONMENT VARIABLES ---
+
+
 /**
  * MongoDB Database Configuration File for HeritageBanking Admin Panel
  */
 
 // MongoDB Settings - USE $_ENV
 // Use null coalescing operator (??) for robustness if the variable might not exist
-define('MONGODB_CONNECTION_URI', $_ENV['MONGODB_CONNECTION_URI'] ?? null);
-define('MONGODB_DB_NAME', $_ENV['MONGODB_DB_NAME'] ?? 'HometownBankPA'); // Default if not set
+// We will now also try getenv() as a fallback for maximum compatibility.
+define('MONGODB_CONNECTION_URI', $_ENV['MONGODB_CONNECTION_URI'] ?? getenv('MONGODB_CONNECTION_URI') ?? null);
+define('MONGODB_DB_NAME', $_ENV['MONGODB_DB_NAME'] ?? getenv('MONGODB_DB_NAME') ?? 'HometownBankPA'); // Default if not set
 
 define('TWO_FACTOR_CODE_LENGTH', 6); // Standard length for most authenticator apps
 define('TWO_FACTOR_CODE_EXPIRY_MINUTES', 5); // Example: Code valid for 5 minutes
@@ -54,25 +96,25 @@ if (!defined('MONGODB_CONNECTION_URI') || empty(MONGODB_CONNECTION_URI)) {
 
 // --- START: Required for Email and Admin Notifications ---
 // Admin Email for notifications - Get from environment variable ADMIN_EMAIL or default.
-define('ADMIN_EMAIL', $_ENV['ADMIN_EMAIL'] ?? 'hometownbankpa@gmail.com');
+define('ADMIN_EMAIL', $_ENV['ADMIN_EMAIL'] ?? getenv('ADMIN_EMAIL') ?? 'hometownbankpa@gmail.com');
 
 // Base URL of your project - Get from environment variable BASE_URL or platform specific env vars.
 // This should be set in Render dashboard to https://hometownpas.onrender.com
-define('BASE_URL', $_ENV['BASE_URL'] ?? 'http://localhost/phpfile-main');
+define('BASE_URL', $_ENV['BASE_URL'] ?? getenv('BASE_URL') ?? 'http://localhost/phpfile-main');
 
 // SMTP Settings for Email Sending (using Gmail)
-define('SMTP_HOST', $_ENV['SMTP_HOST'] ?? 'smtp.gmail.com');
-define('SMTP_USERNAME', $_ENV['SMTP_USERNAME'] ?? null);
-define('SMTP_PASSWORD', $_ENV['SMTP_PASSWORD'] ?? null);
-define('SMTP_PORT', (int)($_ENV['SMTP_PORT'] ?? 587));
-define('SMTP_ENCRYPTION', $_ENV['SMTP_ENCRYPTION'] ?? 'tls');
-define('SMTP_FROM_EMAIL', $_ENV['SMTP_FROM_EMAIL'] ?? ($_ENV['SMTP_USERNAME'] ?? null));
-define('SMTP_FROM_NAME', $_ENV['SMTP_FROM_NAME'] ?? 'HomeTown Bank PA');
+define('SMTP_HOST', $_ENV['SMTP_HOST'] ?? getenv('SMTP_HOST') ?? 'smtp.gmail.com');
+define('SMTP_USERNAME', $_ENV['SMTP_USERNAME'] ?? getenv('SMTP_USERNAME') ?? null);
+define('SMTP_PASSWORD', $_ENV['SMTP_PASSWORD'] ?? getenv('SMTP_PASSWORD') ?? null);
+define('SMTP_PORT', (int)($_ENV['SMTP_PORT'] ?? getenv('SMTP_PORT') ?? 587));
+define('SMTP_ENCRYPTION', $_ENV['SMTP_ENCRYPTION'] ?? getenv('SMTP_ENCRYPTION') ?? 'tls');
+define('SMTP_FROM_EMAIL', $_ENV['SMTP_FROM_EMAIL'] ?? getenv('SMTP_FROM_EMAIL') ?? ($_ENV['SMTP_USERNAME'] ?? getenv('SMTP_USERNAME') ?? null));
+define('SMTP_FROM_NAME', $_ENV['SMTP_FROM_NAME'] ?? getenv('SMTP_FROM_NAME') ?? 'HomeTown Bank PA');
 // --- END: Required for Email and Admin Notifications ---
 
 
 // Control application debugging via APP_DEBUG environment variable: set to 'true' for full errors, or 'false'
-define('APP_DEBUG', ($_ENV['APP_DEBUG'] ?? 'false') === 'true'); // Default to false if not set
+define('APP_DEBUG', ($_ENV['APP_DEBUG'] ?? getenv('APP_DEBUG') ?? 'false') === 'true'); // Default to false if not set
 
 // Set PHP error reporting based on APP_DEBUG
 if (APP_DEBUG) {
@@ -87,8 +129,8 @@ if (APP_DEBUG) {
 
 // --- START: Required for Currency Exchange and Transfer Rules ---
 // Currency Exchange Rate API Configuration
-define('EXCHANGE_RATE_API_BASE_URL', $_ENV['EXCHANGE_RATE_API_BASE_URL'] ?? 'https://v6.exchangerate-api.com/v6/');
-define('EXCHANGE_RATE_API_KEY', $_ENV['EXCHANGE_RATE_API_KEY'] ?? null);
+define('EXCHANGE_RATE_API_BASE_URL', $_ENV['EXCHANGE_RATE_API_BASE_URL'] ?? getenv('EXCHANGE_RATE_API_BASE_URL') ?? 'https://v6.exchangerate-api.com/v6/');
+define('EXCHANGE_RATE_API_KEY', $_ENV['EXCHANGE_RATE_API_KEY'] ?? getenv('EXCHANGE_RATE_API_KEY') ?? null);
 
 // IMPORTANT CHANGE: Define explicitly the allowed currencies for ALL transfers.
 define('ALLOWED_TRANSFER_CURRENCIES', ['GBP', 'EUR', 'USD']);
@@ -105,6 +147,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Set default timezone - from .env or default
-date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? 'Africa/Lagos');
+date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? getenv('APP_TIMEZONE') ?? 'Africa/Lagos');
 
 // --- END: Required for Currency Exchange and Transfer Rules ---
+?>
