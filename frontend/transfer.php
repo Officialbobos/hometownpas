@@ -1,20 +1,27 @@
 <?php
 // Path: C:\xampp\htdocs\hometownbank\frontend\transfer.php
 
-session_start();
+// Ensure session is started FIRST.
+// Config.php might try to start it too, but starting it here first ensures it's always available
+// for $_SESSION checks immediately, before Config.php fully loads.
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Enable error display for debugging. Config.php also sets this based on APP_DEBUG,
-// but keeping it here temporarily ensures errors are visible if Config.php itself fails.
+
+// Enable error display for debugging. (Good for local dev, but Config.php's APP_DEBUG should control this in prod)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Ensure these two lines are now using __DIR__ . '/../'
-// These are relative to the current file (transfer.php in /frontend/)
-require_once __DIR__ . '/../vendor/autoload.php';
+// Load Config.php first. It handles Composer's autoload.php and defines global constants like BASE_URL.
+// __DIR__ . '/../' points from 'frontend/' up to the project root.
 require_once __DIR__ . '/../Config.php';
+
+// Then load functions.php, which might depend on constants or autoloader from Config.php.
 require_once __DIR__ . '/../functions.php';
 
+// Now, Composer classes are available because Config.php loaded autoload.php.
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Exception\Exception as MongoDBException;
@@ -39,6 +46,7 @@ if (empty($full_name)) {
 // Establish MongoDB connection
 try {
     // Check if constants are defined before using them
+    // These checks are good, but if Config.php is working correctly, they should always be true.
     if (!defined('MONGODB_CONNECTION_URI') || empty(MONGODB_CONNECTION_URI)) {
         throw new Exception("MONGODB_CONNECTION_URI is not defined or empty.");
     }
@@ -166,7 +174,7 @@ switch ($active_transfer_method) {
                     <p class="message <?php echo htmlspecialchars($message_type); ?>"><?php echo htmlspecialchars($message); ?></p>
                 <?php endif; ?>
 
-            <form action="<?php echo BASE_URL; ?>/frontend/make_transfer.php" method="POST" id="transferForm">                    <input type="hidden" name="initiate_transfer" value="1">
+            <form action="<?php echo BASE_URL; ?>/frontend/make_transfer.php" method="POST" id="transferForm">                   <input type="hidden" name="initiate_transfer" value="1">
 
                     <div class="form-group">
                         <label for="transfer_method">Select Transfer Method:</label>

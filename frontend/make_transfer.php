@@ -1,17 +1,20 @@
 <?php
-// Path: C:\xampp\htdocs\hometownbank\frontend\make_transfer.php (This is its actual location)
+// Path: C:\xampp\htdocs\hometownbank\frontend\make_transfer.php
 
-session_start();
+// Start the session at the very beginning to ensure it's available for all subsequent code.
+// This also prevents potential "headers already sent" errors if output happens before session_start().
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 
 ini_set('display_errors', 1); // Enable error display for debugging
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// !!! IMPORTANT: Adjust these paths to be relative to THIS FILE'S location !!!
-// It's in frontend/, so it needs to go up two directories to reach vendor/ and Config.php
-require_once __DIR__ . '/../../vendor/autoload.php'; // Go up two levels
-require_once __DIR__ . '/../../Config.php';         // Go up two levels
-require_once __DIR__ . '/../../functions.php';       // Go up two levels
+// !!! IMPORTANT: Load Config.php first. It should handle autoload.php. !!!
+// It's in frontend/, so it needs to go up two directories to reach Config.php and functions.php in the root.
+require_once __DIR__ . '/../../Config.php';
+require_once __DIR__ . '/../../functions.php'; // functions.php may depend on Config.php's settings or autoloader
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
@@ -46,6 +49,8 @@ if (empty($user_full_name)) {
 
 // 2. Establish MongoDB Connection
 try {
+    // These checks are good, but ideally, Config.php should ensure these are defined.
+    // If Config.php is robust, these checks might be redundant here.
     if (!defined('MONGODB_CONNECTION_URI') || empty(MONGODB_CONNECTION_URI)) {
         throw new Exception("MONGODB_CONNECTION_URI is not defined or empty.");
     }
@@ -62,12 +67,14 @@ try {
     error_log("MongoDB connection error in frontend/make_transfer.php: " . $e->getMessage());
     $_SESSION['message'] = "ERROR: Database connection failed. Please try again later. Detail: " . $e->getMessage();
     $_SESSION['message_type'] = "error";
+    $_SESSION['form_data'] = $_POST; // Make sure to preserve form data on DB connection error
     header('Location: ' . BASE_URL . '/transfer'); // Redirect back to transfer.php in frontend
     exit;
 } catch (Exception $e) {
     error_log("General database connection error in frontend/make_transfer.php: " . $e->getMessage());
     $_SESSION['message'] = "ERROR: An unexpected error occurred during database connection. Please try again later. Detail: " . $e->getMessage();
     $_SESSION['message_type'] = "error";
+    $_SESSION['form_data'] = $_POST; // Make sure to preserve form data on general DB connection error
     header('Location: ' . BASE_URL . '/transfer'); // Redirect back to transfer.php in frontend
     exit;
 }

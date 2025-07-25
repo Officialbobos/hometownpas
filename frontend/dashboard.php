@@ -222,7 +222,7 @@ if ($mongoClient) {
             <h2>My Cards</h2>
            <a href="<?php echo BASE_URL; ?>/bank_cards.php" class="button-class">
              <i class="fas fa-credit-card"></i> View My Cards
-            </a>
+           </a>
             <div class="card-list-container" id="userCardList" style="display: none;">
                 <p class="loading-message" id="cardsLoadingMessage">No cards found. Go to "Manage All Cards" to add one.</p>
             </div>
@@ -345,11 +345,6 @@ if ($mongoClient) {
             <i class="fas fa-sign-out-alt"></i> Logout
         </button>
     </div>
-<script>
-    document.getElementById('viewCardsBtn').addEventListener('click', function() {
-        window.location.href = BASE_URL_JS + '/bank_cards.php';
-    });
-</script>
     <script src="<?php echo BASE_URL; ?>/frontend/user.dashboard.js"></script>
 </body>
 </html>

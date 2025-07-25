@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // --- NEW FUNCTIONALITY: Handle transfer type selection within the modal ---
+        // --- Handle transfer type selection within the modal ---
         const internalTransferBtn = document.getElementById('internalTransferBtn');
         const ibanTransferBtn = document.getElementById('ibanTransferBtn');
         const sortCodeTransferBtn = document.getElementById('sortCodeTransferBtn');
@@ -263,8 +263,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- View My Cards Logic (As per previous discussion, it's a direct HTML link) ---
-    // No JS needed for direct navigation. If you want a toggle *on the dashboard*,
-    // you'll need a new button and element to toggle.
+    // --- NEW: View My Cards Logic ---
+    const viewMyCardsButton = document.getElementById('viewMyCardsButton'); // Assuming you give your button this ID
 
+    if (viewMyCardsButton) {
+        viewMyCardsButton.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent default link behavior if it's an <a> tag
+            window.location.href = 'banks_card.php'; // Redirect to banks_card.php
+        });
+    }
 });
