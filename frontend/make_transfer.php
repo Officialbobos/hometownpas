@@ -13,8 +13,8 @@ error_reporting(E_ALL);
 
 // !!! IMPORTANT: Load Config.php first. It should handle autoload.php. !!!
 // It's in frontend/, so it needs to go up two directories to reach Config.php and functions.php in the root.
-require_once __DIR__ . '/../../Config.php';
-require_once __DIR__ . '/../../functions.php'; // functions.php may depend on Config.php's settings or autoloader
+require_once __DIR__ . '/../Config.php';
+require_once __DIR__ . '/../functions.php'; // functions.php may depend on Config.php's settings or autoloader
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
