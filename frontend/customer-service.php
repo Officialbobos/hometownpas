@@ -1,18 +1,28 @@
 <?php
 // Path: C:\xampp\htdocs\hometownbank\frontend\customer_service.php
 
+// Ensure session is started. It's often best practice to have Config.php handle this
+// as it's typically the first file included everywhere. If Config.php already calls
+// session_start(), this block might be redundant but harmless due to the if check.
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-ini_set('display_errors', 1); // Enable error display for debugging
+// Enable error display for debugging. Remember to disable or set to 0 in production.
+ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
+// Include Composer's autoloader for any libraries (like PHPMailer for sendEmail)
 require_once __DIR__ . '/../vendor/autoload.php';
 
-
+// Include your custom configuration and functions files
 require_once __DIR__ . '/../Config.php';
-require_once __DIR__ . '/../functions.php'; // For sanitize_input, and potentially other utilities
+require_once __DIR__ . '/../functions.php'; // For sanitize_input, getMongoDBClient(), sendEmail(), etc.
+
+// No specific backend logic is needed for a static customer service display page
+// unless you plan to dynamically fetch FAQs from a database, etc.
+// For now, it's a static page, so no database connection is required on initial load.
 
 ?>
 <!DOCTYPE html>
@@ -245,7 +255,8 @@ require_once __DIR__ . '/../functions.php'; // For sanitize_input, and potential
 
     <header class="header">
         <div class="logo">
-<img src="<?php echo BASE_URL; ?>/images/hometown_bank_logo.png" alt="Hometown Bank PA Logo">        </div>
+            <img src="<?php echo BASE_URL; ?>/images/hometown_bank_logo.png" alt="Hometown Bank PA Logo">
+        </div>
         <h1>Customer Service</h1>
     </header>
 
@@ -266,9 +277,9 @@ require_once __DIR__ . '/../functions.php'; // For sanitize_input, and potential
             <a href="tel:+12544007639" class="contact-button phone">
                 <i class="fas fa-phone-alt"></i> Call Us: +1 254-400-7639
             </a>
-           <a href="<?php echo BASE_URL; ?>/dashboard" class="contact-button homepage">
-    <i class="fas fa-home"></i> Back to Homepage
-</a>
+            <a href="<?php echo BASE_URL; ?>/dashboard" class="contact-button homepage">
+                <i class="fas fa-home"></i> Back to Dashboard
+            </a>
         </div>
 
         <section class="faq-section">

@@ -1,6 +1,8 @@
 <?php
 // Config.php should be included first to ensure session and constants are available.
 
+// Ensure session is started only once. It's often best to handle this in Config.php
+// if Config.php is the first file included in every request.
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
@@ -9,9 +11,9 @@ ini_set('display_errors', 1); // Enable error display for debugging
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-
-require_once '/../Config.php'; // This now handles session_start() and Composer autoloader.
-require_once '/../functions.php'; // Ensure functions.php is included if it contains getMongoDBClient() or other helpers
+// CORRECTED: Use __DIR__ for robust path resolution
+require_once __DIR__ . '/../Config.php';
+require_once __DIR__ . '/../functions.php'; // Ensure functions.php is included if it contains getMongoDBClient() or other helpers
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
@@ -110,13 +112,16 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
 
                 // Determine the card logo path based on the network
                 $card_network_lower = strtolower($row_arr['card_network'] ?? 'default');
-                $card_logo_path = BASE_URL . '/images/card_logos/' . $card_network_lower . '.png';
-                // Check if the logo file actually exists (optional, but good for debugging)
-                // In a real scenario, you might have default images or robust error handling
-                if (!file_exists(__DIR__ . '/../images/card_logos/' . $card_network_lower . '.png')) {
-                     $card_logo_path = BASE_URL . '/images/card_logos/default.png'; // Fallback if specific logo not found
+
+                // Corrected image path for PHP file_exists check and for frontend URL
+                // Assuming images are in the 'frontend/images/card_logos/' directory
+                $file_system_logo_path = __DIR__ . '/images/card_logos/' . $card_network_lower . '.png';
+                $card_logo_url = FRONTEND_BASE_URL . 'images/card_logos/' . $card_network_lower . '.png';
+
+                if (!file_exists($file_system_logo_path)) {
+                    $card_logo_url = FRONTEND_BASE_URL . 'images/card_logos/default.png'; // Fallback if specific logo not found
                 }
-                $row_arr['card_logo_src'] = $card_logo_path;
+                $row_arr['card_logo_src'] = $card_logo_url;
 
 
                 // DANGER: For mock only - DO NOT send real CVV/PIN to frontend in production
@@ -270,12 +275,15 @@ try {
     // Re-use $userObjectId from the initial connection block
     $cursor = $accountsCollection->find(
         ['user_id' => $userObjectId],
-        ['projection' => ['account_number' => 1, 'account_type' => 1]]
+        ['projection' => ['account_number' => 1, 'account_type' => 1, 'balance' => 1, 'currency' => 1]] // Added balance and currency for display in JS
     );
     foreach ($cursor as $accountDoc) {
         $user_accounts_for_dropdown[] = [
             'id' => (string) $accountDoc['_id'], // Convert ObjectId to string for HTML value
-            'display_name' => ($accountDoc['account_type'] ?? 'Account') . ' (****' . substr($accountDoc['account_number'] ?? '', -4) . ')'
+            'account_type' => $accountDoc['account_type'] ?? 'Account',
+            'display_account_number' => '****' . substr($accountDoc['account_number'] ?? '', -4),
+            'balance' => $accountDoc['balance'] ?? 0.00, // Make sure to fetch balance
+            'currency' => $accountDoc['currency'] ?? 'USD' // Make sure to fetch currency
         ];
     }
 } catch (MongoDBDriverException $e) {
@@ -467,7 +475,7 @@ try {
                         <option value="">Select Account</option>
                         <?php foreach ($user_accounts_for_dropdown as $account): ?>
                             <option value="<?php echo htmlspecialchars($account['id']); ?>">
-                                <?php echo htmlspecialchars($account['display_name']); ?>
+                                <?php echo htmlspecialchars($account['account_type'] . ' (' . $account['display_account_number'] . ') - ' . $account['currency'] . sprintf('%.2f', $account['balance'])); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>

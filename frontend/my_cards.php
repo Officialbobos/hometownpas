@@ -1,7 +1,7 @@
 <?php
 session_start();
-require_once '../../Config.php'; // Adjust path based on your directory structure
-require_once '../../functions.php'; // For MongoDB setup and other helpers (like sendEmail if used)
+require_once '/../Config.php'; // Adjust path based on your directory structure
+require_once '/../functions.php'; // For MongoDB setup and other helpers (like sendEmail if used)
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId; // For working with MongoDB's unique IDs
