@@ -41,7 +41,7 @@ $bankCardsCollection = null;
 try {
     // Establish MongoDB connection using the CORRECTED CONSTANTS
     $client = getMongoDBClient(); // Use the helper function from functions.php
-    $database = $client->selectDatabase(MONGO_DB_NAME); // Use constant from Config.php
+    $database = $client->selectDatabase(MONGODB_DB_NAME); // Use constant from Config.php
     $usersCollection = $database->selectCollection('users');
     $accountsCollection = $database->selectCollection('accounts');
     $bankCardsCollection = $database->selectCollection('bank_cards');
