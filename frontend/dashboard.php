@@ -47,7 +47,7 @@ require_once __DIR__ . '/../functions.php'; // For sanitize_input, and potential
 
 // Check if the user is logged in. If not, redirect to login page.
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: ../index.php'); // Corrected from indx.php to index.php
+    header('Location: /'); // Corrected from indx.php to index.php
     exit;
 }
 
