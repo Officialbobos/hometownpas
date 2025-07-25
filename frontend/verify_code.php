@@ -7,10 +7,27 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../vendor/autoload.php'; // Correct path to autoload.php
-$dotenv = Dotenv\Dotenv::createImmutable(dirname(__DIR__)); // Corrected path to project root
-$dotenv->load();
 
-require_once __DIR__ . '/../Config.php';         // Path from frontend/ to project root
+// --- Start Dotenv loading (conditional for deployment) ---
+// This block attempts to load .env files only if they exist.
+// On Render, environment variables should be set directly in the dashboard,
+// so a physical .env file won't be present.
+$dotenvPath = dirname(__DIR__);
+if (file_exists($dotenvPath . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
+    try {
+        $dotenv->load(); // This will only run if .env file exists
+    } catch (Dotenv\Exception\InvalidPathException $e) {
+        // This catch is mostly for local dev if .env is missing.
+        // On Render, this block won't be hit because file_exists is false.
+        error_log("Dotenv load error locally on path " . $dotenvPath . ": " . $e->getMessage());
+    }
+}
+// If .env doesn't exist (like on Render), the variables are assumed to be pre-loaded
+// into the environment by the hosting platform (e.g., Render's Config Vars).
+// --- End Dotenv loading ---
+
+require_once __DIR__ . '/../Config.php';          // Path from frontend/ to project root
 require_once __DIR__ . '/../functions.php';       // Path from frontend/ to project root
 
 use MongoDB\Client;
