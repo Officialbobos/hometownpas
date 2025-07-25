@@ -264,12 +264,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- NEW: View My Cards Logic ---
-    const viewMyCardsButton = document.getElementById('viewMyCardsButton'); // Assuming you give your button this ID
+const viewMyCardsButton = document.getElementById('viewMyCardsButton'); // Now this ID will exist
 
-    if (viewMyCardsButton) {
-        viewMyCardsButton.addEventListener('click', (e) => {
-            e.preventDefault(); // Prevent default link behavior if it's an <a> tag
-            window.location.href = 'banks_card.php'; // Redirect to banks_card.php
-        });
-    }
+if (viewMyCardsButton) {
+    viewMyCardsButton.addEventListener('click', (e) => {
+        e.preventDefault(); // Prevent default link behavior, as we're handling it with JS
+        // Ensure BASE_URL_JS is correctly passed from PHP and includes the domain
+        window.location.href = `${BASE_URL_JS}/frontend/bank_cards.php`; // Corrected path and filename
+    });
+}
 });

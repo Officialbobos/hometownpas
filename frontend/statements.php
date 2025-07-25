@@ -81,8 +81,8 @@ try {
             'transaction_type' => 1,
             'status' => 1,
             'transaction_reference' => 1,
-            // You might need to project 'sender_account_id' or 'recipient_account_id'
-            // if you need to determine if the transaction was an inflow or outflow relative to THIS user.
+            'user_id' => 1, // Crucial for determining if it's a debit or credit for THIS user
+            'recipient_user_id' => 1, // Crucial for determining if it's a debit or credit for THIS user
         ]
     ];
 
@@ -94,15 +94,8 @@ try {
             $transaction['initiated_at'] = $transaction['initiated_at']->toDateTime()->format('Y-m-d H:i:s');
         }
 
-        // To correctly determine if it's a 'debit' or 'credit' from *this user's perspective*,
-        // you need to know which account (sender or recipient) belongs to the logged-in user.
-        // For simplicity, using the 'transaction_type' field as is, but be aware of its definition.
-        // For example, a 'transfer' type might be a debit for the sender and a credit for the receiver.
-        // You'd need to compare $user_id_mongo with $transaction['user_id'] and $transaction['recipient_user_id']
-        // and adjust 'transaction_type' (or introduce 'flow_type') based on that.
-        // For now, we'll assume `transaction_type` correctly indicates debit/credit from the source's POV.
-
-        $user_transactions[] = (array) $transaction; // Cast to array for consistent access
+        // Cast to array for consistent access
+        $user_transactions[] = (array) $transaction;
     }
 
 } catch (Exception $e) {
@@ -360,18 +353,11 @@ uksort($grouped_transactions, function($a, $b) {
         }
 
         /* Applying specific colors based on transaction type for amounts */
-        .transaction-item-amount.credit,
-        .transaction-item-amount.deposit { /* Added deposit for clarity */
+        .transaction-item-amount.credit {
             color: #28a745; /* Green for credit/deposit */
         }
 
-        .transaction-item-amount.debit,
-        .transaction-item-amount.withdrawal, /* Added withdrawal for clarity */
-        .transaction-item-amount.transfer,
-        .transaction-item-amount.internal_self_transfer,
-        .transaction-item-amount.internal_heritage,
-        .transaction-item-amount.external_iban,
-        .transaction-item-amount.external_sort_code {
+        .transaction-item-amount.debit {
             color: #dc3545; /* Red for debit and all transfer types */
         }
 
@@ -566,32 +552,48 @@ uksort($grouped_transactions, function($a, $b) {
                             </h3>
                             <ul class="transactions-list">
                                 <?php foreach ($transactions as $transaction):
-                                    // Determine the amount class and sign based on transaction type
                                     $amount_class = '';
                                     $amount_sign = '';
                                     
-                                    // IMPORTANT: This logic assumes 'transaction_type' accurately reflects
-                                    // inflow/outflow from the perspective of the *user whose statement this is*.
-                                    // If 'transaction_type' is generic (e.g., 'transfer' for both sender/receiver),
-                                    // you'd need additional logic based on 'user_id' and 'recipient_user_id'
-                                    // to decide if it's an income (+) or expense (-).
-                                    // For example: if ($transaction['user_id'] == $user_id_mongo) { $amount_class = 'debit'; $amount_sign = '-'; } else { $amount_class = 'credit'; $amount_sign = '+'; }
-                                    
-                                    if (in_array($transaction['transaction_type'], ['credit', 'deposit'])) {
+                                    // Determine if the logged-in user is the sender or recipient
+                                    $is_sender = $user_id_mongo == $transaction['user_id'];
+                                    $is_recipient = $user_id_mongo == $transaction['recipient_user_id'];
+
+                                    if ($is_sender && $is_recipient) {
+                                        // This case might happen for internal self-transfers or specific transaction types
+                                        // You'll need to define how to handle these. For simplicity, treating as debit.
+                                        $amount_class = 'debit';
+                                        $amount_sign = '-';
+                                    } elseif ($is_sender) {
+                                        // Logged-in user is the sender (outflow)
+                                        $amount_class = 'debit';
+                                        $amount_sign = '-';
+                                    } elseif ($is_recipient) {
+                                        // Logged-in user is the recipient (inflow)
                                         $amount_class = 'credit';
                                         $amount_sign = '+';
                                     } else {
-                                        // All other types (debit, transfer, withdrawal, etc.) are considered outgoing/debit for display purposes here
+                                        // Fallback if neither sender nor recipient (shouldn't happen with correct filter)
+                                        $amount_class = 'debit'; // Default to debit for safety
+                                        $amount_sign = '-';
+                                    }
+
+                                    // Special handling for 'deposit' and 'withdrawal' if they are distinct transaction types
+                                    // and not covered by sender/recipient logic (e.g., ATM deposits/withdrawals)
+                                    if ($transaction['transaction_type'] === 'deposit') {
+                                        $amount_class = 'credit';
+                                        $amount_sign = '+';
+                                    } elseif ($transaction['transaction_type'] === 'withdrawal') {
                                         $amount_class = 'debit';
                                         $amount_sign = '-';
                                     }
+
                                 ?>
                                     <li class="transaction-item">
                                         <div class="transaction-item-details">
                                             <span class="description"><?php echo htmlspecialchars($transaction['description']); ?></span>
                                             <span class="date-ref">
                                                 <?php 
-                                                // Ensure $transaction['initiated_at'] is a string or DateTime object for format()
                                                 echo (new DateTime($transaction['initiated_at']))->format('M d, Y H:i'); 
                                                 ?>
                                                 (Ref: <?php echo htmlspecialchars($transaction['transaction_reference']); ?>)

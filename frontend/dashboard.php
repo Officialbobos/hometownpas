@@ -220,8 +220,7 @@ if ($mongoClient) {
 
         <section class="bank-cards-section">
             <h2>My Cards</h2>
-           <a href="<?php echo BASE_URL; ?>/bank_cards.php" class="button-class">
-             <i class="fas fa-credit-card"></i> View My Cards
+        <li><a href="<?php echo BASE_URL; ?>/frontend/bank_cards.php"><i class="fas fa-credit-card"></i> Bank Cards</a></li>                     <i class="fas fa-credit-card"></i> View My Cards
            </a>
             <div class="card-list-container" id="userCardList" style="display: none;">
                 <p class="loading-message" id="cardsLoadingMessage">No cards found. Go to "Manage All Cards" to add one.</p>
@@ -288,7 +287,7 @@ if ($mongoClient) {
         <div class="transfer-modal-content">
             <h3>Choose Transfer Type</h3>
             <div class="transfer-options-list">
-                <button class="transfer-option" data-transfer-type="Own Account" onclick="window.location.href='<?php echo BASE_URL; ?>/transfer?type=own_account'">
+                <button class="transfer-option" data-transfer-type="Own Account" onclick="window.location.href='<?php echo BASE_URL; ?>/frontend/transfer.php?type=own_account'">
                     <i class="fas fa-wallet"></i> <p>Transfer to My Other Account</p>
                 </button>
 
