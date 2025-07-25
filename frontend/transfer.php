@@ -7,26 +7,45 @@ ini_set('display_errors', 1); // Enable error display for debugging (turn off in
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-require_once __DIR__ . '/../vendor/autoload.php'; // Composer autoloader FIRST
+// --- START DEBUGGING SNIPPET ---
+echo "<pre>";
+echo "<h2>Debugging File Paths in transfer.php</h2>";
+echo "Current __DIR__: " . __DIR__ . "<br>";
 
-// --- Start Dotenv loading (Crucial for Render/Local dev) ---
-$dotenvPath = dirname(__DIR__); // Go up one level from 'frontend' to the project root (hometownbank)
+$expectedConfigPath = __DIR__ . '/../Config.php';
+echo "Expected Config.php path: " . $expectedConfigPath . "<br>";
+echo "Config.php file_exists: " . (file_exists($expectedConfigPath) ? 'TRUE' : 'FALSE') . "<br>";
+echo "Config.php is_readable: " . (is_readable($expectedConfigPath) ? 'TRUE' : 'FALSE') . "<br>";
 
-if (file_exists($dotenvPath . '/.env')) {
-    $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
-    try {
-        $dotenv->load();
-        error_log("DEBUG: .env file EXISTS locally in transfer.php. Loaded Dotenv.");
-    } catch (Dotenv\Exception\InvalidPathException $e) {
-        error_log("Dotenv load error locally on path " . $dotenvPath . " in transfer.php: " . $e->getMessage());
-    }
+$parentDir = dirname(__DIR__);
+echo "Parent directory (for .env): " . $parentDir . "<br>";
+echo ".env file_exists in parent: " . (file_exists($parentDir . '/.env') ? 'TRUE' : 'FALSE') . "<br>";
+
+echo "<h3>Listing contents of /var/www/html/</h3>";
+$htmlDir = '/var/www/html/';
+if (is_dir($htmlDir)) {
+    $files = scandir($htmlDir);
+    echo implode("<br>", $files);
 } else {
-    error_log("DEBUG: .env file DOES NOT exist in transfer.php. Skipping Dotenv load. (Expected on Render)");
+    echo "/var/www/html/ is not a directory or does not exist.<br>";
 }
-// --- End Dotenv loading ---
 
-require_once '../Config.php'; // Now Config.php can safely read $_ENV variables
-require_once '../functions.php'; // Ensure this has sanitize_input, bcmath functions, and get_currency_symbol
+echo "<h3>Listing contents of /var/www/html/frontend/</h3>";
+$frontendDir = '/var/www/html/frontend/';
+if (is_dir($frontendDir)) {
+    $files = scandir($frontendDir);
+    echo implode("<br>", $files);
+} else {
+    echo "/var/www/html/frontend/ is not a directory or does not exist.<br>";
+}
+
+echo "</pre>";
+// --- END DEBUGGING SNIPPET ---
+
+// Ensure these two lines are now using __DIR__ . '/../'
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../Config.php';
+require_once __DIR__ . '/../functions.php';
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
