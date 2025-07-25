@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Logic for Account Cards Carousel ---
     const accountCardsContainer = document.querySelector('.account-cards-container');
+    // Ensure accountCardsContainer exists before querying its children
     const accountCards = accountCardsContainer ? Array.from(accountCardsContainer.querySelectorAll('.account-card')) : [];
     const accountPagination = document.querySelector('.account-pagination');
 
@@ -21,28 +22,34 @@ document.addEventListener('DOMContentLoaded', () => {
     function getCardDimensions() {
         if (accountCards.length === 0) return { cardWidth: 0, cardMarginRight: 0, totalCardWidth: 0 };
         const cardStyle = getComputedStyle(accountCards[0]);
-        // Get the actual width of the card including padding and border
-        const cardWidth = accountCards[0].offsetWidth;
-        const cardMarginRight = parseFloat(cardStyle.marginRight) || 0;
-        const totalCardWidth = cardWidth + cardMarginRight;
-        return { cardWidth, cardMarginRight, totalCardWidth };
+        const cardWidth = accountCards[0].offsetWidth; // Includes padding and border
+        // Assumes gap is applied as margin-right to all but the last card, or uses actual gap property
+        const gap = parseFloat(cardStyle.marginRight) || 0; // If using margin for gap
+        // If using CSS gap property on container, you might need to adjust this:
+        // const containerStyle = getComputedStyle(accountCardsContainer);
+        // const gap = parseFloat(containerStyle.gap) || 0; // If CSS `gap` is used
+        const totalCardWidth = cardWidth + gap; // Card width + space after it
+        return { cardWidth, gap, totalCardWidth };
     }
 
     function showAccountCard(index) {
         if (accountCards.length === 0 || !accountCardsContainer) {
-            // console.log("No account cards or container found for carousel."); // Debug
+            console.warn("No account cards or container found for carousel. Skipping carousel logic.");
             return;
         }
 
-        // Ensure index is within bounds (looping)
+        // Ensure index is within bounds (looping behavior for carousel)
         currentAccountIndex = (index % accountCards.length + accountCards.length) % accountCards.length;
 
         const { totalCardWidth } = getCardDimensions();
         const offset = currentAccountIndex * totalCardWidth;
 
+        // Apply the transform to scroll the container
         accountCardsContainer.style.transform = `translateX(-${offset}px)`;
-        accountCardsContainer.style.transition = 'transform 0.5s ease-in-out'; // Re-enable transition after drag
+        // Re-enable transition after potential `transition: none` from drag/resize
+        accountCardsContainer.style.transition = 'transform 0.5s ease-in-out';
 
+        // Update pagination dots
         if (accountPagination) {
             const dots = accountPagination.querySelectorAll('.dot');
             dots.forEach((dot, dotIndex) => {
@@ -61,7 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear existing dots
         accountPagination.innerHTML = '';
 
-        if (accountCards.length <= 1) { // Only show dots if more than one card
+        // Only show dots if more than one card
+        if (accountCards.length <= 1) {
             return;
         }
 
@@ -79,8 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Initialize carousel if cards are present
     if (accountCards.length > 0) {
-        // Initial display
         showAccountCard(currentAccountIndex);
         createPaginationDots();
 
@@ -89,42 +97,40 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('resize', () => {
             clearTimeout(resizeTimeout);
             resizeTimeout = setTimeout(() => {
-                // Temporarily disable transition during resize to prevent weird jumps
+                // Temporarily disable transition during resize to prevent jumps
                 if (accountCardsContainer) {
                     accountCardsContainer.style.transition = 'none';
                 }
                 showAccountCard(currentAccountIndex); // Recalculate offset based on new dimensions
-                // No need to recreate dots unless number of cards changes or structure changes
             }, 200); // Debounce resize for better performance
         });
 
-        // Touch/Swipe Logic
+        // --- Touch/Swipe Logic for Account Cards ---
         let touchStartX = 0;
         let touchEndX = 0;
-        let isSwiping = false; // Flag to ensure we only swipe if started on container
+        let isSwiping = false;
 
         accountCardsContainer.addEventListener('touchstart', (e) => {
             touchStartX = e.touches[0].clientX;
             isSwiping = true;
-            // Temporarily disable transition during drag for smoother feel
-            accountCardsContainer.style.transition = 'none';
-        }, { passive: true });
+            accountCardsContainer.style.transition = 'none'; // Disable transition during drag
+        }, { passive: true }); // Use passive listener for better scroll performance
 
         accountCardsContainer.addEventListener('touchmove', (e) => {
-            if (!isSwiping || e.touches.length > 1) return;
+            if (!isSwiping || e.touches.length > 1) return; // Only track single touch swipe
 
             touchEndX = e.touches[0].clientX;
             const diff = touchEndX - touchStartX;
             const { totalCardWidth } = getCardDimensions();
             const currentOffset = -currentAccountIndex * totalCardWidth;
 
-            // Apply the drag visually
+            // Apply the drag visually by directly manipulating transform
             accountCardsContainer.style.transform = `translateX(${currentOffset + diff}px)`;
         });
 
         accountCardsContainer.addEventListener('touchend', (e) => {
             if (!isSwiping) return;
-            isSwiping = false; // Reset swipe flag
+            isSwiping = false;
 
             touchEndX = e.changedTouches[0].clientX;
             const swipeThreshold = 50; // Minimum pixels to swipe to trigger a change
@@ -138,18 +144,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentAccountIndex--;
                 showAccountCard(currentAccountIndex);
             } else {
-                // Not enough swipe, snap back to current card
+                // Not enough swipe, snap back to current card position
                 showAccountCard(currentAccountIndex);
             }
-            // Transition is re-enabled inside showAccountCard
         });
 
-        // Mouse Drag Logic for Desktop (Optional, but good for completeness)
+        // --- Mouse Drag Logic for Desktop (Optional, but good for completeness) ---
         let isDragging = false;
         let dragStartX = 0;
-        let currentTranslate = 0;
+        let currentTranslate = 0; // Stores the base translateX value before drag starts
 
         accountCardsContainer.addEventListener('mousedown', (e) => {
+            // Only left click (main button)
+            if (e.button !== 0) return;
+
             isDragging = true;
             dragStartX = e.clientX;
             // Get current transform value for smooth continuation
@@ -161,6 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         accountCardsContainer.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
+            e.preventDefault(); // Prevent text selection during drag
             const dragDistance = e.clientX - dragStartX;
             accountCardsContainer.style.transform = `translateX(${currentTranslate + dragDistance}px)`;
         });
@@ -182,14 +191,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         accountCardsContainer.addEventListener('mouseleave', () => {
-            // If mouse leaves while dragging, treat it as mouseup
+            // If mouse leaves while dragging, treat it as mouseup to avoid stuck state
             if (isDragging) {
                 isDragging = false;
                 accountCardsContainer.style.cursor = 'grab';
                 showAccountCard(currentAccountIndex);
             }
         });
-    }
+    } // End of accountCards.length > 0 check
 
 
     // --- Transfer Modal Logic ---
@@ -206,25 +215,27 @@ document.addEventListener('DOMContentLoaded', () => {
             transferModalOverlay.classList.remove('active');
         });
 
+        // Close modal if clicking on the overlay itself (outside the content)
         transferModalOverlay.addEventListener('click', (e) => {
             if (e.target === transferModalOverlay) {
                 transferModalOverlay.classList.remove('active');
             }
         });
 
-        // --- Handle transfer type selection within the modal ---
-        // IMPORTANT: The `onclick` attributes in dashboard.php HTML are already handling this redirection.
-        // If you want to handle it purely in JS, you need to remove the `onclick` attributes from the HTML
-        // and assign unique IDs to each transfer option button.
+        // Note: The `onclick` attributes in dashboard.php HTML for transfer options
+        // are already handling the redirection. If you wanted to manage this purely
+        // in JS, you would remove those `onclick`s and add event listeners here.
         // For example:
-        // <button class="transfer-option" id="transferOwnAccountBtn" data-transfer-type="Own Account">
-        // Then in JS:
-        // const transferOwnAccountBtn = document.getElementById('transferOwnAccountBtn');
-        // if (transferOwnAccountBtn) {
-        //     transferOwnAccountBtn.addEventListener('click', () => handleTransferTypeClick('own_account'));
-        // }
-        // ... and so on for all transfer types.
-        // As it stands, the HTML `onclick` will trigger the navigation.
+        /*
+        document.querySelectorAll('.transfer-option').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const transferType = button.dataset.transferType; // Get data-transfer-type
+                // Construct URL based on type, e.g., `${BASE_URL_JS}/transfer?type=${transferType}`
+                // window.location.href = some_url;
+                transferModalOverlay.classList.remove('active'); // Close modal
+            });
+        });
+        */
     }
 
     // --- Sidebar Logic ---
@@ -244,27 +255,28 @@ document.addEventListener('DOMContentLoaded', () => {
             sidebarOverlay.classList.remove('active');
         });
 
+        // Close sidebar if clicking on the overlay
         sidebarOverlay.addEventListener('click', () => {
             sidebar.classList.remove('active');
             sidebarOverlay.classList.remove('active');
         });
     }
 
-    // --- NEW: View My Cards Logic ---
+    // --- View My Cards Logic ---
     // Make sure the <a> tag in dashboard.php has id="viewMyCardsButton"
     const viewMyCardsButton = document.getElementById('viewMyCardsButton');
 
     if (viewMyCardsButton) {
         viewMyCardsButton.addEventListener('click', (e) => {
-            e.preventDefault(); // Prevent default link behavior if BASE_URL_JS isn't ready or for custom handling
-            // Ensure BASE_URL_JS is correctly passed from PHP and includes the domain
-            // Refer to the "Key Observations and Changes" section above for adding BASE_URL_JS in dashboard.php
+            e.preventDefault(); // Prevent default link behavior
+
+            // Check if BASE_URL_JS is defined (it should be, via the PHP script block)
             if (typeof BASE_URL_JS !== 'undefined') {
-                window.location.href = `${BASE_URL_JS}/frontend/bank_cards.php`;
+                window.location.href = `${BASE_URL_JS}/bank_cards`; // Ensure this matches your router
             } else {
-                console.error("BASE_URL_JS is not defined. Cannot navigate to bank_cards.php.");
-                // Fallback to direct navigation if BASE_URL_JS is not defined, assuming relative path works
-                window.location.href = './bank_cards.php';
+                console.error("BASE_URL_JS is not defined. Cannot navigate to bank cards.");
+                // Fallback to relative path, though relying on BASE_URL_JS is better
+                window.location.href = './bank_cards';
             }
         });
     }

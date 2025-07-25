@@ -233,8 +233,7 @@ if (!function_exists('get_currency_symbol')) {
         <section class="bank-cards-section">
             <h2>My Cards</h2>
             <div class="view-all-link">
-                <a href="<?php echo BASE_URL; ?>/bank_cards">
-                    <i class="fas fa-credit-card"></i> View My Card
+        <a href="<?php echo BASE_URL; ?>/bank_cards" id="viewMyCardsButton"> <i class="fas fa-credit-card"></i> View My Card
                 </a>
             </div>
             <div class="card-list-container" id="userCardList" style="display: none;">

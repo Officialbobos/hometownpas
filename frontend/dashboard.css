@@ -132,6 +132,8 @@ section h2 {
     -webkit-overflow-scrolling: touch; /* For smoother scrolling on iOS */
     gap: 20px; /* Space between cards */
     margin-bottom: 20px;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+
     /* Remove grid properties if they were here */
 }
 
