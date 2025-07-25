@@ -103,7 +103,7 @@ $recent_transactions = []; // Array to store recent transactions
 if ($mongoClient) {
     try {
         // MongoDB stores _id as ObjectId by default. If your user_id is an integer or string, adjust the query.
-        // You mentioned the _id was '6881f2fa549401e932055a2d' in the error stack, which is an ObjectId.
+        // You mentioned the _id was '6881f2fa549401e932055a2d' in which is an ObjectId.
         // So, use new MongoDB\BSON\ObjectId($user_id);
         $filter = ['user_id' => new MongoDB\BSON\ObjectId($user_id)];
 
@@ -220,8 +220,10 @@ if ($mongoClient) {
 
         <section class="bank-cards-section">
             <h2>My Cards</h2>
-        <li><a href="<?php echo BASE_URL; ?>/frontend/bank_cards.php"><i class="fas fa-credit-card"></i> Bank Cards</a></li>                     <i class="fas fa-credit-card"></i> View My Cards
-           </a>
+            <div class="view-all-link"> <a href="<?php echo BASE_URL; ?>/frontend/bank_cards.php">
+                    <i class="fas fa-credit-card"></i> View My Card
+                </a>
+            </div>
             <div class="card-list-container" id="userCardList" style="display: none;">
                 <p class="loading-message" id="cardsLoadingMessage">No cards found. Go to "Manage All Cards" to add one.</p>
             </div>
@@ -229,8 +231,8 @@ if ($mongoClient) {
 
         <section class="activity-section">
             <div class="transactions-header">
-                <h2>Transactions</h2> <span class="more-options" onclick="window.location.href='<?php echo BASE_URL; ?>/statements'">...</span>
-            </div>
+                <div class="transactions-header">
+        <h2>Transactions</h2> <span class="more-options" onclick="window.location.href='<?php echo BASE_URL; ?>/statements'">...</span></div>
             <div class="transaction-list">
                 <?php if (empty($recent_transactions)): ?>
                     <p class="loading-message" id="transactionsLoadingMessage">No recent transactions to display.</p>

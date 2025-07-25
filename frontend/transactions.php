@@ -2,6 +2,7 @@
 session_start();
 require_once '../Config.php'; // Essential for MONGO_URI, MONGO_DB_NAME
 require_once '../vendor/autoload.php'; // Make sure Composer's autoloader is included for MongoDB classes
+require_once '../functions.php'; // <--- ADD THIS LINE if formatCurrency is here
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;

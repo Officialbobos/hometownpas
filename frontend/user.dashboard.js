@@ -213,31 +213,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // --- Handle transfer type selection within the modal ---
-        const internalTransferBtn = document.getElementById('internalTransferBtn');
-        const ibanTransferBtn = document.getElementById('ibanTransferBtn');
-        const sortCodeTransferBtn = document.getElementById('sortCodeTransferBtn');
-        const usaTransferBtn = document.getElementById('usaTransferBtn');
-
-        const handleTransferTypeClick = (type) => {
-            // Close the modal first
-            transferModalOverlay.classList.remove('active');
-            // Redirect to the transfer page with the selected type
-            window.location.href = `transfer.php?type=${type}`;
-        };
-
-        if (internalTransferBtn) {
-            internalTransferBtn.addEventListener('click', () => handleTransferTypeClick('internal'));
-        }
-        if (ibanTransferBtn) {
-            ibanTransferBtn.addEventListener('click', () => handleTransferTypeClick('iban'));
-        }
-        if (sortCodeTransferBtn) {
-            sortCodeTransferBtn.addEventListener('click', () => handleTransferTypeClick('sortcode'));
-        }
-        if (usaTransferBtn) {
-            usaTransferBtn.addEventListener('click', () => handleTransferTypeClick('usa'));
-        }
-        // You would add more if you have other transfer types
+        // IMPORTANT: The `onclick` attributes in dashboard.php HTML are already handling this redirection.
+        // If you want to handle it purely in JS, you need to remove the `onclick` attributes from the HTML
+        // and assign unique IDs to each transfer option button.
+        // For example:
+        // <button class="transfer-option" id="transferOwnAccountBtn" data-transfer-type="Own Account">
+        // Then in JS:
+        // const transferOwnAccountBtn = document.getElementById('transferOwnAccountBtn');
+        // if (transferOwnAccountBtn) {
+        //     transferOwnAccountBtn.addEventListener('click', () => handleTransferTypeClick('own_account'));
+        // }
+        // ... and so on for all transfer types.
+        // As it stands, the HTML `onclick` will trigger the navigation.
     }
 
     // --- Sidebar Logic ---
@@ -264,13 +251,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- NEW: View My Cards Logic ---
-const viewMyCardsButton = document.getElementById('viewMyCardsButton'); // Now this ID will exist
+    // Make sure the <a> tag in dashboard.php has id="viewMyCardsButton"
+    const viewMyCardsButton = document.getElementById('viewMyCardsButton');
 
-if (viewMyCardsButton) {
-    viewMyCardsButton.addEventListener('click', (e) => {
-        e.preventDefault(); // Prevent default link behavior, as we're handling it with JS
-        // Ensure BASE_URL_JS is correctly passed from PHP and includes the domain
-        window.location.href = `${BASE_URL_JS}/frontend/bank_cards.php`; // Corrected path and filename
-    });
-}
+    if (viewMyCardsButton) {
+        viewMyCardsButton.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent default link behavior if BASE_URL_JS isn't ready or for custom handling
+            // Ensure BASE_URL_JS is correctly passed from PHP and includes the domain
+            // Refer to the "Key Observations and Changes" section above for adding BASE_URL_JS in dashboard.php
+            if (typeof BASE_URL_JS !== 'undefined') {
+                window.location.href = `${BASE_URL_JS}/frontend/bank_cards.php`;
+            } else {
+                console.error("BASE_URL_JS is not defined. Cannot navigate to bank_cards.php.");
+                // Fallback to direct navigation if BASE_URL_JS is not defined, assuming relative path works
+                window.location.href = './bank_cards.php';
+            }
+        });
+    }
 });

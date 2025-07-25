@@ -1,7 +1,8 @@
 <?php
 session_start();
-require_once '../Config.php'; // Ensure this Config.php contains MongoDB connection details
+require_once '../Config.php'; // Essential for MONGO_URI, MONGO_DB_NAME
 require_once '../vendor/autoload.php'; // Make sure Composer's autoloader is included for MongoDB classes
+require_once '../functions.php'; // Include functions.php if it contains utility functions like formatCurrency
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
@@ -25,6 +26,7 @@ try {
 }
 
 $user_data = [];
+$user_awards = []; // Initialize array to store user's awards/winner info
 $mongoClient = null; // Initialize to null for finally block
 
 try {
@@ -32,21 +34,26 @@ try {
     $mongoClient = new Client(MONGO_URI);
     $database = $mongoClient->selectDatabase(MONGO_DB_NAME);
     $usersCollection = $database->users; // Assuming your user collection is named 'users'
+    $awardsCollection = $database->awards; // Assuming a new 'awards' collection for winner info
 
     // Fetch user data from the 'users' collection by _id
-    // MongoDB's findOne returns an object by default, which can be cast to an array
     $user_data = (array) $usersCollection->findOne(['_id' => $user_id_obj]);
+
+    // Fetch awards/winner information for the logged-in user
+    // Sort by award_date descending to show most recent awards first
+    $user_awards = $awardsCollection->find(
+        ['user_id' => $user_id_obj],
+        ['sort' => ['award_date' => -1]]
+    )->toArray();
 
 } catch (Exception $e) {
     // Catch any exceptions that occur during MongoDB operations
     error_log("MongoDB Error in profile.php: " . $e->getMessage());
     // You might want to display a user-friendly error message or redirect
     $user_data = []; // Ensure user_data is empty on error
+    $user_awards = []; // Ensure awards data is empty on error
 } finally {
-    // In MongoDB PHP driver, there's no explicit close() method like MySQLi.
-    // The client handles connections automatically, often using persistent connections or connection pooling.
-    // Unsetting the client variable here just cleans up the reference.
-    $mongoClient = null;
+    $mongoClient = null; // Clean up the client reference
 }
 
 // Fallback for display if data not found (though should ideally exist if logged in)
@@ -59,7 +66,7 @@ $display_address = $user_data['home_address'] ?? 'N/A';
 
 // Variables for additional profile details
 $display_nationality = $user_data['nationality'] ?? 'N/A';
-$display_dob = $user_data['date_of_birth'] ?? 'N/A'; 
+$display_dob = $user_data['date_of_birth'] ?? 'N/A';
 // If date_of_birth is stored as a MongoDB\BSON\UTCDateTime object, format it:
 if ($display_dob instanceof MongoDB\BSON\UTCDateTime) {
     $display_dob = $display_dob->toDateTime()->format('Y-m-d');
@@ -72,15 +79,15 @@ $display_membership_number = $user_data['membership_number'] ?? 'N/A';
 // --- PROFILE IMAGE PATH LOGIC (ADJUSTED) ---
 // Define the path to the default profile image relative to the project root.
 // Assuming 'images' folder is also at the project root, similar to 'uploads'.
-$default_profile_image_path = 'images/default_profile.png'; 
+$default_profile_image_path = 'images/default_profile.png';
 
 // Determine the image to display: user's custom image or the default.
 // The path stored in the database is 'uploads/profile_images/filename.ext'.
 // Since profile.php is in 'frontend/', and 'uploads/' is in root, we go up one level (..)
 // before concatenating the stored path.
-$profile_image_src = !empty($user_data['profile_image']) ? 
-                     '../' . htmlspecialchars($user_data['profile_image']) : 
-                     '../' . $default_profile_image_path; 
+$profile_image_src = !empty($user_data['profile_image']) ?
+                     '../' . htmlspecialchars($user_data['profile_image']) :
+                     '../' . $default_profile_image_path;
 // --- END PROFILE IMAGE PATH LOGIC ---
 
 ?>
@@ -217,6 +224,7 @@ $profile_image_src = !empty($user_data['profile_image']) ?
             max-width: 600px; /* Max width for the card */
             margin: 30px auto; /* Center the card horizontally and add top/bottom margin */
             text-align: center; /* Center image and headings initially */
+            margin-bottom: 30px; /* Add margin below the main profile card */
         }
 
         .profile-card h2 {
@@ -265,7 +273,65 @@ $profile_image_src = !empty($user_data['profile_image']) ?
         .profile-actions {
             margin-top: 30px;
             text-align: center;
-            /* No buttons here, so this section might be empty or removed if no other actions */
+        }
+
+        /* NEW: Styling for Winners Information Section */
+        .winners-info-card {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+            max-width: 600px;
+            margin: 30px auto; /* Centers the card horizontally */
+            text-align: center;
+        }
+
+        .winners-info-card h2 {
+            color: #0056b3;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        .winners-info-list {
+            list-style: none;
+            padding: 0;
+            text-align: left; /* Align list items to the left */
+        }
+
+        .winners-info-list li {
+            background-color: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1em;
+        }
+
+        .winners-info-list li:last-child {
+            margin-bottom: 0;
+        }
+
+        .winners-info-list li strong {
+            color: #0056b3;
+            flex-basis: 30%; /* Give labels some width */
+            min-width: 120px; /* Ensure minimum width for labels */
+        }
+
+        .winners-info-list li span {
+            flex-basis: 65%; /* Give values remaining width */
+            text-align: right;
+        }
+        
+        .winners-info-list p { /* For message when no awards */
+            color: #666;
+            font-style: italic;
+            text-align: center;
+            margin-top: 15px;
         }
 
         /* Responsive Adjustments for Profile Page */
@@ -300,7 +366,7 @@ $profile_image_src = !empty($user_data['profile_image']) ?
             .profile-container {
                 padding: 20px;
             }
-            .profile-card {
+            .profile-card, .winners-info-card { /* Apply to both cards */
                 margin: 20px auto;
                 padding: 20px;
             }
@@ -310,14 +376,18 @@ $profile_image_src = !empty($user_data['profile_image']) ?
             .profile-details p strong {
                 width: 100px; /* Adjust label width for smaller screens */
             }
+            .winners-info-list li strong, .winners-info-list li span {
+                flex-basis: 100%; /* Stack label and value on small screens */
+                text-align: left;
+            }
+            .winners-info-list li strong {
+                margin-bottom: 5px; /* Add space between stacked label and value */
+            }
         }
 
         @media (max-width: 480px) {
             .dashboard-header .logo-barclays {
                 height: 30px;
-            }
-            .user-info span {
-                /* display: none; */ /* You might want to hide name on very small screens for header */
             }
             .user-info .profile-icon {
                 margin-right: 5px;
@@ -325,12 +395,10 @@ $profile_image_src = !empty($user_data['profile_image']) ?
             .sidebar ul li a i {
                 margin-right: 0;
             }
-            /* Keeping icon names visible on mobile */
-            /* .sidebar ul li a span { display: none; } */
             .sidebar ul li a {
                 padding: 10px 5px;
             }
-            .profile-card h2 {
+            .profile-card h2, .winners-info-card h2 {
                 font-size: 1.5em;
             }
 
@@ -340,7 +408,6 @@ $profile_image_src = !empty($user_data['profile_image']) ?
                 height: 100px; /* Smaller height for mobile */
             }
             /* --- End Profile Image Size Reduction --- */
-
 
             .profile-details p strong {
                 display: block; /* Stack label and value on very small screens */
@@ -370,6 +437,7 @@ $profile_image_src = !empty($user_data['profile_image']) ?
                 <li><a href="dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
                 <li><a href="accounts.php"><i class="fas fa-wallet"></i> <span>Accounts</span></a></li>
                 <li><a href="transfer.php"><i class="fas fa-exchange-alt"></i> <span>Transfers</span></a></li>
+                <li><a href="transactions.php"><i class="fas fa-history"></i> <span>Transaction History</span></a></li>
                 <li><a href="statements.php"><i class="fas fa-file-invoice"></i> <span>Statements</span></a></li>
                 <li><a href="profile.php" class="active"><i class="fas fa-user"></i> <span>Profile</span></a></li>
                 <li><a href="bank_cards.php"><i class="fas fa-credit-card"></i> <span>Bank Cards</span></a></li>
@@ -398,11 +466,39 @@ $profile_image_src = !empty($user_data['profile_image']) ?
                         <p><strong>Occupation:</strong> <?php echo $display_occupation; ?></p>
                         <p><strong>Membership No.:</strong> <?php echo $display_membership_number; ?></p>
                     </div>
-                    <?php else: ?>
+                <?php else: ?>
                     <p>User data not found.</p>
                 <?php endif; ?>
             </section>
-        </main>
+
+            <section class="winners-info-card">
+                <h2>Your Awards & Recognitions</h2>
+                <?php if (!empty($user_awards)): ?>
+                    <ul class="winners-info-list">
+                        <?php foreach ($user_awards as $award): ?>
+                            <li>
+                                <strong>Award:</strong> <span><?php echo htmlspecialchars($award['award_name'] ?? 'N/A'); ?></span>
+                                <strong>Date:</strong> <span><?php
+                                    if (isset($award['award_date']) && $award['award_date'] instanceof MongoDB\BSON\UTCDateTime) {
+                                        echo $award['award_date']->toDateTime()->format('Y-m-d');
+                                    } else {
+                                        echo 'N/A';
+                                    }
+                                ?></span>
+                                <?php if (isset($award['value']) && $award['value'] > 0): ?>
+                                    <strong>Value:</strong> <span><?php echo formatCurrency($award['value'], $award['currency'] ?? 'USD'); ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($award['description'])): ?>
+                                    <strong>Details:</strong> <span><?php echo htmlspecialchars($award['description']); ?></span>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p>No awards or special recognitions found for your account at this time.</p>
+                <?php endif; ?>
+            </section>
+            </main>
     </div>
 
     <footer class="dashboard-footer">
