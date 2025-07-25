@@ -71,7 +71,7 @@ body {
 }
 
 /* Section Common Styling */
-section {
+.section {
     padding: 25px;
     margin: 20px;
     background-color: rgba(255, 255, 255, 0.08); /* Semi-transparent white background */
@@ -82,9 +82,9 @@ section {
     animation: fadeInScale 0.7s ease-out;
 }
 
-section h2 {
+.section h2 {
     color: #ffffff;
-    font-size: 24px;
+    font-size: 20px;
     margin-bottom: 20px;
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.8); /* Stronger white glow */
 }
@@ -328,19 +328,21 @@ section h2 {
     margin-bottom: 40px; /* Space at the bottom */
 }
 
-.transactions-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
+ .transactions-header {
+        flex-direction: column; /* CHANGED: Stack the heading and the "more options" button */
+        align-items: flex-start; /* CHANGED: Align them to the left */
+        margin-bottom: 10px; /* ADJUSTED */
+    }
 
 .transactions-header h2 {
-    margin: 0;
-}
+        width: 100%; /* Ensure it takes full available width */
+        margin-bottom: 10px; /* Add space below heading if stacked */
+        white-space: normal; /* CHANGED: Allow text wrapping */
+        text-align: left; /* CHANGED: Align text to left */
+    }
 
 .more-options {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: bold;
     color: #c9a0dc;
     cursor: pointer;
@@ -383,11 +385,14 @@ section h2 {
 }
 
 .transaction-description {
-    display: block;
+     display: block;
     font-weight: 600;
     color: #ffffff;
     font-size: 15px;
     margin-bottom: 2px;
+    white-space: nowrap; /* Keep on one line for desktop */
+    overflow: hidden; /* Hide overflow for desktop */
+    text-overflow: ellipsis; /* Add ellipsis for desktop */
 }
 
 .transaction-account {
@@ -745,6 +750,7 @@ section h2 {
         -ms-overflow-style: none;  /* Hide scrollbar for IE/Edge */
     }
 
+
     .account-cards-container::-webkit-scrollbar { /* Hide scrollbar for Chrome/Safari */
         display: none;
     }
@@ -765,6 +771,7 @@ section h2 {
     }
 
     .actions-section {
+        display: grid; /* Changed to grid here for consistency if you meant 2 columns */
         grid-template-columns: repeat(2, 1fr); /* 2 columns on smaller screens */
         gap: 15px;
     }
@@ -815,42 +822,44 @@ section h2 {
 }
 
 @media (max-width: 480px) {
-    .header {
+     .header {
         flex-wrap: wrap;
-        justify-content: center;
-        text-align: center;
+        justify-content: space-between; /* Keeps elements at edges */
+        align-items: center;
+        padding: 10px 15px; /* Adjust padding as needed for edges */
     }
 
     .greeting {
         width: 100%;
         order: 1; /* Move greeting below icons */
         margin-top: 10px;
-    }
-
-    .menu-icon, .profile-pic {
-        order: 0; /* Keep icons at the top */
-        flex-basis: 50%;
         text-align: center;
     }
-    .profile-pic {
-        text-align: right;
-    }
-    .menu-icon {
-        text-align: left;
+
+     .menu-icon {
+        order: 1; /* Move to the right side of the top row */
+        flex: 0 0 auto;
+        /* text-align: right; /* Not strictly necessary if flex handles it */
     }
 
+   
     section {
-        padding: 15px;
-        margin: 10px;
+        padding: 12px;
+        margin: 9px;
     }
 
     section h2 {
-        font-size: 18px;
+        font-size: 16px;
     }
 
     /* Account cards on very small screens (still carousel, but maybe slightly smaller minimums) */
     .account-card {
-        min-width: 260px; /* Slightly smaller minimum width */
+        min-width: 260px;
+        flex: 0 0 calc(100% - 16px); /* ADJUSTED for a smaller margin */
+        margin-right: 16px; /* ADJUSTED */
+    }
+      .account-card:last-child {
+        margin-right: 0;
     }
 
     .transaction-item {

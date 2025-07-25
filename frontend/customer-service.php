@@ -1,7 +1,19 @@
 <?php
 // Path: C:\xampp\htdocs\hometownbank\frontend\customer_service.php
-// Adjust path dynamically for Config.php
-require_once dirname(__DIR__) . '/Config.php'; // Go up one level from 'frontend' to the project root
+
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+ini_set('display_errors', 1); // Enable error display for debugging
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+require_once __DIR__ . '/../vendor/autoload.php';
+
+
+require_once __DIR__ . '/../Config.php';
+require_once __DIR__ . '/../functions.php'; // For sanitize_input, and potentially other utilities
+
 ?>
 <!DOCTYPE html>
 <html lang="en">

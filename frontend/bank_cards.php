@@ -1,5 +1,15 @@
 <?php
 // Config.php should be included first to ensure session and constants are available.
+
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+ini_set('display_errors', 1); // Enable error display for debugging
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+
 require_once '../Config.php'; // This now handles session_start() and Composer autoloader.
 require_once '../functions.php'; // Ensure functions.php is included if it contains getMongoDBClient() or other helpers
 
@@ -486,12 +496,13 @@ try {
             <button id="messageBoxButton">OK</button>
         </div>
     </div>
-
-    <script>
-        const BASE_URL_JS = <?php echo json_encode(BASE_URL); ?>;
-        const currentUserId = <?php echo json_encode($user_id); ?>;
-        const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
-    </script>
-    <script src="<?php echo BASE_URL; ?>/frontend/cards.js"></script>
+<script>
+    // These variables must be defined before cards.js is loaded
+    const PHP_BASE_URL = <?php echo json_encode(BASE_URL); ?>;
+    const FRONTEND_BASE_URL = <?php echo json_encode(BASE_URL . '/frontend/'); ?>; // Assuming /frontend/ is where your JS/CSS/images are
+    const currentUserId = <?php echo json_encode($user_id); ?>;
+    const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
+</script>
+<script src="<?php echo BASE_URL; ?>/frontend/cards.js"></script>
 </body>
 </html>

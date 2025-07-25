@@ -150,4 +150,3 @@ if (session_status() === PHP_SESSION_NONE) {
 date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? getenv('APP_TIMEZONE') ?? 'Africa/Lagos');
 
 // --- END: Required for Currency Exchange and Transfer Rules ---
-?>

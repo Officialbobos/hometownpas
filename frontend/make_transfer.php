@@ -432,7 +432,7 @@ try {
         'method' => $destination_account_details['type'] // Use the structured type for modal
     ];
 
-    header('Location: ' . BASE_URL . '/transfer'); // Redirect back to transfer.php in frontend
+    header('Location: ' . BASE_URL . '/dashboard'); // Redirect back to transfer.php in frontend
     exit;
 
 } catch (MongoDBException $e) {

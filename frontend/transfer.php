@@ -161,9 +161,6 @@ switch ($active_transfer_method) {
             <div class="greeting">
                 <h1>Make a Transfer</h1>
             </div>
-            <div class="profile-pic">
-                <img src="<?php echo BASE_URL; ?>/images/default-profile.png" alt="Profile Picture" id="headerProfilePic">
-            </div>
         </header>
 
         <main class="main-content">
@@ -174,7 +171,8 @@ switch ($active_transfer_method) {
                     <p class="message <?php echo htmlspecialchars($message_type); ?>"><?php echo htmlspecialchars($message); ?></p>
                 <?php endif; ?>
 
-            <form action="<?php echo BASE_URL; ?>/frontend/make_transfer.php" method="POST" id="transferForm">                   <input type="hidden" name="initiate_transfer" value="1">
+            <form action="<?php echo BASE_URL; ?>/frontend/make_transfer.php" method="POST" id="transferForm">                  
+                 <input type="hidden" name="initiate_transfer" value="1">
 
                     <div class="form-group">
                         <label for="transfer_method">Select Transfer Method:</label>
