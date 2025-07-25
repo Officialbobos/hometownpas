@@ -2,51 +2,70 @@
 // Path: C:\xampp\htdocs\hometownbank\frontend\transfer.php
 
 session_start();
-require_once '../Config.php';
-require_once '../functions.php'; // Ensure this has sanitize_input, bcmath functions, and get_currency_symbol
-require_once __DIR__ . '/../vendor/autoload.php'; // Assuming you installed MongoDB driver via Composer
 
-use MongoDB\Client; // Add this line based on your config.php
-use MongoDB\BSON\ObjectId; // Corrected: Import ObjectId for easier use
-use MongoDB\Exception\Exception as MongoDBException; // Add this line based on your config.php
+ini_set('display_errors', 1); // Enable error display for debugging (turn off in production)
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+require_once __DIR__ . '/../vendor/autoload.php'; // Composer autoloader FIRST
+
+// --- Start Dotenv loading (Crucial for Render/Local dev) ---
+$dotenvPath = dirname(__DIR__); // Go up one level from 'frontend' to the project root (hometownbank)
+
+if (file_exists($dotenvPath . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
+    try {
+        $dotenv->load();
+        error_log("DEBUG: .env file EXISTS locally in transfer.php. Loaded Dotenv.");
+    } catch (Dotenv\Exception\InvalidPathException $e) {
+        error_log("Dotenv load error locally on path " . $dotenvPath . " in transfer.php: " . $e->getMessage());
+    }
+} else {
+    error_log("DEBUG: .env file DOES NOT exist in transfer.php. Skipping Dotenv load. (Expected on Render)");
+}
+// --- End Dotenv loading ---
+
+require_once '../Config.php'; // Now Config.php can safely read $_ENV variables
+require_once '../functions.php'; // Ensure this has sanitize_input, bcmath functions, and get_currency_symbol
+
+use MongoDB\Client;
+use MongoDB\BSON\ObjectId;
+use MongoDB\Exception\Exception as MongoDBException;
 
 
 // Check login, etc.
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    // Corrected: Use BASE_URL for redirect to login page
-    header('Location: ' . BASE_URL . '/login'); // Redirect to login route handled by index.php
+    header('Location: ' . BASE_URL . '/login');
     exit;
 }
 
 $user_id = $_SESSION['user_id'];
 $first_name = $_SESSION['first_name'] ?? 'User';
 $last_name = $_SESSION['last_name'] ?? '';
-$user_email = $_SESSION['temp_user_email'] ?? $_SESSION['email'] ?? ''; // Added fallback for user_email
+$user_email = $_SESSION['temp_user_email'] ?? $_SESSION['email'] ?? '';
 $full_name = trim($first_name . ' ' . $last_name);
 if (empty($full_name)) {
-    // If first_name and last_name are empty, try username (if it exists in session)
     $full_name = $_SESSION['username'] ?? 'User';
 }
 
 // Establish MongoDB connection
 try {
-    // Use MONGODB_CONNECTION_URI and MONGODB_DB_NAME from Config.php
     $client = new Client(MONGODB_CONNECTION_URI);
-    $db = $client->selectDatabase(MONGODB_DB_NAME); // Use MONGODB_DB_NAME
+    $db = $client->selectDatabase(MONGODB_DB_NAME);
     $accountsCollection = $db->accounts;
-} catch (MongoDBException $e) { // Catch specific MongoDB exceptions
-    error_log("MongoDB connection error in transfer.php: " . $e->getMessage()); // Log error
-    die("ERROR: Could not connect to MongoDB. Please try again later. " . $e->getMessage()); // Display a user-friendly message
-} catch (Exception $e) { // Catch any other general exceptions
-    error_log("General database connection error in transfer.php: " . $e->getMessage()); // Log error
-    die("ERROR: An unexpected error occurred during database connection. Please try again later. " . $e->getMessage()); // Display user-friendly message
+} catch (MongoDBException $e) {
+    error_log("MongoDB connection error in transfer.php: " . $e->getMessage());
+    die("ERROR: Could not connect to MongoDB. Please try again later. Detail: " . $e->getMessage()); // Keep detail for now for debugging on Render
+} catch (Exception $e) {
+    error_log("General database connection error in transfer.php: " . $e->getMessage());
+    die("ERROR: An unexpected error occurred during database connection. Please try again later. Detail: " . $e->getMessage());
 }
 
 
 $user_accounts = [];
 try {
-    // MongoDB stores _id as ObjectId, so convert user_id to ObjectId for query
-    $userIdObjectId = new ObjectId($user_id); // Use the imported ObjectId
+    // Ensure user_id from session is a string representation of ObjectId
+    $userIdObjectId = new ObjectId($user_id);
     $cursor = $accountsCollection->find([
         'user_id' => $userIdObjectId,
         'status' => 'active'
@@ -90,16 +109,16 @@ switch ($active_transfer_method) {
     case 'own_account':
         $active_transfer_method = 'internal_self';
         break;
-    case 'bank_to_bank':
+    case 'bank_to_bank': // This was ambiguous, making it 'internal_heritage' (Hometown to Hometown)
         $active_transfer_method = 'internal_heritage';
         break;
     case 'international_bank':
         $active_transfer_method = 'external_iban';
         break;
-    case 'uk_bank': // Added for consistency with previous discussion
+    case 'uk_bank':
         $active_transfer_method = 'external_sort_code';
         break;
-    case 'ach':
+    case 'ach': // ACH and Wire/Domestic Wire map to USA account transfer
     case 'wire':
     case 'domestic_wire':
         $active_transfer_method = 'external_usa_account';
@@ -175,7 +194,7 @@ switch ($active_transfer_method) {
                                     data-balance="<?php echo htmlspecialchars($account['balance']); ?>"
                                     data-currency="<?php echo htmlspecialchars($account['currency']); ?>"
                                     <?php echo ((string)($form_data['source_account_id'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo htmlspecialchars($account['currency']); ?> <?php echo number_format((float)$account['balance'], 2); ?>
+                                    <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <?php echo number_format((float)$account['balance'], 2); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -195,7 +214,7 @@ switch ($active_transfer_method) {
                                 <?php foreach ($user_accounts as $account): ?>
                                     <option value="<?php echo htmlspecialchars($account['id']); ?>"
                                         <?php echo ((string)($form_data['destination_account_id_self'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo htmlspecialchars($account['currency']); ?> <?php echo number_format((float)$account['balance'], 2); ?>
+                                        <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <?php echo number_format((float)$account['balance'], 2); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -345,9 +364,8 @@ switch ($active_transfer_method) {
         window.APP_DATA = {
             userAccountsData: <?php echo json_encode($user_accounts); ?>,
             initialSelectedFromAccount: '<?php echo htmlspecialchars($form_data['source_account_id'] ?? ''); ?>',
-            // Map the incoming GET 'type' or form data to the consistent transfer method names for JS
             initialTransferMethod: '<?php
-                $js_transfer_method = $active_transfer_method; // Use the already processed active_transfer_method
+                $js_transfer_method = $active_transfer_method;
                 echo htmlspecialchars($js_transfer_method);
             ?>',
             showModal: <?php echo $show_modal_on_load ? 'true' : 'false'; ?>,

@@ -188,7 +188,10 @@ if ($mongoClient) {
                             </div>
                             <div class="account-balance">
                                 <p class="balance-amount">
-                                    <?php echo htmlspecialchars($account['currency'] ?? 'USD'); ?> <?php echo number_format($account['balance'] ?? 0, 2); ?>
+                                    <?php
+                                    // Assuming get_currency_symbol() function exists in functions.php
+                                    echo get_currency_symbol($account['currency'] ?? 'USD');
+                                    ?> <?php echo number_format($account['balance'] ?? 0, 2); ?>
                                 </p>
                                 <p class="balance-status">Available</p>
                             </div>
@@ -256,7 +259,10 @@ if ($mongoClient) {
                             <div class="transaction-amount-date">
                                 <span class="transaction-amount <?php echo (($transaction['transaction_type'] ?? '') == 'Credit') ? 'credit' : 'debit'; ?>">
                                     <?php echo (($transaction['transaction_type'] ?? '') == 'Credit' ? '+' : '-'); ?>
-                                    <?php echo htmlspecialchars($transaction['currency'] ?? 'USD'); ?> <?php echo number_format($transaction['amount'] ?? 0, 2); ?>
+                                    <?php
+                                    // Assuming get_currency_symbol() function exists in functions.php
+                                    echo get_currency_symbol($transaction['currency'] ?? 'USD');
+                                    ?> <?php echo number_format($transaction['amount'] ?? 0, 2); ?>
                                 </span>
                                 <span class="transaction-date">
                                     <?php
@@ -344,49 +350,5 @@ if ($mongoClient) {
     </div>
 
     <script src="<?php echo BASE_URL; ?>/frontend/user.dashboard.js"></script>
-    <script src="<?php echo BASE_URL; ?>/frontend/dashboard-interactions.js"></script>
-    <script>
-        // Example of passing PHP variable to JS
-        document.addEventListener('DOMContentLoaded', function() {
-            const transferButton = document.getElementById('transferButton');
-            const transferModalOverlay = document.getElementById('transferModalOverlay');
-            const closeTransferModal = document.getElementById('closeTransferModal');
-
-            transferButton.addEventListener('click', function() {
-                transferModalOverlay.style.display = 'flex';
-            });
-
-            closeTransferModal.addEventListener('click', function() {
-                transferModalOverlay.style.display = 'none';
-            });
-
-            // Close modal if clicking outside
-            transferModalOverlay.addEventListener('click', function(event) {
-                if (event.target === transferModalOverlay) {
-                    transferModalOverlay.style.display = 'none';
-                }
-            });
-
-            const menuIcon = document.getElementById('menuIcon');
-            const sidebar = document.getElementById('sidebar');
-            const closeSidebarBtn = document.getElementById('closeSidebarBtn');
-            const sidebarOverlay = document.getElementById('sidebarOverlay');
-
-            menuIcon.addEventListener('click', function() {
-                sidebar.classList.add('active');
-                sidebarOverlay.classList.add('active');
-            });
-
-            closeSidebarBtn.addEventListener('click', function() {
-                sidebar.classList.remove('active');
-                sidebarOverlay.classList.remove('active');
-            });
-
-            sidebarOverlay.addEventListener('click', function() {
-                sidebar.classList.remove('active');
-                sidebarOverlay.classList.remove('active');
-            });
-        });
-    </script>
 </body>
 </html>

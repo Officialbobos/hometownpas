@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- Transfer Modal Logic (NO CHANGE) ---
+    // --- Transfer Modal Logic ---
     const transferButton = document.getElementById('transferButton');
     const transferModalOverlay = document.getElementById('transferModalOverlay');
     const closeTransferModal = document.getElementById('closeTransferModal');
@@ -211,9 +211,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 transferModalOverlay.classList.remove('active');
             }
         });
+
+        // --- NEW FUNCTIONALITY: Handle transfer type selection within the modal ---
+        const internalTransferBtn = document.getElementById('internalTransferBtn');
+        const ibanTransferBtn = document.getElementById('ibanTransferBtn');
+        const sortCodeTransferBtn = document.getElementById('sortCodeTransferBtn');
+        const usaTransferBtn = document.getElementById('usaTransferBtn');
+
+        const handleTransferTypeClick = (type) => {
+            // Close the modal first
+            transferModalOverlay.classList.remove('active');
+            // Redirect to the transfer page with the selected type
+            window.location.href = `transfer.php?type=${type}`;
+        };
+
+        if (internalTransferBtn) {
+            internalTransferBtn.addEventListener('click', () => handleTransferTypeClick('internal'));
+        }
+        if (ibanTransferBtn) {
+            ibanTransferBtn.addEventListener('click', () => handleTransferTypeClick('iban'));
+        }
+        if (sortCodeTransferBtn) {
+            sortCodeTransferBtn.addEventListener('click', () => handleTransferTypeClick('sortcode'));
+        }
+        if (usaTransferBtn) {
+            usaTransferBtn.addEventListener('click', () => handleTransferTypeClick('usa'));
+        }
+        // You would add more if you have other transfer types
     }
 
-    // --- Sidebar Logic (NO CHANGE) ---
+    // --- Sidebar Logic ---
     const menuIcon = document.getElementById('menuIcon');
     const sidebar = document.getElementById('sidebar');
     const closeSidebarBtn = document.getElementById('closeSidebarBtn');

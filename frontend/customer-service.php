@@ -1,3 +1,8 @@
+<?php
+// Path: C:\xampp\htdocs\hometownbank\frontend\customer_service.php
+// Adjust path dynamically for Config.php
+require_once dirname(__DIR__) . '/Config.php'; // Go up one level from 'frontend' to the project root
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -228,8 +233,7 @@
 
     <header class="header">
         <div class="logo">
-            <img src="/images/hometown_bank_logo.png" alt="Hometown Bank PA Logo">
-        </div>
+<img src="<?php echo BASE_URL; ?>/images/hometown_bank_logo.png" alt="Hometown Bank PA Logo">        </div>
         <h1>Customer Service</h1>
     </header>
 
@@ -250,9 +254,9 @@
             <a href="tel:+12544007639" class="contact-button phone">
                 <i class="fas fa-phone-alt"></i> Call Us: +1 254-400-7639
             </a>
-            <a href="/dashboard" class="contact-button homepage">
-                <i class="fas fa-home"></i> Back to Homepage
-            </a>
+           <a href="<?php echo BASE_URL; ?>/dashboard" class="contact-button homepage">
+    <i class="fas fa-home"></i> Back to Homepage
+</a>
         </div>
 
         <section class="faq-section">
