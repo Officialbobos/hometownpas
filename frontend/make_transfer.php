@@ -1,478 +1,447 @@
 <?php
-session_start(); // Only one session_start() needed
-require_once '../Config.php'; // Contains DB constants (now MongoDB URI), SMTP settings etc.
-require_once '../vendor/autoload.php'; // For PHPMailer and MongoDB driver
-require_once '../functions.php'; // Contains sendEmail, get_currency_symbol, bcmul_precision, bcsub_precision, bcadd_precision, complete_pending_transfer, reject_pending_transfer
+// Path: C:\xampp\htdocs\hometownbank\frontend\make_transfer.php (This is its actual location)
+
+session_start();
+
+ini_set('display_errors', 1); // Enable error display for debugging
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// !!! IMPORTANT: Adjust these paths to be relative to THIS FILE'S location !!!
+// It's in frontend/, so it needs to go up two directories to reach vendor/ and Config.php
+require_once __DIR__ . '/../../vendor/autoload.php'; // Go up two levels
+require_once __DIR__ . '/../../Config.php';         // Go up two levels
+require_once __DIR__ . '/../../functions.php';       // Go up two levels
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
+use MongoDB\Exception\Exception as MongoDBException;
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception as PHPMailerException;
 
-// Check if the user is logged in. If not, redirect to login page.
+// --- Debugging: Log incoming POST data and session info ---
+error_log("--- frontend/make_transfer.php initiated ---");
+error_log("Session User ID: " . ($_SESSION['user_id'] ?? 'Not set'));
+error_log("Session User Logged In: " . (($_SESSION['user_logged_in'] ?? false) ? 'true' : 'false'));
+error_log("POST Data: " . print_r($_POST, true));
+error_log("--- End frontend/make_transfer.php debug ---");
+// --- End Debugging ---
+
+
+// 1. Authentication and Authorization Check
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: login.php');
+    $_SESSION['message'] = "You must be logged in to make a transfer.";
+    $_SESSION['message_type'] = "error";
+    header('Location: ' . BASE_URL . '/login');
     exit;
 }
 
-// Convert string user_id from session to MongoDB ObjectId
+$user_id = $_SESSION['user_id'];
+$user_email = $_SESSION['email'] ?? $_SESSION['temp_user_email'] ?? '';
+$user_full_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
+if (empty($user_full_name)) {
+    $user_full_name = $_SESSION['username'] ?? 'Customer';
+}
+
+
+// 2. Establish MongoDB Connection
 try {
-    $user_id = new ObjectId($_SESSION['user_id']);
-} catch (Exception $e) {
-    // Handle invalid ObjectId, redirect or show error
-    error_log("Invalid user ID in session: " . $_SESSION['user_id']);
-    header('Location: login.php');
-    exit;
-}
-
-
-// Initialize variables for redirection with messages
-$message = '';
-$message_type = '';
-$post_data_for_redirect = []; // To preserve form data in case of error
-$_SESSION['show_modal_on_load'] = false; // Flag to show the confirmation modal
-
-// Only process if form was submitted
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer'])) {
-
-    // Store POST data to pass back if there's an error
-    $post_data_for_redirect = $_POST;
-
-    // Establish MongoDB connection
-    $mongoClient = null;
-    $session = null; // For MongoDB transactions
-    try {
-        $mongoClient = new Client(MONGO_URI);
-        $database = $mongoClient->selectDatabase(MONGO_DB_NAME);
-
-        // Start a MongoDB session for transactions
-        $session = $mongoClient->startSession();
-        $session->startTransaction();
-
-        $usersCollection = $database->users;
-        $accountsCollection = $database->accounts;
-        $transactionsCollection = $database->transactions;
-
-        // Fetch user's email and full name
-        $user_email = '';
-        $full_name = 'User';
-        $user_preferred_currency = ''; // New: To store user's preferred currency from DB
-
-        $userDetails = $usersCollection->findOne(['_id' => $user_id], ['session' => $session]);
-        if ($userDetails) {
-            $full_name = trim(($userDetails['first_name'] ?? '') . ' ' . ($userDetails['last_name'] ?? ''));
-            $user_email = $userDetails['email'] ?? '';
-            $user_preferred_currency = strtoupper($userDetails['preferred_currency'] ?? ''); // Fetch preferred currency
-        } else {
-            throw new Exception("User details not found.");
-        }
-
-        // Fetch all accounts belonging to the logged-in user
-        $user_accounts = [];
-        $accountsCursor = $accountsCollection->find(
-            ['user_id' => $user_id, 'status' => 'active'],
-            ['session' => $session]
-        );
-        foreach ($accountsCursor as $account_row) {
-            $account_row['id'] = (string)$account_row['_id']; // Convert ObjectId to string for consistent array key
-            $user_accounts[] = $account_row;
-        }
-
-        if (empty($user_accounts)) {
-            throw new Exception("You don't have any active accounts linked to your profile. Please contact support.");
-        }
-
-        // Input Sanitization and Validation
-        $source_account_id_str = filter_var($_POST['source_account_id'] ?? '', FILTER_SANITIZE_STRING); // Keep as string for ObjectId conversion
-        $transfer_method = trim($_POST['transfer_method'] ?? '');
-        $amount_str = trim($_POST['amount'] ?? ''); // Keep as string for bcmath
-        $description = trim($_POST['description'] ?? '');
-        $recipient_name = trim($_POST['recipient_name'] ?? '');
-
-        // Convert source_account_id string to ObjectId
-        try {
-            $source_account_id = new ObjectId($source_account_id_str);
-        } catch (Exception $e) {
-            throw new Exception("Invalid source account ID format.");
-        }
-
-        // Get source account details from the fetched list (DO NOT TRUST CLIENT-SIDE DATA)
-        $source_account = null;
-        foreach ($user_accounts as $acc) {
-            if ($acc['_id'] == $source_account_id) { // Compare ObjectIds
-                $source_account = $acc;
-                break;
-            }
-        }
-
-        if (!$source_account) {
-            throw new Exception("Invalid source account selected or account not found/active for your profile.");
-        }
-
-        $sender_currency = strtoupper($source_account['currency']); // Get sender's currency from the fetched account details
-
-        // --- NEW GLOBAL CURRENCY RESTRICTION CHECK ---
-        $allowed_currencies_config = defined('ALLOWED_TRANSFER_CURRENCIES') ? ALLOWED_TRANSFER_CURRENCIES : [];
-        $allowed_currencies_upper = array_map('strtoupper', $allowed_currencies_config);
-
-        $is_allowed_by_config = in_array($sender_currency, $allowed_currencies_upper);
-        $is_allowed_by_preferred_currency = ($user_preferred_currency !== '' && $sender_currency === $user_preferred_currency);
-
-        if (!$is_allowed_by_config && !$is_allowed_by_preferred_currency) {
-            $allowed_list_display = implode(', ', $allowed_currencies_upper);
-            if ($user_preferred_currency) {
-                $allowed_list_display .= " or your preferred currency (" . $user_preferred_currency . ")";
-            }
-            throw new Exception("Transfers are currently only allowed in " . $allowed_list_display . ". Your selected account is in " . htmlspecialchars($sender_currency) . ".");
-        }
-        // --- END NEW GLOBAL CURRENCY RESTRICTION CHECK ---
-
-        // Common validations
-        if (!is_numeric($amount_str) || bccomp($amount_str, '0', 2) <= 0) {
-            throw new Exception('Please enter a positive amount.');
-        }
-        // Use bcsub_precision for accurate subtraction before comparison for available balance
-        if (bccomp($amount_str, $source_account['balance'], 2) > 0) {
-            throw new Exception('Insufficient funds in the selected source account for this transfer.');
-        }
-        if (empty($transfer_method)) {
-            throw new Exception('Please select a transfer method.');
-        }
-
-        $sender_current_balance = $source_account['balance'];
-        $sender_account_number = $source_account['account_number'];
-
-        // Generate a unique transaction reference early
-        $transaction_reference = 'HTB-' . date('YmdHis') . '-' . substr(uniqid(), -6);
-
-        // Initialize transaction data array
-        $transaction_data = [
-            'user_id' => $user_id, // ObjectId
-            'account_id' => $source_account_id, // ObjectId
-            'amount' => $amount_str, // Stored as string for precision
-            'currency' => $sender_currency,
-            'transaction_type' => 'DEBIT', // Default for sender's transaction
-            'description' => $description,
-            'status' => 'PENDING', // All user-initiated transfers are PENDING for admin approval
-            'initiated_at' => new MongoDB\BSON\UTCDateTime(), // Store as BSON Date
-            'transaction_reference' => $transaction_reference,
-            'recipient_name' => htmlspecialchars($recipient_name), // Sanitize for storage
-            'recipient_account_number' => null,
-            'recipient_iban' => null,
-            'recipient_swift_bic' => null,
-            'recipient_sort_code' => null,
-            'recipient_external_account_number' => null,
-            'recipient_user_id' => null, // For internal transfers (ObjectId)
-            'recipient_bank_name' => null,
-            'sender_name' => htmlspecialchars($full_name), // Sanitize sender's name
-            'sender_account_number' => $sender_account_number,
-            'sender_user_id' => $user_id, // ObjectId
-            'converted_amount' => null,
-            'converted_currency' => null,
-            'exchange_rate' => null,
-            'external_bank_details' => null, // JSON string for external, or nested document
-            'transaction_date' => new MongoDB\BSON\UTCDateTime(strtotime(date('Y-m-d')) * 1000) // Date without time
-        ];
-
-        // Deduct amount immediately from source account (optimistic locking with balance check)
-        // MongoDB update with comparison for atomic operation
-        $new_sender_balance = bcsub_precision($sender_current_balance, $amount_str, 2);
-
-        $updateResult = $accountsCollection->updateOne(
-            [
-                '_id' => $source_account_id,
-                'user_id' => $user_id,
-                'balance' => (float)$sender_current_balance // Ensure comparison is correct for float type
-            ],
-            ['$set' => ['balance' => (float)$new_sender_balance]], // Store as float
-            ['session' => $session]
-        );
-
-        if ($updateResult->getModifiedCount() === 0) {
-            // This means either the document wasn't found or the balance didn't match (concurrency issue)
-            throw new Exception("Source account balance update failed or insufficient funds (concurrency issue detected).");
-        }
-
-        // Method-specific logic for recipient details and transaction type
-        $is_internal_transfer = false;
-
-        switch ($transfer_method) {
-            case 'internal_self':
-                $is_internal_transfer = true;
-                $destination_account_id_self_str = filter_var($_POST['destination_account_id_self'] ?? '', FILTER_SANITIZE_STRING);
-
-                try {
-                    $destination_account_id_self = new ObjectId($destination_account_id_self_str);
-                } catch (Exception $e) {
-                    throw new Exception("Invalid destination account ID for self-transfer.");
-                }
-
-                if ($destination_account_id_self == $source_account_id) { // Compare ObjectIds
-                    throw new Exception("Please select a valid different account for self-transfer.");
-                }
-
-                $destination_account = null;
-                foreach ($user_accounts as $acc) {
-                    if ($acc['_id'] == $destination_account_id_self) { // Compare ObjectIds
-                        $destination_account = $acc;
-                        break;
-                    }
-                }
-                if (!$destination_account) {
-                    throw new Exception("Invalid destination account for self-transfer.");
-                }
-                if (strtoupper($destination_account['currency']) !== $sender_currency) {
-                    throw new Exception("Currency mismatch for self-transfer. Accounts must be in the same currency.");
-                }
-
-                $transaction_data['transaction_type'] = 'INTERNAL_SELF_TRANSFER_OUT';
-                $transaction_data['recipient_user_id'] = $user_id; // Recipient is self
-                $transaction_data['recipient_account_number'] = $destination_account['account_number'];
-                break;
-
-            case 'internal_heritage': // Renamed 'internal_hometown_bank' for consistency
-                $is_internal_transfer = true;
-                $recipient_account_number_internal = trim($_POST['recipient_account_number_internal'] ?? '');
-                if (empty($recipient_account_number_internal) || empty($recipient_name)) {
-                    throw new Exception("Recipient account number and name are required for HomeTown Bank Pa transfer.");
-                }
-
-                $internalRecipient = $accountsCollection->findOne(
-                    ['account_number' => $recipient_account_number_internal, 'status' => 'active'],
-                    ['session' => $session]
-                );
-
-                if (!$internalRecipient) {
-                    throw new Exception("Recipient HomeTown Bank Pa account not found or is inactive.");
-                }
-                if ($internalRecipient['user_id'] == $user_id) { // Compare ObjectIds
-                    throw new Exception("You cannot transfer to your own account using this method. Use 'Between My Accounts'.");
-                }
-                if (strtoupper($internalRecipient['currency']) !== $sender_currency) {
-                    throw new Exception("Currency mismatch for HomeTown Bank Pa transfer. Accounts must be in the same currency.");
-                }
-
-                $transaction_data['transaction_type'] = 'INTERNAL_TRANSFER_OUT';
-                $transaction_data['recipient_user_id'] = $internalRecipient['user_id']; // Store as ObjectId
-                $transaction_data['recipient_account_number'] = $internalRecipient['account_number'];
-                break;
-
-            case 'external_iban':
-                $recipient_iban = trim($_POST['recipient_iban'] ?? '');
-                $recipient_swift_bic = trim($_POST['recipient_swift_bic'] ?? '');
-                $recipient_bank_name_iban = trim($_POST['recipient_bank_name_iban'] ?? '');
-                $recipient_country = trim($_POST['recipient_country'] ?? '');
-
-                if (empty($recipient_iban) || empty($recipient_swift_bic) || empty($recipient_bank_name_iban) || empty($recipient_name) || empty($recipient_country)) {
-                    throw new Exception("All IBAN transfer details (IBAN, SWIFT/BIC, Bank Name, Recipient Name, and Country) are required.");
-                }
-                if (strlen($recipient_iban) < 15 || strlen($recipient_iban) > 34 || !preg_match('/^[A-Z0-9]+$/', strtoupper($recipient_iban))) {
-                    throw new Exception("Invalid IBAN format. Must be alphanumeric, 15-34 characters.");
-                }
-                if (strlen($recipient_swift_bic) < 8 || strlen($recipient_swift_bic) > 11 || !preg_match('/^[A-Z0-9]+$/', strtoupper($recipient_swift_bic))) {
-                    throw new Exception("Invalid SWIFT/BIC format. Must be alphanumeric, 8 or 11 characters.");
-                }
-
-                // Store external_bank_details as a nested document instead of JSON string
-                $transaction_data['external_bank_details'] = [
-                    'iban' => strtoupper($recipient_iban),
-                    'swift_bic' => strtoupper($recipient_swift_bic),
-                    'bank_name' => $recipient_bank_name_iban,
-                    'country' => $recipient_country,
-                ];
-                $transaction_data['recipient_iban'] = strtoupper($recipient_iban);
-                $transaction_data['recipient_swift_bic'] = strtoupper($recipient_swift_bic);
-                $transaction_data['recipient_bank_name'] = $recipient_bank_name_iban;
-                $transaction_data['transaction_type'] = 'EXTERNAL_IBAN_TRANSFER_OUT';
-                break;
-
-            case 'external_sort_code':
-                $recipient_sort_code = trim($_POST['recipient_sort_code'] ?? '');
-                $recipient_external_account_number = trim($_POST['recipient_external_account_number'] ?? '');
-                $recipient_bank_name_sort = trim($_POST['recipient_bank_name_sort'] ?? '');
-
-                if (empty($recipient_sort_code) || empty($recipient_external_account_number) || empty($recipient_bank_name_sort) || empty($recipient_name)) {
-                    throw new Exception("All Sort Code transfer details (Sort Code, Account Number, Bank Name, Recipient Name) are required.");
-                }
-                if (!preg_match('/^\d{6}$/', $recipient_sort_code)) {
-                    throw new Exception("Invalid UK Sort Code format (6 digits required).");
-                }
-                if (!preg_match('/^\d{8}$/', $recipient_external_account_number)) {
-                    throw new Exception("Invalid UK Account Number format (8 digits required).");
-                }
-
-                // Store external_bank_details as a nested document
-                $transaction_data['external_bank_details'] = [
-                    'sort_code' => $recipient_sort_code,
-                    'account_number' => $recipient_external_account_number,
-                    'bank_name' => $recipient_bank_name_sort,
-                ];
-                $transaction_data['recipient_sort_code'] = $recipient_sort_code;
-                $transaction_data['recipient_external_account_number'] = $recipient_external_account_number;
-                $transaction_data['recipient_bank_name'] = $recipient_bank_name_sort;
-                $transaction_data['transaction_type'] = 'EXTERNAL_SORT_CODE_TRANSFER_OUT';
-                break;
-
-            case 'external_usa_account': // New case for USA accounts (ACH/Wire details)
-                $recipient_usa_account_number = trim($_POST['recipient_usa_account_number'] ?? '');
-                $recipient_usa_routing_number = trim($_POST['recipient_usa_routing_number'] ?? '');
-                $recipient_bank_name_usa = trim($_POST['recipient_bank_name_usa'] ?? '');
-                $recipient_address_usa = trim($_POST['recipient_address_usa'] ?? '');
-                $recipient_city_usa = trim($_POST['recipient_city_usa'] ?? '');
-                $recipient_state_usa = trim($_POST['recipient_state_usa'] ?? '');
-                $recipient_zip_usa = trim($_POST['recipient_zip_usa'] ?? '');
-                $recipient_account_type_usa = trim($_POST['recipient_account_type_usa'] ?? '');
-
-                if (empty($recipient_usa_account_number) || empty($recipient_usa_routing_number) || empty($recipient_bank_name_usa) || empty($recipient_name) || empty($recipient_address_usa) || empty($recipient_city_usa) || empty($recipient_state_usa) || empty($recipient_zip_usa) || empty($recipient_account_type_usa)) {
-                    throw new Exception("All USA account transfer details (Account Number, Routing Number, Bank Name, Recipient Name, Address, City, State, Zip, and Account Type) are required.");
-                }
-                if (!preg_match('/^\d{9}$/', $recipient_usa_routing_number)) {
-                    throw new Exception("Invalid USA Routing Number format (9 digits required).");
-                }
-                if (!in_array($recipient_account_type_usa, ['Checking', 'Savings'])) {
-                    throw new Exception("Invalid USA Account Type. Must be 'Checking' or 'Savings'.");
-                }
-
-                // Store external_bank_details as a nested document
-                $transaction_data['external_bank_details'] = [
-                    'account_number' => $recipient_usa_account_number,
-                    'routing_number' => $recipient_usa_routing_number,
-                    'bank_name' => $recipient_bank_name_usa,
-                    'address' => $recipient_address_usa,
-                    'city' => $recipient_city_usa,
-                    'state' => $recipient_state_usa,
-                    'zip' => $recipient_zip_usa,
-                    'account_type' => $recipient_account_type_usa,
-                ];
-                $transaction_data['recipient_external_account_number'] = $recipient_usa_account_number;
-                $transaction_data['recipient_bank_name'] = $recipient_bank_name_usa;
-                $transaction_data['transaction_type'] = 'EXTERNAL_USA_TRANSFER_OUT';
-
-                if ($sender_currency !== 'USD') {
-                    throw new Exception("USA account transfers are only available for USD accounts. Your selected account is in " . htmlspecialchars($sender_currency) . ".");
-                }
-                break;
-
-            default:
-                throw new Exception("Invalid transfer method selected.");
-        }
-
-        // Handle currency conversion if needed (currently same currency due to global check)
-        $transaction_data['converted_amount'] = (float)$amount_str;
-        $transaction_data['converted_currency'] = $sender_currency;
-        $transaction_data['exchange_rate'] = 1.0;
-
-        // Insert transaction into the 'transactions' collection
-        $insertResult = $transactionsCollection->insertOne(
-            $transaction_data,
-            ['session' => $session]
-        );
-
-        if (!$insertResult->getInsertedId()) {
-            throw new Exception("Failed to insert transaction record.");
-        }
-        $transaction_id = $insertResult->getInsertedId(); // Get the ID of the newly inserted transaction
-
-        // Commit the transaction if all operations were successful
-        $session->commitTransaction();
-
-        $message = 'Transfer of ' . htmlspecialchars(get_currency_symbol($sender_currency) . number_format((float)$amount_str, 2)) . ' initiated successfully! It is currently **Pending** admin approval.';
-        $message_type = 'success';
-        $_SESSION['show_modal_on_load'] = true; // Set flag to display modal
-
-        // Store transfer details for the modal
-        $_SESSION['transfer_success_details'] = [
-            'amount' => number_format((float)$amount_str, 2),
-            'currency' => $sender_currency,
-            'recipient_name' => htmlspecialchars($recipient_name),
-            'status' => 'Pending',
-            'reference' => $transaction_reference,
-            'method' => str_replace('_', ' ', $transfer_method)
-        ];
-
-        // Send Email Confirmation
-        $email_subject = "HomeTown Bank Pa: Transfer Initiated - Ref: " . htmlspecialchars($transaction_reference); // Updated Bank Name
-
-        $email_body = '
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; background-color: #f4f4f4;">
-            <tr>
-                <td align="center" style="padding: 20px 0;">
-                    <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-                        <tr>
-                            <td align="center" style="padding: 20px 0; background-color: #004A7F;">
-                                <img src="https://i.imgur.com/YmC3kg3.png" alt="HomeTown Bank Pa Logo" style="display: block; max-width: 100px; height: auto; margin: 0 auto; padding: 10px;"> </td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 30px 40px;">
-                                <p style="font-size: 16px; font-weight: bold; color: #004A7F; margin-bottom: 20px;">Dear ' . htmlspecialchars($full_name) . ',</p>
-                                <p style="margin-bottom: 20px;">Your transfer request has been successfully initiated.</p>
-
-                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 25px; border: 1px solid #dddddd; border-collapse: collapse;">
-                                    <tr>
-                                        <td style="padding: 12px 15px; background-color: #f9f9f9; width: 40%; font-weight: bold; border-bottom: 1px solid #eeeeee;">Amount:</td>
-                                        <td style="padding: 12px 15px; background-color: #f9f9f9; border-bottom: 1px solid #eeeeee;">' . htmlspecialchars(get_currency_symbol($sender_currency) . number_format((float)$amount_str, 2)) . '</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 12px 15px; width: 40%; font-weight: bold; border-bottom: 1px solid #eeeeee;">Recipient:</td>
-                                        <td style="padding: 12px 15px; border-bottom: 1px solid #eeeeee;">' . htmlspecialchars($recipient_name) . '</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 12px 15px; background-color: #f9f9f9; width: 40%; font-weight: bold; border-bottom: 1px solid #eeeeee;">Transfer Method:</td>
-                                        <td style="padding: 12px 15px; background-color: #f9f9f9; border-bottom: 1px solid #eeeeee;">' . htmlspecialchars(str_replace('_', ' ', $transfer_method)) . '</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 12px 15px; width: 40%; font-weight: bold; border-bottom: 1px solid #eeeeee;">Status:</td>
-                                        <td style="padding: 12px 15px; border-bottom: 1px solid #eeeeee;"><strong style="color: #FFA500;">Pending</strong></td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 12px 15px; background-color: #f9f9f9; width: 40%; font-weight: bold;">Reference:</td>
-                                        <td style="padding: 12px 15px; background-color: #f9f9f9;">' . htmlspecialchars($transaction_reference) . '</td>
-                                    </tr>
-                                </table>
-
-                                <p style="margin-top: 20px;">We will notify you once your transfer has been processed by our team. You can monitor its status in your transaction history.</p>
-                                <p style="margin-top: 20px; font-weight: bold; color: #004A7F;">Thank you for banking with HomeTown Bank Pa.</p>
-                                <p style="font-size: 15px; color: #555555; margin-top: 5px;">The HomeTown Bank Pa Team</p>
-
-                                <p style="font-size: 11px; color: #888888; text-align: center; margin-top: 40px; border-top: 1px solid #eeeeee; padding-top: 20px;">
-                                    This is an automated email, please do not reply.
-                                </p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td align="center" style="padding: 20px; background-color: #004A7F; color: #ffffff; font-size: 12px;">
-                                &copy; ' . date("Y") . ' HomeTown Bank Pa. All rights reserved.
-                            </td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-        </table>';
-
-        sendEmail($user_email, $email_subject, $email_body);
-
-    } catch (Exception $e) {
-        if ($session && $session->inTransaction()) {
-            $session->abortTransaction(); // Abort transaction on error
-        }
-        $message = 'Transfer failed: ' . $e->getMessage();
-        $message_type = 'error';
-        error_log("User Transfer Error (process_transfer.php): " . $e->getMessage() . " (User ID: " . $_SESSION['user_id'] . ", Sender Account: " . ($_POST['source_account_id'] ?? 'N/A') . ", Ref: " . ($transaction_reference ?? 'N/A') . ")");
-
-        $_SESSION['form_data'] = $post_data_for_redirect; // Preserve form data for error display
-        $_SESSION['message'] = $message;
-        $_SESSION['message_type'] = $message_type;
-        $_SESSION['show_modal_on_load'] = false; // Do not show modal on error
-    } finally {
-        if ($session) {
-            $session->endSession(); // End the session whether successful or not
-        }
+    if (!defined('MONGODB_CONNECTION_URI') || empty(MONGODB_CONNECTION_URI)) {
+        throw new Exception("MONGODB_CONNECTION_URI is not defined or empty.");
+    }
+    if (!defined('MONGODB_DB_NAME') || empty(MONGODB_DB_NAME)) {
+        throw new Exception("MONGODB_DB_NAME is not defined or empty.");
     }
 
-    // Redirect back to transfer.php with messages and optionally, old form data
-    header('Location: transfer.php');
+    $client = new Client(MONGODB_CONNECTION_URI);
+    $db = $client->selectDatabase(MONGODB_DB_NAME);
+    $accountsCollection = $db->accounts;
+    $transactionsCollection = $db->transactions;
+    $usersCollection = $db->users; // Needed to get recipient info for internal transfers
+} catch (MongoDBException $e) {
+    error_log("MongoDB connection error in frontend/make_transfer.php: " . $e->getMessage());
+    $_SESSION['message'] = "ERROR: Database connection failed. Please try again later. Detail: " . $e->getMessage();
+    $_SESSION['message_type'] = "error";
+    header('Location: ' . BASE_URL . '/transfer'); // Redirect back to transfer.php in frontend
+    exit;
+} catch (Exception $e) {
+    error_log("General database connection error in frontend/make_transfer.php: " . $e->getMessage());
+    $_SESSION['message'] = "ERROR: An unexpected error occurred during database connection. Please try again later. Detail: " . $e->getMessage();
+    $_SESSION['message_type'] = "error";
+    header('Location: ' . BASE_URL . '/transfer'); // Redirect back to transfer.php in frontend
+    exit;
+}
+
+
+// 3. Validate and Sanitize Input
+$form_data = $_POST; // Store all POST data for re-population on error
+
+$source_account_id = filter_input(INPUT_POST, 'source_account_id', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+$transfer_method = filter_input(INPUT_POST, 'transfer_method', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+$amount = filter_input(INPUT_POST, 'amount', FILTER_VALIDATE_FLOAT);
+$description = filter_input(INPUT_POST, 'description', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+$recipient_name = filter_input(INPUT_POST, 'recipient_name', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+$errors = [];
+
+if (empty($source_account_id)) {
+    $errors[] = "Source account is required.";
+}
+if (empty($transfer_method)) {
+    $errors[] = "Transfer method is required.";
+}
+if ($amount === false || $amount <= 0) {
+    $errors[] = "Valid amount is required (must be greater than 0).";
+}
+
+// Specific validation based on transfer method
+$destination_account_details = []; // Will store details of the destination for logging and display
+
+switch ($transfer_method) {
+    case 'internal_self':
+        $destination_account_id_self = filter_input(INPUT_POST, 'destination_account_id_self', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        if (empty($destination_account_id_self)) {
+            $errors[] = "Destination account is required for transfers between your accounts.";
+        } elseif ($source_account_id === $destination_account_id_self) {
+            $errors[] = "Source and destination accounts cannot be the same.";
+        } else {
+            // Fetch destination account details for logging
+            try {
+                $destAccount = $accountsCollection->findOne(['_id' => new ObjectId($destination_account_id_self), 'user_id' => new ObjectId($user_id)]);
+                if (!$destAccount) {
+                    $errors[] = "Invalid destination account selected.";
+                } else {
+                    $destination_account_details = [
+                        'type' => 'Internal (Self)',
+                        'account_number' => substr($destAccount['account_number'], -4),
+                        'account_type' => $destAccount['account_type'],
+                        'recipient_name' => $user_full_name // It's still the user
+                    ];
+                }
+            } catch (MongoDBException $e) {
+                error_log("MongoDB error fetching internal self destination account: " . $e->getMessage());
+                $errors[] = "Error validating destination account.";
+            }
+        }
+        break;
+
+    case 'internal_heritage':
+        $recipient_account_number_internal = filter_input(INPUT_POST, 'recipient_account_number_internal', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        if (empty($recipient_account_number_internal)) {
+            $errors[] = "Recipient HomeTown Bank Pa Account Number is required.";
+        } elseif (!preg_match('/^\d{10,12}$/', $recipient_account_number_internal)) { // Example regex, adjust as needed
+             $errors[] = "Recipient HomeTown Bank Pa Account Number format is invalid (e.g., 10-12 digits).";
+        }
+        if (empty($recipient_name)) {
+            $errors[] = "Recipient Name is required for HomeTown Bank Pa transfers.";
+        } else {
+            // Try to find the recipient account and user
+            try {
+                $recipientAccount = $accountsCollection->findOne(['account_number' => $recipient_account_number_internal, 'status' => 'active']);
+                if (!$recipientAccount) {
+                    $errors[] = "Recipient account not found or is not active.";
+                } else {
+                    // Prevent self-transfer to other Hometown accounts if it's the same user
+                    if ((string)$recipientAccount['user_id'] === (string)(new ObjectId($user_id))) {
+                        $errors[] = "Cannot transfer to your own account using 'To Another HomeTown Bank Pa Account' method. Please use 'Between My Accounts'.";
+                    } else {
+                        $recipientUser = $usersCollection->findOne(['_id' => $recipientAccount['user_id']]);
+                        $recipientFullName = trim(($recipientUser['first_name'] ?? '') . ' ' . ($recipientUser['last_name'] ?? ''));
+
+                        // Basic check for name match (can be more sophisticated)
+                        if (strtolower($recipientFullName) !== strtolower($recipient_name)) {
+                           // Consider this a soft warning or strict error based on bank policy
+                           // For now, let's make it a strict error to ensure correct recipient
+                           $errors[] = "Recipient name does not match the account holder. Please confirm recipient details.";
+                        }
+                        $destination_account_details = [
+                            'type' => 'Internal (Heritage)',
+                            'account_number' => substr($recipientAccount['account_number'], -4),
+                            'account_type' => $recipientAccount['account_type'],
+                            'recipient_name' => $recipientFullName
+                        ];
+                    }
+                }
+            } catch (MongoDBException $e) {
+                error_log("MongoDB error fetching internal heritage recipient: " . $e->getMessage());
+                $errors[] = "Error validating recipient account details.";
+            }
+        }
+        break;
+
+    case 'external_iban':
+        $recipient_bank_name_iban = filter_input(INPUT_POST, 'recipient_bank_name_iban', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $recipient_iban = filter_input(INPUT_POST, 'recipient_iban', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $recipient_swift_bic = filter_input(INPUT_POST, 'recipient_swift_bic', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $recipient_country = filter_input(INPUT_POST, 'recipient_country', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+        if (empty($recipient_name) || empty($recipient_bank_name_iban) || empty($recipient_iban) || empty($recipient_swift_bic) || empty($recipient_country)) {
+            $errors[] = "All International Bank Transfer (IBAN/SWIFT) fields are required.";
+        }
+        // Basic IBAN validation (can be more robust)
+        if (!empty($recipient_iban) && !preg_match('/^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/', strtoupper($recipient_iban))) {
+            $errors[] = "Invalid IBAN format.";
+        }
+        // Basic SWIFT/BIC validation
+        if (!empty($recipient_swift_bic) && !preg_match('/^[A-Z0-9]{8}([A-Z0-9]{3})?$/i', $recipient_swift_bic)) {
+            $errors[] = "Invalid SWIFT/BIC format.";
+        }
+        $destination_account_details = [
+            'type' => 'External (IBAN/SWIFT)',
+            'bank_name' => $recipient_bank_name_iban,
+            'iban' => $recipient_iban,
+            'swift_bic' => $recipient_swift_bic,
+            'country' => $recipient_country,
+            'recipient_name' => $recipient_name
+        ];
+        break;
+
+    case 'external_sort_code':
+        $recipient_bank_name_sort = filter_input(INPUT_POST, 'recipient_bank_name_sort', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $recipient_sort_code = filter_input(INPUT_POST, 'recipient_sort_code', FILTER_SANITIZE_NUMBER_INT);
+        $recipient_external_account_number = filter_input(INPUT_POST, 'recipient_external_account_number', FILTER_SANITIZE_NUMBER_INT);
+
+        if (empty($recipient_name) || empty($recipient_bank_name_sort) || empty($recipient_sort_code) || empty($recipient_external_account_number)) {
+            $errors[] = "All UK Bank Transfer (Sort Code/Account No) fields are required.";
+        }
+        if (!empty($recipient_sort_code) && !preg_match('/^\d{6}$/', $recipient_sort_code)) {
+            $errors[] = "Sort Code must be 6 digits.";
+        }
+        if (!empty($recipient_external_account_number) && !preg_match('/^\d{8}$/', $recipient_external_account_number)) {
+            $errors[] = "Account Number must be 8 digits for UK transfers.";
+        }
+        $destination_account_details = [
+            'type' => 'External (UK Sort Code)',
+            'bank_name' => $recipient_bank_name_sort,
+            'sort_code' => $recipient_sort_code,
+            'account_number' => $recipient_external_account_number,
+            'recipient_name' => $recipient_name
+        ];
+        break;
+
+    case 'external_usa_account':
+        $recipient_bank_name_usa = filter_input(INPUT_POST, 'recipient_bank_name_usa', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $recipient_usa_routing_number = filter_input(INPUT_POST, 'recipient_usa_routing_number', FILTER_SANITIZE_NUMBER_INT);
+        $recipient_usa_account_number = filter_input(INPUT_POST, 'recipient_usa_account_number', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $recipient_account_type_usa = filter_input(INPUT_POST, 'recipient_account_type_usa', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $recipient_address_usa = filter_input(INPUT_POST, 'recipient_address_usa', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $recipient_city_usa = filter_input(INPUT_POST, 'recipient_city_usa', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $recipient_state_usa = filter_input(INPUT_POST, 'recipient_state_usa', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $recipient_zip_usa = filter_input(INPUT_POST, 'recipient_zip_usa', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+        if (empty($recipient_name) || empty($recipient_bank_name_usa) || empty($recipient_usa_routing_number) || empty($recipient_usa_account_number) || empty($recipient_account_type_usa) || empty($recipient_address_usa) || empty($recipient_city_usa) || empty($recipient_state_usa) || empty($recipient_zip_usa)) {
+            $errors[] = "All USA Bank Transfer fields are required.";
+        }
+        if (!empty($recipient_usa_routing_number) && !preg_match('/^\d{9}$/', $recipient_usa_routing_number)) {
+            $errors[] = "Routing Number must be 9 digits for USA transfers.";
+        }
+        $destination_account_details = [
+            'type' => 'External (USA Account)',
+            'bank_name' => $recipient_bank_name_usa,
+            'routing_number' => $recipient_usa_routing_number,
+            'account_number' => $recipient_usa_account_number,
+            'account_type' => $recipient_account_type_usa,
+            'address' => [
+                'street' => $recipient_address_usa,
+                'city' => $recipient_city_usa,
+                'state' => $recipient_state_usa,
+                'zip' => $recipient_zip_usa
+            ],
+            'recipient_name' => $recipient_name
+        ];
+        break;
+
+    default:
+        $errors[] = "Invalid transfer method selected.";
+        break;
+}
+
+if (!empty($errors)) {
+    $_SESSION['message'] = "Please correct the following errors: <br>" . implode("<br>", $errors);
+    $_SESSION['message_type'] = "error";
+    $_SESSION['form_data'] = $form_data; // Persist form data
+    header('Location: ' . BASE_URL . '/transfer'); // Redirect back to transfer.php in frontend
+    exit;
+}
+
+
+// 4. Fetch Source Account Details and Check Balance
+try {
+    $sourceAccount = $accountsCollection->findOne([
+        '_id' => new ObjectId($source_account_id),
+        'user_id' => new ObjectId($user_id),
+        'status' => 'active'
+    ]);
+
+    if (!$sourceAccount) {
+        throw new Exception("Source account not found or is not active for this user.");
+    }
+
+    if ($sourceAccount['balance'] < $amount) {
+        throw new Exception("Insufficient balance in source account. Available: " . get_currency_symbol($sourceAccount['currency']) . number_format((float)$sourceAccount['balance'], 2));
+    }
+} catch (MongoDBException $e) {
+    error_log("MongoDB error fetching source account: " . $e->getMessage());
+    $_SESSION['message'] = "Error fetching your account details. Please try again.";
+    $_SESSION['message_type'] = "error";
+    $_SESSION['form_data'] = $form_data;
+    header('Location: ' . BASE_URL . '/transfer'); // Redirect back to transfer.php in frontend
+    exit;
+} catch (Exception $e) {
+    error_log("Account validation error in frontend/make_transfer.php: " . $e->getMessage());
+    $_SESSION['message'] = "Transfer failed: " . $e->getMessage();
+    $_SESSION['message_type'] = "error";
+    $_SESSION['form_data'] = $form_data;
+    header('Location: ' . BASE_URL . '/transfer'); // Redirect back to transfer.php in frontend
+    exit;
+}
+
+// 5. Generate Reference Number
+$reference_number = generateUniqueReferenceNumber(); // Make sure this function exists in functions.php
+
+// 6. Begin Transaction (Conceptual - for a real system, this involves proper database transactions)
+// For MongoDB, single operations are atomic, multi-document transactions require replica set.
+// Here, we're doing separate updates/inserts, so order and error handling are critical.
+
+try {
+    $current_time = new MongoDB\BSON\UTCDateTime(); // Current timestamp in BSON format
+
+    // Deduct amount from source account
+    $accountsCollection->updateOne(
+        ['_id' => new ObjectId($source_account_id)],
+        ['$inc' => ['balance' => -$amount]]
+    );
+
+    // If internal self-transfer, add to destination account
+    if ($transfer_method === 'internal_self') {
+        $accountsCollection->updateOne(
+            ['_id' => new ObjectId($destination_account_id_self)],
+            ['$inc' => ['balance' => $amount]]
+        );
+    }
+
+    // Record transaction
+    $transaction_data = [
+        'user_id' => new ObjectId($user_id),
+        'transaction_type' => 'Transfer',
+        'method' => $transfer_method,
+        'source_account_id' => new ObjectId($source_account_id),
+        'amount' => (float)$amount,
+        'currency' => $sourceAccount['currency'],
+        'description' => $description,
+        'status' => 'pending', // All transfers require approval in this system
+        'reference_number' => $reference_number,
+        'timestamp' => $current_time,
+        'recipient_name' => $recipient_name,
+        'meta_data' => $destination_account_details // Store recipient details
+    ];
+
+    if ($transfer_method === 'internal_self') {
+        $transaction_data['destination_account_id'] = new ObjectId($destination_account_id_self);
+    } elseif ($transfer_method === 'internal_heritage') {
+        $transaction_data['meta_data']['recipient_account_number'] = $recipient_account_number_internal;
+    }
+
+    $transactionsCollection->insertOne($transaction_data);
+
+    // 7. Send Email Notification
+    $mail = new PHPMailer(true);
+    try {
+        //Server settings
+        $mail->isSMTP();
+        $mail->Host       = SMTP_HOST;
+        $mail->SMTPAuth   = true;
+        $mail->Username   = SMTP_USERNAME;
+        $mail->Password   = SMTP_PASSWORD;
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = SMTP_PORT;
+        $mail->setFrom(SMTP_FROM_EMAIL, SMTP_FROM_NAME);
+        $mail->addAddress($user_email, $user_full_name); // User's email
+
+        //Content
+        $mail->isHTML(true);
+        $mail->Subject = 'Transfer Initiated - HomeTown Bank Pa';
+        $email_body = "
+            <p>Dear {$user_full_name},</p>
+            <p>Your transfer request has been successfully initiated and is now **pending approval**.</p>
+            <p><strong>Transfer Details:</strong></p>
+            <ul>
+                <li>Amount: " . get_currency_symbol($sourceAccount['currency']) . number_format($amount, 2) . "</li>
+                <li>From Account: {$sourceAccount['account_type']} (****" . substr($sourceAccount['account_number'], -4) . ")</li>
+                <li>To: {$recipient_name}</li>
+                <li>Method: ";
+
+        // Enhance email body based on transfer method
+        switch ($transfer_method) {
+            case 'internal_self':
+                $email_body .= "Between My Accounts";
+                $destAccountForEmail = $accountsCollection->findOne(['_id' => new ObjectId($destination_account_id_self)]);
+                if ($destAccountForEmail) {
+                    $email_body .= " ({$destAccountForEmail['account_type']} ****" . substr($destAccountForEmail['account_number'], -4) . ")";
+                }
+                break;
+            case 'internal_heritage':
+                $email_body .= "To Another HomeTown Bank Pa Account (Account No: ****" . substr($recipient_account_number_internal, -4) . ")";
+                break;
+            case 'external_iban':
+                $email_body .= "International Bank Transfer (IBAN: " . $destination_account_details['iban'] . ", SWIFT: " . $destination_account_details['swift_bic'] . ")";
+                break;
+            case 'external_sort_code':
+                $email_body .= "UK Bank Transfer (Sort Code: " . $destination_account_details['sort_code'] . ", Account No: " . $destination_account_details['account_number'] . ")";
+                break;
+            case 'external_usa_account':
+                $email_body .= "USA Bank Transfer (Routing No: " . $destination_account_details['routing_number'] . ", Account No: " . $destination_account_details['account_number'] . ")";
+                break;
+        }
+
+        $email_body .= "</li>
+                <li>Description: " . ($description ?: 'N/A') . "</li>
+                <li>Status: Pending Approval</li>
+                <li>Reference Number: {$reference_number}</li>
+            </ul>
+            <p>We will notify you once the transfer has been processed.</p>
+            <p>Thank you for banking with HomeTown Bank Pa.</p>
+            ";
+        $mail->Body = $email_body;
+
+        $mail->send();
+        error_log("Transfer confirmation email sent to " . $user_email . " for reference " . $reference_number);
+    } catch (PHPMailerException $e) {
+        error_log("Error sending transfer confirmation email to {$user_email}: " . $mail->ErrorInfo);
+        // Do not die, as the transfer itself was recorded. Just log the email failure.
+    }
+
+
+    // 8. Success: Redirect back to transfer page with success message
+    $_SESSION['message'] = "Your transfer of " . get_currency_symbol($sourceAccount['currency']) . number_format($amount, 2) . " has been successfully initiated!";
+    $_SESSION['message_type'] = "success";
+    $_SESSION['show_modal_on_load'] = true;
+    $_SESSION['transfer_success_details'] = [
+        'amount' => number_format($amount, 2),
+        'currency' => get_currency_symbol($sourceAccount['currency']),
+        'recipient' => $recipient_name,
+        'status' => 'Pending Approval',
+        'reference' => $reference_number,
+        'method' => $destination_account_details['type'] // Use the structured type for modal
+    ];
+
+    header('Location: ' . BASE_URL . '/transfer'); // Redirect back to transfer.php in frontend
     exit;
 
-} else {
-    // If not a POST request, just redirect to transfer.php to display the form
-    header('Location: transfer.php');
+} catch (MongoDBException $e) {
+    // If database operations fail after initial deduction (rollback would be needed in a real system)
+    error_log("Critical MongoDB error during transfer operations in frontend/make_transfer.php: " . $e->getMessage());
+    $_SESSION['message'] = "A critical error occurred during the transfer. Please contact support. Detail: " . $e->getMessage();
+    $_SESSION['message_type'] = "error";
+    $_SESSION['form_data'] = $form_data;
+    header('Location: ' . BASE_URL . '/transfer'); // Redirect back to transfer.php in frontend
+    exit;
+} catch (Exception $e) {
+    // General error during transfer process
+    error_log("Unexpected error during transfer in frontend/make_transfer.php: " . $e->getMessage());
+    $_SESSION['message'] = "An unexpected error occurred during the transfer. Please try again. Detail: " . $e->getMessage();
+    $_SESSION['message_type'] = "error";
+    $_SESSION['form_data'] = $form_data;
+    header('Location: ' . BASE_URL . '/transfer'); // Redirect back to transfer.php in frontend
     exit;
 }

@@ -164,9 +164,6 @@ if ($mongoClient) {
             <div class="greeting">
                 <h1 data-user-first-name="<?php echo htmlspecialchars($first_name); ?>">Hi, <?php echo htmlspecialchars($first_name); ?></h1>
             </div>
-            <div class="profile-pic">
-                <img src="<?php echo BASE_URL; ?>/images/default-profile.png" alt="Profile Picture" id="headerProfilePic">
-            </div>
         </header>
 
         <section class="accounts-section">
@@ -223,8 +220,8 @@ if ($mongoClient) {
 
         <section class="bank-cards-section">
             <h2>My Cards</h2>
-            <a class="view-cards-button" id="viewMyCardsButton" href="<?php echo BASE_URL; ?>/bank_cards">
-                <i class="fas fa-credit-card"></i> View My Cards
+           <a href="<?php echo BASE_URL; ?>/bank_cards.php" class="button-class">
+             <i class="fas fa-credit-card"></i> View My Cards
             </a>
             <div class="card-list-container" id="userCardList" style="display: none;">
                 <p class="loading-message" id="cardsLoadingMessage">No cards found. Go to "Manage All Cards" to add one.</p>
@@ -348,7 +345,11 @@ if ($mongoClient) {
             <i class="fas fa-sign-out-alt"></i> Logout
         </button>
     </div>
-
+<script>
+    document.getElementById('viewCardsBtn').addEventListener('click', function() {
+        window.location.href = BASE_URL_JS + '/bank_cards.php';
+    });
+</script>
     <script src="<?php echo BASE_URL; ?>/frontend/user.dashboard.js"></script>
 </body>
 </html>

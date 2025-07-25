@@ -230,6 +230,24 @@ function sanitize_input(?string $data): string {
     return $data;
 }
 
+/**
+ * Generates a unique reference number.
+ *
+ * @param int $length The length of the random part of the string.
+ * @return string The generated unique reference number prefixed with 'TRF-'.
+ */
+if (!function_exists('generateUniqueReferenceNumber')) {
+    function generateUniqueReferenceNumber($length = 12) {
+        $characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $charactersLength = strlen($characters);
+        $randomString = '';
+        for ($i = 0; $i < $length; $i++) {
+            $randomString .= $characters[rand(0, $charactersLength - 1)];
+        }
+        return 'TRF-' . $randomString; // Prefix for clarity
+    }
+}
+
 
 // --- Database-dependent Helper Functions ---
 
@@ -358,32 +376,32 @@ function complete_pending_transfer($transaction_id): array {
             $recipient_tx_type = (strpos($transaction_details['transaction_type'], 'SELF') !== false) ? 'INTERNAL_SELF_TRANSFER_IN' : 'INTERNAL_TRANSFER_IN';
 
             $recipientTransactionData = [
-                'user_id'                       => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
-                'account_id'                    => $recipient_account_id, // This should be ObjectId
-                'amount'                        => new Decimal128($credit_amount_str), // Store as Decimal128
-                'currency'                      => $credit_currency,
-                'transaction_type'              => $recipient_tx_type,
-                'description'                   => $transaction_details['description'],
-                'status'                        => 'COMPLETED',
-                'initiated_at'                  => $transaction_details['initiated_at'], // Use original initiated_at
-                'transaction_reference'         => $transaction_details['transaction_reference'] . '_IN', // Unique ref for incoming
-                'recipient_name'                => $transaction_details['recipient_name'],
-                'recipient_account_number'      => $transaction_details['recipient_account_number'],
-                'recipient_iban'                => $transaction_details['recipient_iban'] ?? null,
-                'recipient_swift_bic'           => $transaction_details['recipient_swift_bic'] ?? null,
-                'recipient_sort_code'           => $transaction_details['recipient_sort_code'] ?? null,
+                'user_id'                         => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
+                'account_id'                      => $recipient_account_id, // This should be ObjectId
+                'amount'                          => new Decimal128($credit_amount_str), // Store as Decimal128
+                'currency'                        => $credit_currency,
+                'transaction_type'                => $recipient_tx_type,
+                'description'                     => $transaction_details['description'],
+                'status'                          => 'COMPLETED',
+                'initiated_at'                    => $transaction_details['initiated_at'], // Use original initiated_at
+                'transaction_reference'           => $transaction_details['transaction_reference'] . '_IN', // Unique ref for incoming
+                'recipient_name'                  => $transaction_details['recipient_name'],
+                'recipient_account_number'        => $transaction_details['recipient_account_number'],
+                'recipient_iban'                  => $transaction_details['recipient_iban'] ?? null,
+                'recipient_swift_bic'             => $transaction_details['recipient_swift_bic'] ?? null,
+                'recipient_sort_code'             => $transaction_details['recipient_sort_code'] ?? null,
                 'recipient_external_account_number' => $transaction_details['recipient_external_account_number'] ?? null,
-                'recipient_user_id'             => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
-                'recipient_bank_name'           => $transaction_details['recipient_bank_name'] ?? null,
-                'sender_name'                   => $transaction_details['sender_name'],
-                'sender_account_number'         => $transaction_details['sender_account_number'],
-                'sender_user_id'                => (is_string($transaction_details['sender_user_id']) && strlen($transaction_details['sender_user_id']) === 24 && ctype_xdigit($transaction_details['sender_user_id'])) ? new ObjectId($transaction_details['sender_user_id']) : $transaction_details['sender_user_id'],
-                'converted_amount'              => new Decimal128($credit_amount_str), // Store as Decimal128
-                'converted_currency'            => $credit_currency,
-                'exchange_rate'                 => new Decimal128((string)($transaction_details['exchange_rate'] ?? 1.0)), // Store as Decimal128
-                'external_bank_details'         => $transaction_details['external_bank_details'] ?? null,
-                'transaction_date'              => new UTCDateTime(strtotime('today') * 1000), // Date without time
-                'completed_at'                  => new UTCDateTime(), // Current UTC timestamp
+                'recipient_user_id'               => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
+                'recipient_bank_name'             => $transaction_details['recipient_bank_name'] ?? null,
+                'sender_name'                     => $transaction_details['sender_name'],
+                'sender_account_number'           => $transaction_details['sender_account_number'],
+                'sender_user_id'                  => (is_string($transaction_details['sender_user_id']) && strlen($transaction_details['sender_user_id']) === 24 && ctype_xdigit($transaction_details['sender_user_id'])) ? new ObjectId($transaction_details['sender_user_id']) : $transaction_details['sender_user_id'],
+                'converted_amount'                => new Decimal128($credit_amount_str), // Store as Decimal128
+                'converted_currency'              => $credit_currency,
+                'exchange_rate'                   => new Decimal128((string)($transaction_details['exchange_rate'] ?? 1.0)), // Store as Decimal128
+                'external_bank_details'           => $transaction_details['external_bank_details'] ?? null,
+                'transaction_date'                => new UTCDateTime(strtotime('today') * 1000), // Date without time
+                'completed_at'                    => new UTCDateTime(), // Current UTC timestamp
             ];
 
             $insertResult = $transactionsCollection->insertOne($recipientTransactionData, ['session' => $session]);
@@ -418,7 +436,7 @@ function complete_pending_transfer($transaction_id): array {
         // --- Email Notification for Sender ---
         // Pass original transaction ID (from MySQL) if needed for email history lookup.
         // Assuming get_user_details can now handle MongoDB _id for users if updated.
-        $sender_user = get_user_details($transaction_details['sender_user_id']); // Use the user_id from the fetched transaction
+        $sender_user = get_user_details($transaction_details['user_id']); // Use the user_id from the fetched transaction
 
         if ($sender_user && $sender_user['email']) {
             $subject = "Transaction Completed - Reference: {$transaction_details['transaction_reference']}";
@@ -472,7 +490,6 @@ function complete_pending_transfer($transaction_id): array {
         } else {
             error_log("Could not send completion email for transaction ID {$transactionObjectId}: Sender user details (email) not found.");
         }
-
         // --- Email Notification for Recipient (if internal transfer) ---
         if (strpos($transaction_details['transaction_type'], 'INTERNAL') !== false && isset($transaction_details['recipient_user_id'])) {
             $recipient_user = get_user_details($transaction_details['recipient_user_id']);
@@ -643,7 +660,7 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
         $session->commitTransaction();
 
         // --- Email Notification for Sender (Rejection) ---
-        $sender_user = get_user_details($transaction_details['sender_user_id']);
+        $sender_user = get_user_details($transaction_details['user_id']);
         if ($sender_user && $sender_user['email']) {
             $subject = "Transaction Rejected - Reference: {$transaction_details['transaction_reference']}";
             $body = '
