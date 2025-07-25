@@ -12,19 +12,42 @@ error_reporting(E_ALL);
 // This is crucial because Dotenv and other libraries are loaded through it.
 require_once __DIR__ . '/../vendor/autoload.php';
 
-// Load .env variables. This must happen AFTER autoload.php and BEFORE Config.php if Config.php uses $_ENV.
-$dotenv = Dotenv\Dotenv::createImmutable(dirname(__DIR__)); // Go up two levels from frontend/ to phpfile-main/
-$dotenv->load();
+// --- Start Dotenv loading (conditional for deployment) ---
+// This block attempts to load .env files only if they exist.
+// On Render, environment variables should be set directly in the dashboard,
+// so a physical .env file won't be present.
+$dotenvPath = dirname(__DIR__); // Go up one level from 'frontend' to the project root (hometownbank)
+
+// THIS IS THE CRUCIAL CONDITIONAL CHECK
+if (file_exists($dotenvPath . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
+    try {
+        $dotenv->load(); // This will only run if .env file exists
+    _error_log("DEBUG: .env file EXISTS locally. Loaded Dotenv."); // Optional: for debugging local environment
+    } catch (Dotenv\Exception\InvalidPathException $e) {
+        // This catch is mostly for local dev if .env is missing or unreadable.
+        error_log("Dotenv load error locally on path " . $dotenvPath . ": " . $e->getMessage());
+    }
+} else {
+    // This block will execute on Render, as .env should NOT exist there.
+    // Environment variables are expected to be set via Render's Config Vars.
+    error_log("DEBUG: .env file DOES NOT exist. Skipping Dotenv load. (Expected on Render)"); // Optional: for debugging Render environment
+}
+// If .env doesn't exist (like on Render), the variables are assumed to be pre-loaded
+// into the environment by the hosting platform (e.g., Render's Config Vars).
+// --- End Dotenv loading ---
+
 
 // Now load your Config.php and functions.php files.
-// Config.php can now safely access $_ENV variables if they're defined in your .env file.
+// Config.php can now safely access $_ENV variables if they're defined in your .env file
+// or if they're loaded as environment variables by the hosting provider.
 require_once __DIR__ . '/../Config.php';
 require_once __DIR__ . '/../functions.php'; // For sanitize_input, and potentially other utilities
 
 
 // Check if the user is logged in. If not, redirect to login page.
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: ../indx.php'); // Redirect to the main login page (e.g., indx.php)
+    header('Location: ../index.php'); // Corrected from indx.php to index.php
     exit;
 }
 
@@ -33,7 +56,7 @@ $user_id = $_SESSION['user_id'];
 $username = $_SESSION['username'] ?? 'User'; // Fallback if username not set in session
 $first_name = $_SESSION['first_name'] ?? '';
 $last_name = $_SESSION['last_name'] ?? '';
-$user_email = $_SESSION['temp_user_email'] ?? ''; // Assuming email is stored in session from 2FA flow
+$user_email = $_SESSION['email'] ?? ''; // Assuming email is stored in session as 'email' after 2FA flow
 
 // Generate full name for display
 $full_name = trim($first_name . ' ' . $last_name);
@@ -54,7 +77,9 @@ try {
 
 } catch (MongoDB\Driver\Exception\Exception $e) {
     // Handle MongoDB connection errors
-    die("ERROR: Could not connect to MongoDB. " . $e->getMessage());
+    error_log("ERROR: Could not connect to MongoDB. " . $e->getMessage()); // Log the error
+    // Display a user-friendly message without exposing raw error
+    die("A critical database error occurred. Please try again later.");
 }
 
 
