@@ -1,222 +1,301 @@
 <?php
-echo "INDEX_LOADED_V_FINAL"; // Add this line
+echo "INDEX_LOADED_V_FINAL"; // <-- CONFIRMATION LINE
+// CONFIRM_CHANGE_INDEX_20250724 // <-- CONFIRMATION LINE
 
-// C:\xampp\htdocs\heritagebank\index.php
-session_start();
+// This file serves as the main entry point for the HeritageBanking Admin Panel.
+// It includes essential configuration, defines the base URL, and handles routing
+// to different parts of the application based on the user's authentication status.
 
-require_once __DIR__ . '/vendor/autoload.php'; // This loads all Composer-installed classes
+// Load essential configuration and constants
+require_once __DIR__ . '/Config.php';
+require_once __DIR__ . '/functions.php';
 
-// Include your database configuration and functions file
-require_once 'Config.php'; // Path from project root
-require_once 'functions.php'; // Path from project root
-
-// Include MongoDB Client and ObjectId for database operations (if not already included by functions.php)
-// It's good practice to ensure they are available if you interact with MongoDB directly here.
-use MongoDB\Client;
-use MongoDB\BSON\ObjectId;
-use MongoDB\BSON\UTCDateTime;
-use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
-$message = '';
-$message_type = ''; // 'success', 'error', 'warning'
-
-// If user is already logged in (session is active)
-if (isset($_SESSION['user_id'])) {
-    // Redirect based on role if needed, or always to dashboard
-    if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) {
-        header('Location: admin/dashboard.php'); // Admin dashboard
-    } else {
-        header('Location: frontend/dashboard.php'); // User dashboard <--- Corrected this line
-    }
-    exit();
+// Start the session if not already started (Config.php handles session_start, but double check)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-// Handle login form submission
-if (isset($_POST['login'])) {
-    $last_name = sanitize_input($_POST['last_name'] ?? '');
-    $membership_number = sanitize_input($_POST['membership_number'] ?? '');
+// Check if the user is logged in
+$isLoggedIn = isset($_SESSION['user_id']);
+$userRole = $_SESSION['role'] ?? 'guest'; // Default to 'guest' if not set
 
-    if (empty($last_name) || empty($membership_number)) {
-        $message = "Please enter both last name and membership number.";
-        $message_type = 'error';
-    } else {
-        try {
-            $usersCollection = getCollection('users');
+// Define the base path for routing
+// This is relative to the document root (e.g., / for example.com, or /my_app/ for example.com/my_app)
+$basePath = '/'; // Assuming the app is at the root of the domain/subdomain on Render
 
-            // Find user by membership number and last name
-            $user = $usersCollection->findOne([
-                'membership_number' => $membership_number,
-                'last_name' => $last_name,
-                'status' => 'active' // Ensure only active users can log in
-            ]);
+// Get the requested URL path (e.g., /login, /dashboard, /admin/users)
+$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-            if ($user) {
-                // User found, now check 2FA status
-                if (isset($user['two_factor_enabled']) && $user['two_factor_enabled'] === true) {
-                    // 2FA is enabled, initiate 2FA verification
-
-                    // Generate a 2FA code (e.g., 6-digit number)
-                    $two_factor_code = str_pad(random_int(0, (10**TWO_FACTOR_CODE_LENGTH) - 1), TWO_FACTOR_CODE_LENGTH, '0', STR_PAD_LEFT);
-                    $expiry_time = new UTCDateTime(strtotime('+' . TWO_FACTOR_CODE_EXPIRY_MINUTES . ' minutes') * 1000);
-
-                    // Store the code and expiry in the database for verification
-                    $updateResult = $usersCollection->updateOne(
-                        ['_id' => $user['_id']],
-                        ['$set' => [
-                            'two_factor_temp_code' => $two_factor_code,
-                            'two_factor_code_expiry' => $expiry_time
-                        ]]
-                    );
-
-                    if ($updateResult->getModifiedCount() === 0) {
-                        throw new Exception("Failed to save 2FA code for user.");
-                    }
-
-                    // Send the 2FA code via email
-                    $user_email = $user['email'] ?? null;
-                    $user_full_name = $user['full_name'] ?? trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
-
-                    if ($user_email && sendEmail(
-                        $user_email,
-                        'Your Two-Factor Authentication Code',
-                        '
-                        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-                            <h2>Two-Factor Authentication Code</h2>
-                            <p>Dear ' . htmlspecialchars($user_full_name) . ',</p>
-                            <p>You have attempted to log in to your HomeTown Bank account.</p> <--- Consistent name
-                            <p>Your verification code is: <strong>' . htmlspecialchars($two_factor_code) . '</strong></p>
-                            <p>This code is valid for ' . TWO_FACTOR_CODE_EXPIRY_MINUTES . ' minutes.</p>
-                            <p>Please enter this code on the login screen to complete your sign-in.</p>
-                            <p>If you did not attempt to log in, please secure your account immediately or contact support.</p>
-                            <p>Thank you,<br>HomeTown Bank Pa. Security Team</p> <--- Consistent name
-                        </div>
-                        '
-                    )) {
-                        // Store necessary info in session to carry over to verify_code.php
-                        $_SESSION['temp_user_id'] = (string)$user['_id']; // Temp ID for 2FA verification
-                        $_SESSION['auth_step'] = 'awaiting_2fa';
-                        $_SESSION['2fa_email_sent_to'] = hideEmailPartially($user_email); // For display
-
-                        header('Location: frontend/verify_code.php'); // Redirect to the 2FA verification page
-                        exit();
-                    } else {
-                        $message = "Failed to send 2FA code. Please try again or contact support.";
-                        $message_type = 'error';
-                        error_log("2FA: Failed to send email to " . $user_email . " for user " . (string)$user['_id']);
-                    }
-
-                } else {
-                    // 2FA is NOT enabled for this user, proceed with direct login
-                    $_SESSION['user_id'] = (string)$user['_id']; // Store as string for session
-                    $_SESSION['first_name'] = $user['first_name'] ?? '';
-                    $_SESSION['last_name'] = $user['last_name'] ?? '';
-                    $_SESSION['full_name'] = $user['full_name'] ?? trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
-                    $_SESSION['email'] = $user['email'] ?? '';
-                    $_SESSION['is_admin'] = $user['is_admin'] ?? false;
-
-                    // Redirect to dashboard or admin panel based on role
-                    if ($_SESSION['is_admin']) {
-                        header('Location: admin/dashboard.php');
-                    } else {
-                        header('Location: frontend/dashboard.php');
-                    }
-                    exit();
-                }
-
-            } else {
-                $message = "Invalid last name or membership number. Please try again.";
-                $message_type = 'error';
-            }
-        } catch (Exception $e) {
-            error_log("User login error: " . $e->getMessage());
-            $message = "An unexpected error occurred during login. Please try again later.";
-            $message_type = 'error';
-        }
-    }
+// Remove the basePath if the app is not at the root (e.g., for localhost/phpfile-main)
+// On Render, BASE_URL might be different from $requestUri prefix.
+// This handles cases where BASE_URL has a subfolder path like /phpfile-main
+if (BASE_URL !== 'http://localhost/phpfile-main' && strpos($requestUri, $basePath) === 0) {
+    $requestUri = substr($requestUri, strlen($basePath));
 }
 
-// The hideEmailPartially function should be moved to functions.php
-// /**
-//  * Hides part of an email address for display purposes (e.g., example@domain.com -> e*****e@domain.com)
-//  * @param string $email The email address.
-//  * @return string The partially hidden email.
-//  */
-// function hideEmailPartially(string $email): string {
-//     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-//         return "Invalid Email"; // Or just return the original if it's not a valid email format
-//     }
-//     $parts = explode('@', $email);
-//     $name = $parts[0];
-//     $domain = $parts[1];
+// Remove leading/trailing slashes for consistent routing
+$requestUri = trim($requestUri, '/');
 
-//     if (strlen($name) > 3) {
-//         $name = substr($name, 0, 1) . str_repeat('*', strlen($name) - 2) . substr($name, -1);
-//     } else if (strlen($name) > 0) {
-//         $name = str_repeat('*', strlen($name));
-//     }
+// Default page for logged-in users is the dashboard
+if ($isLoggedIn) {
+    $defaultPage = 'dashboard';
+} else {
+    // Default page for guests is the login page
+    $defaultPage = 'login';
+}
 
-//     return $name . '@' . $domain;
-// }
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HomeTown Bank - User Login</title> <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
-</head>
-<body>
-    <div class="background-container">
-    </div>
+// Determine the requested route, defaulting based on login status
+$route = $requestUri === '' ? $defaultPage : $requestUri;
 
-    <div class="login-card-container">
-        <div class="login-card">
-            <div class="bank-logo">
-                <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo"> </div>
+// --- Routing Logic ---
+switch ($route) {
+    case 'login':
+        if ($isLoggedIn) {
+            // If already logged in, redirect to dashboard
+            header('Location: ' . BASE_URL . '/dashboard');
+            exit;
+        }
+        include 'frontend/login.php';
+        break;
 
-            <?php if (!empty($message)): ?>
-                <div id="login-message" class="message-box <?php echo htmlspecialchars($message_type); ?>" style="display: block;">
-                    <?php echo htmlspecialchars($message); ?>
-                </div>
-            <?php else: ?>
-                <div id="login-message" class="message-box" style="display: none;"></div>
-            <?php endif; ?>
+    case 'dashboard':
+        if (!$isLoggedIn) {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'frontend/dashboard.php';
+        break;
 
-            <form class="login-form" id="loginForm" action="index.php" method="POST">
-                <div class="form-group username-group">
-                    <label for="last_name" class="sr-only">Last Name</label>
-                    <p class="input-label">Last Name</p>
-                    <div class="input-wrapper">
-                        <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($_POST['last_name'] ?? ''); ?>" required>
-                    </div>
-                </div>
+    case 'logout':
+        // Destroy session and redirect to login
+        session_unset();
+        session_destroy();
+        // Clear cookies if session_name() is known
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $params["path"], $params["domain"],
+                $params["secure"], $params["httponly"]
+            );
+        }
+        header('Location: ' . BASE_URL . '/login');
+        exit;
 
-                <div class="form-group password-group">
-                    <label for="membership_number" class="sr-only">Membership Number</label>
-                    <p class="input-label">Membership Number</p>
-                    <div class="input-wrapper">
-                        <input type="text" id="membership_number" name="membership_number" placeholder="" required pattern="\d{12}" title="Membership number must be 12 digits" value="<?php echo htmlspecialchars($_POST['membership_number'] ?? ''); ?>">
-                    </div>
-                    <a href="#" class="forgot-password-link">Forgot?</a>
-                </div>
+    case 'admin':
+        // Admin dashboard or default admin view
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'heritagebank_admin/dashboard.php';
+        break;
 
-                <div class="buttons-group">
-                    <button type="submit" name="login" class="btn btn-primary">Sign in</button>
-                </div>
-            </form>
+    case 'admin/users/create_user':
+    case 'admin/users/manage_users':
+    case 'admin/users/edit_user':
+    case 'admin/users/account_status_management':
+    case 'admin/users/generate_bank_card':
+    case 'admin/users/manage_user_funds':
+    case 'admin/users/transactions_management':
+    case 'admin/users/generate_mock_transaction':
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        // Include admin user management pages
+        include 'heritagebank_admin/users/' . str_replace('admin/users/', '', $route) . '.php';
+        break;
 
-            </div>
-    </div>
+    case 'api/admin/fetch_user_accounts':
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            http_response_code(403); // Forbidden
+            echo json_encode(['success' => false, 'message' => 'Unauthorized access.']);
+            exit;
+        }
+        include 'heritagebank_admin/users/fetch_user_acounts.php'; // Adjusted filename
+        break;
+    
+    // Frontend user routes
+    case 'accounts':
+        if (!$isLoggedIn) {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'frontend/accounts.php';
+        break;
 
-    <footer>
-        <p>&copy; 2025 HomeTown Bank Pa. All rights reserved.</p> <div class="footer-links">
-            <a href="heritagebank_admin/index.php">Privacy Policy</a>
-            <a href="#">Terms of Service</a>
-            <a href="#">Contact Us</a>
-        </div>
-    </footer>
+    case 'my_cards': // Corrected path to point to a new my_cards.php for frontend
+        if (!$isLoggedIn) {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'frontend/my_cards.php';
+        break;
 
-    <script src="script.js"></script>
-</body>
-</html>
+    case 'verify_code':
+        if (!$isLoggedIn) {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'frontend/verify_code.php';
+        break;
+
+    case 'bank_cards':
+        if (!$isLoggedIn) {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'frontend/bank_cards.php';
+        break;
+
+    case 'set_card_pin': // New route for setting card PIN
+        if (!$isLoggedIn) {
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        include 'frontend/set_card_pin.php';
+        break;
+
+
+    // --- API Endpoints ---
+    case 'api/send_two_factor_code':
+        if (!$isLoggedIn) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/send_two_factor_code.php';
+        break;
+
+    case 'api/verify_two_factor_code':
+        if (!$isLoggedIn) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/verify_two_factor_code.php';
+        break;
+
+    case 'api/submit_transfer':
+        if (!$isLoggedIn) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/submit_transfer.php';
+        break;
+    
+    case 'api/get_exchange_rate':
+        if (!$isLoggedIn) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/get_exchange_rate.php';
+        break;
+
+    case 'api/transfer_history':
+        if (!$isLoggedIn) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/transfer_history.php';
+        break;
+    
+    case 'api/get_account_balance':
+        if (!$isLoggedIn) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/get_account_balance.php';
+        break;
+
+    case 'api/admin/create_user':
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/admin/create_user.php';
+        break;
+
+    case 'api/admin/edit_user':
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/admin/edit_user.php';
+        break;
+
+    case 'api/admin/delete_user':
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/admin/delete_user.php';
+        break;
+
+    case 'api/admin/update_user_status':
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/admin/update_user_status.php';
+        break;
+
+    case 'api/admin/update_user_funds':
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/admin/update_user_funds.php';
+        break;
+
+    case 'api/admin/generate_bank_card':
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/admin/generate_bank_card.php';
+        break;
+
+    case 'api/admin/generate_mock_transaction':
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/admin/generate_mock_transaction.php';
+        break;
+
+    case 'api/admin/update_transaction_status':
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/admin/update_transaction_status.php';
+        break;
+
+    case 'api/admin/delete_transaction':
+        if (!$isLoggedIn || $userRole !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        include 'api/admin/delete_transaction.php';
+        break;
+
+    // --- Fallback for 404 Not Found ---
+    default:
+        http_response_code(404);
+        include '404.php'; // Make sure you have a 404.php file
+        break;
+}
