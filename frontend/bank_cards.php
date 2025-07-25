@@ -1,6 +1,7 @@
 <?php
 // Config.php should be included first to ensure session and constants are available.
 require_once '../Config.php'; // This now handles session_start() and Composer autoloader.
+require_once '../functions.php'; // Ensure functions.php is included if it contains getMongoDBClient() or other helpers
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
@@ -27,8 +28,8 @@ $bankCardsCollection = null;
 
 try {
     // Establish MongoDB connection using the CORRECTED CONSTANTS
-    $client = new Client(MONGODB_CONNECTION_URI); // CORRECTED CONSTANT
-    $database = $client->selectDatabase(MONGODB_DB_NAME); // CORRECTED CONSTANT
+    $client = getMongoDBClient(); // Use the helper function from functions.php
+    $database = $client->selectDatabase(MONGO_DB_NAME); // Use constant from Config.php
     $usersCollection = $database->selectCollection('users');
     $accountsCollection = $database->selectCollection('accounts');
     $bankCardsCollection = $database->selectCollection('bank_cards');
@@ -96,6 +97,18 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 $row_arr['display_card_number'] = '**** **** **** ' . substr($row_arr['card_number'] ?? '', -4);
                 $row_arr['card_holder_name'] = strtoupper($user_full_name);
                 $row_arr['display_expiry'] = str_pad($row_arr['expiry_month'] ?? '', 2, '0', STR_PAD_LEFT) . '/' . substr($row_arr['expiry_year'] ?? '', 2, 2);
+
+                // Determine the card logo path based on the network
+                $card_network_lower = strtolower($row_arr['card_network'] ?? 'default');
+                $card_logo_path = BASE_URL . '/images/card_logos/' . $card_network_lower . '.png';
+                // Check if the logo file actually exists (optional, but good for debugging)
+                // In a real scenario, you might have default images or robust error handling
+                if (!file_exists(__DIR__ . '/../images/card_logos/' . $card_network_lower . '.png')) {
+                     $card_logo_path = BASE_URL . '/images/card_logos/default.png'; // Fallback if specific logo not found
+                }
+                $row_arr['card_logo_src'] = $card_logo_path;
+
+
                 // DANGER: For mock only - DO NOT send real CVV/PIN to frontend in production
                 // For a real application, remove this line entirely or mock it with '***' from backend.
                 // $row_arr['display_cvv'] = $row_arr['cvv'] ?? '***'; // Keep for now as per original code, but strongly advise against.
@@ -105,6 +118,8 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 unset($row_arr['cvv']);
                 unset($row_arr['pin']); // Assuming 'pin' field might exist
                 unset($row_arr['_id']); // Remove internal MongoDB ID from frontend
+                unset($row_arr['user_id']); // Remove internal MongoDB ID from frontend
+                unset($row_arr['account_id']); // Remove internal MongoDB ID from frontend
 
                 $bank_cards[] = $row_arr;
             }
@@ -197,27 +212,22 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             if ($insertOneResult->getInsertedCount() === 1) {
                 $inserted_card_id = (string) $insertOneResult->getInsertedId(); // Get string representation of new ObjectId
 
-                // Email sending logic
+                // Email sending logic - using sendEmail function
                 $subject = "Your HomeTown Bank Card Order Confirmation";
                 $body = "Dear " . htmlspecialchars($user_full_name) . ",\n\n"
-                        . "Thank you for ordering a new " . htmlspecialchars($cardNetwork) . " " . htmlspecialchars($cardType) . " card linked to your " . htmlspecialchars($linked_account_type) . " account (" . htmlspecialchars($linked_account_number) . ") from HomeTown Bank PA.\n\n"
-                        . "Your order for a new card (ID: " . $inserted_card_id . ") has been successfully placed.\n"
-                        . "Card Type: " . htmlspecialchars($cardType) . "\n"
-                        . "Card Network: " . htmlspecialchars($cardNetwork) . "\n"
-                        . "Linked Account: " . htmlspecialchars($linked_account_type) . " (No: " . htmlspecialchars($linked_account_number) . ")\n"
-                        . "Shipping Address: " . htmlspecialchars($shippingAddress) . "\n\n"
-                        . "Your card is currently being processed and will be shipped to the address provided. You will receive it within 5-7 business days.\n\n"
-                        . "Once you receive your card, please log in to your dashboard to activate it and set your PIN.\n\n"
-                        . "If you have any questions, please contact our customer support.\n\n"
-                        . "Sincerely,\n"
-                        . "The HomeTown Bank PA Team";
+                    . "Thank you for ordering a new " . htmlspecialchars($cardNetwork) . " " . htmlspecialchars($cardType) . " card linked to your " . htmlspecialchars($linked_account_type) . " account (" . htmlspecialchars($linked_account_number) . ") from HomeTown Bank PA.\n\n"
+                    . "Your order for a new card (ID: " . $inserted_card_id . ") has been successfully placed.\n"
+                    . "Card Type: " . htmlspecialchars($cardType) . "\n"
+                    . "Card Network: " . htmlspecialchars($cardNetwork) . "\n"
+                    . "Linked Account: " . htmlspecialchars($linked_account_type) . " (No: " . htmlspecialchars($linked_account_number) . ")\n"
+                    . "Shipping Address: " . htmlspecialchars($shippingAddress) . "\n\n"
+                    . "Your card is currently being processed and will be shipped to the address provided. You will receive it within 5-7 business days.\n\n"
+                    . "Once you receive your card, please log in to your dashboard to activate it and set your PIN.\n\n"
+                    . "If you have any questions, please contact our customer support.\n\n"
+                    . "Sincerely,\n"
+                    . "The HomeTown Bank PA Team";
 
-                $headers = "From: " . SMTP_FROM_NAME . " <" . SMTP_FROM_EMAIL . ">\r\n";
-                $headers .= "Reply-To: " . SMTP_FROM_EMAIL . "\r\n";
-                $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-                $headers .= "X-Mailer: PHP/" . phpversion();
-
-                if (mail($user_email, $subject, $body, $headers)) {
+                if (sendEmail($user_email, $subject, nl2br($body), true)) { // Use nl2br for simple HTML formatting, true for isHtml
                     $email_status = "Email sent successfully.";
                 } else {
                     $email_status = "Failed to send email. Please check server logs.";
@@ -305,7 +315,8 @@ try {
         .card-item .card-footer { display: flex; justify-content: space-between; align-items: flex-end; font-size: 0.9em; width: 100%; }
         .card-item .card-footer .label { font-size: 0.7em; opacity: 0.7; margin-bottom: 3px; }
         .card-item .card-footer .value { font-weight: bold; }
-        .card-item .card-logo { position: absolute; bottom: 25px; right: 25px; height: 40px; }
+        /* Removed .card-item .card-logo as it will be injected by JS now */
+        .card-logo-img { position: absolute; bottom: 25px; right: 25px; height: 40px; } /* New class for the image itself */
         .card-status { font-size: 0.9em; text-align: right; margin-top: 10px; opacity: 0.9; }
         .card-status.active { color: #d4edda; }
         .card-status.inactive { color: #f8d7da; }
@@ -477,20 +488,9 @@ try {
     </div>
 
     <script>
-        // Ensure BASE_URL is correctly passed to JavaScript for AJAX requests and paths.
-        // It's better to get the true BASE_URL from the PHP constant, not deduce from path.
         const BASE_URL_JS = <?php echo json_encode(BASE_URL); ?>;
-        const currentUserId = <?php echo json_encode($user_id); ?>; // Still the string ObjectId
+        const currentUserId = <?php echo json_encode($user_id); ?>;
         const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
-        // FRONTEND_BASE_URL is generally not needed if BASE_URL_JS handles all root-relative paths.
-        // If 'cards.js' specifically relies on a relative path from the current directory, keep this or adjust cards.js
-        // For Render, it's often best to make all JS paths root-relative as well.
-        // const FRONTEND_BASE_URL = '/frontend/'; // May not be necessary if paths in JS are adjusted to use BASE_URL_JS
-
-        // Adjust cards.js to use BASE_URL_JS for its AJAX requests and any other internal paths.
-        // For example, if cards.js makes an AJAX call to 'bank_cards.php?action=fetch_cards',
-        // it should be changed to `${BASE_URL_JS}/frontend/bank_cards.php?action=fetch_cards`
-        // or just `bank_cards.php?action=fetch_cards` if the script itself is already at the correct path for AJAX.
     </script>
     <script src="<?php echo BASE_URL; ?>/frontend/cards.js"></script>
 </body>

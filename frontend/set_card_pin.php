@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="user-dashboard-container">
         <div class="user-header">
-            <img src="/images/logo.png" alt="HomeTown Bank Logo" class="logo">
+        <img src="<?php echo BASE_URL; ?>/images/hometown_bank_logo.png" alt="HomeTown Bank Logo" class="logo">
             <h2>Set Card PIN</h2>
             <a href="../logout.php" class="logout-button">Logout</a>
         </div>

@@ -7,13 +7,14 @@ require_once '../functions.php'; // Ensure this has sanitize_input, bcmath funct
 require_once __DIR__ . '/../vendor/autoload.php'; // Assuming you installed MongoDB driver via Composer
 
 use MongoDB\Client; // Add this line based on your config.php
+use MongoDB\BSON\ObjectId; // Corrected: Import ObjectId for easier use
 use MongoDB\Exception\Exception as MongoDBException; // Add this line based on your config.php
 
 
 // Check login, etc.
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
     // Corrected: Use BASE_URL for redirect to login page
-    header('Location: ' . BASE_URL . '/index.php'); // Assuming index.php is your login page
+    header('Location: ' . BASE_URL . '/login'); // Redirect to login route handled by index.php
     exit;
 }
 
@@ -45,7 +46,7 @@ try {
 $user_accounts = [];
 try {
     // MongoDB stores _id as ObjectId, so convert user_id to ObjectId for query
-    $userIdObjectId = new MongoDB\BSON\ObjectId($user_id);
+    $userIdObjectId = new ObjectId($user_id); // Use the imported ObjectId
     $cursor = $accountsCollection->find([
         'user_id' => $userIdObjectId,
         'status' => 'active'
@@ -81,7 +82,36 @@ $form_data = $_SESSION['form_data'] ?? [];
 unset($_SESSION['form_data']);
 
 // Determine the active transfer method for UI display
-$active_transfer_method = $_GET['type'] ?? ($form_data['transfer_method'] ?? 'internal_self'); // Use GET 'type' first, then form data, then default
+// Prioritize GET 'type', then form data, then default
+$active_transfer_method = $_GET['type'] ?? ($form_data['transfer_method'] ?? 'internal_self');
+
+// Map old GET 'type' values to new internal method names for consistency in the select dropdown
+switch ($active_transfer_method) {
+    case 'own_account':
+        $active_transfer_method = 'internal_self';
+        break;
+    case 'bank_to_bank':
+        $active_transfer_method = 'internal_heritage';
+        break;
+    case 'international_bank':
+        $active_transfer_method = 'external_iban';
+        break;
+    case 'uk_bank': // Added for consistency with previous discussion
+        $active_transfer_method = 'external_sort_code';
+        break;
+    case 'ach':
+    case 'wire':
+    case 'domestic_wire':
+        $active_transfer_method = 'external_usa_account';
+        break;
+    default:
+        // If it's not one of the recognized types or form data values, default to internal_self
+        if (!in_array($active_transfer_method, ['internal_self', 'internal_heritage', 'external_iban', 'external_sort_code', 'external_usa_account'])) {
+            $active_transfer_method = 'internal_self';
+        }
+        break;
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -126,26 +156,26 @@ $active_transfer_method = $_GET['type'] ?? ($form_data['transfer_method'] ?? 'in
 
                     <div class="form-group">
                         <label for="transfer_method">Select Transfer Method:</label>
-                        <select id="transfer_method" name="transfer_method" required>
+                        <select id="transfer_method" name="transfer_method" class="form-control" required>
                             <option value="">-- Choose Transfer Type --</option>
-                            <option value="internal_self" <?php echo ($active_transfer_method === 'own_account' || $active_transfer_method === 'internal_self' ? 'selected' : ''); ?>>Between My Accounts</option>
-                            <option value="internal_heritage" <?php echo ($active_transfer_method === 'bank_to_bank' || $active_transfer_method === 'internal_heritage' ? 'selected' : ''); ?>>To Another HomeTown Bank Pa Account</option>
-                            <option value="external_iban" <?php echo ($active_transfer_method === 'international_bank' || $active_transfer_method === 'external_iban' ? 'selected' : ''); ?>>International Bank Transfer (IBAN/SWIFT)</option>
-                            <option value="external_sort_code" <?php echo ($active_transfer_method === 'uk_bank' || $active_transfer_method === 'external_sort_code' ? 'selected' : ''); ?>>UK Bank Transfer (Sort Code/Account No)</option>
-                            <option value="external_usa_account" <?php echo ($active_transfer_method === 'ach' || $active_transfer_method === 'wire' || $active_transfer_method === 'domestic_wire' || $active_transfer_method === 'external_usa_account' ? 'selected' : ''); ?>>USA Bank Transfer (Routing/Account No)</option>
+                            <option value="internal_self" <?php echo ($active_transfer_method === 'internal_self' ? 'selected' : ''); ?>>Between My Accounts</option>
+                            <option value="internal_heritage" <?php echo ($active_transfer_method === 'internal_heritage' ? 'selected' : ''); ?>>To Another HomeTown Bank Pa Account</option>
+                            <option value="external_iban" <?php echo ($active_transfer_method === 'external_iban' ? 'selected' : ''); ?>>International Bank Transfer (IBAN/SWIFT)</option>
+                            <option value="external_sort_code" <?php echo ($active_transfer_method === 'external_sort_code' ? 'selected' : ''); ?>>UK Bank Transfer (Sort Code/Account No)</option>
+                            <option value="external_usa_account" <?php echo ($active_transfer_method === 'external_usa_account' ? 'selected' : ''); ?>>USA Bank Transfer (Routing/Account No)</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label for="source_account_id">From Account:</label>
-                        <select id="source_account_id" name="source_account_id" required>
+                        <select id="source_account_id" name="source_account_id" class="form-control" required>
                             <option value="">-- Select Your Account --</option>
                             <?php foreach ($user_accounts as $account): ?>
                                 <option value="<?php echo htmlspecialchars($account['id']); ?>"
                                     data-balance="<?php echo htmlspecialchars($account['balance']); ?>"
                                     data-currency="<?php echo htmlspecialchars($account['currency']); ?>"
                                     <?php echo ((string)($form_data['source_account_id'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo htmlspecialchars($account['currency']); ?> <?php echo number_format($account['balance'], 2); ?>
+                                    <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo htmlspecialchars($account['currency']); ?> <?php echo number_format((float)$account['balance'], 2); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -154,18 +184,18 @@ $active_transfer_method = $_GET['type'] ?? ($form_data['transfer_method'] ?? 'in
 
                     <div class="form-group external-fields common-external-fields">
                         <label for="recipient_name">Recipient Full Name:</label>
-                        <input type="text" id="recipient_name" name="recipient_name" value="<?php echo htmlspecialchars($form_data['recipient_name'] ?? ''); ?>">
+                        <input type="text" id="recipient_name" name="recipient_name" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_name'] ?? ''); ?>">
                     </div>
 
                     <div id="fields_internal_self" class="external-fields">
                         <div class="form-group">
                             <label for="destination_account_id_self">To My Account:</label>
-                            <select id="destination_account_id_self" name="destination_account_id_self">
+                            <select id="destination_account_id_self" name="destination_account_id_self" class="form-control">
                                 <option value="">-- Select Your Other Account --</option>
                                 <?php foreach ($user_accounts as $account): ?>
                                     <option value="<?php echo htmlspecialchars($account['id']); ?>"
                                         <?php echo ((string)($form_data['destination_account_id_self'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo htmlspecialchars($account['balance'], 2); ?>
+                                        <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo htmlspecialchars($account['currency']); ?> <?php echo number_format((float)$account['balance'], 2); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -175,60 +205,60 @@ $active_transfer_method = $_GET['type'] ?? ($form_data['transfer_method'] ?? 'in
                     <div id="fields_internal_heritage" class="external-fields">
                         <div class="form-group">
                             <label for="recipient_account_number_internal">Recipient HomeTown Bank Pa Account Number:</label>
-                            <input type="text" id="recipient_account_number_internal" name="recipient_account_number_internal" value="<?php echo htmlspecialchars($form_data['recipient_account_number_internal'] ?? ''); ?>">
+                            <input type="text" id="recipient_account_number_internal" name="recipient_account_number_internal" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_account_number_internal'] ?? ''); ?>">
                         </div>
                     </div>
 
                     <div id="fields_external_iban" class="external-fields">
                         <div class="form-group">
                             <label for="recipient_bank_name_iban">Recipient Bank Name:</label>
-                            <input type="text" id="recipient_bank_name_iban" name="recipient_bank_name_iban" value="<?php echo htmlspecialchars($form_data['recipient_bank_name_iban'] ?? ''); ?>">
+                            <input type="text" id="recipient_bank_name_iban" name="recipient_bank_name_iban" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_bank_name_iban'] ?? ''); ?>">
                         </div>
                         <div class="form-group">
                             <label for="recipient_iban">Recipient IBAN:</label>
-                            <input type="text" id="recipient_iban" name="recipient_iban" value="<?php echo htmlspecialchars($form_data['recipient_iban'] ?? ''); ?>" placeholder="e.g., GBXX XXXX XXXX XXXX XXXX XXXX">
+                            <input type="text" id="recipient_iban" name="recipient_iban" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_iban'] ?? ''); ?>" placeholder="e.g., GBXX XXXX XXXX XXXX XXXX XXXX">
                         </div>
                         <div class="form-group">
                             <label for="recipient_swift_bic">Recipient SWIFT/BIC:</label>
-                            <input type="text" id="recipient_swift_bic" name="recipient_swift_bic" value="<?php echo htmlspecialchars($form_data['recipient_swift_bic'] ?? ''); ?>" placeholder="e.g., BARCGB22">
+                            <input type="text" id="recipient_swift_bic" name="recipient_swift_bic" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_swift_bic'] ?? ''); ?>" placeholder="e.g., BARCGB22">
                         </div>
                         <div class="form-group">
                             <label for="recipient_country">Recipient Country:</label>
-                            <input type="text" id="recipient_country" name="recipient_country" value="<?php echo htmlspecialchars($form_data['recipient_country'] ?? ''); ?>" placeholder="e.g., United Kingdom">
+                            <input type="text" id="recipient_country" name="recipient_country" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_country'] ?? ''); ?>" placeholder="e.g., United Kingdom">
                         </div>
                     </div>
 
                     <div id="fields_external_sort_code" class="external-fields">
                         <div class="form-group">
                             <label for="recipient_bank_name_sort">Recipient Bank Name:</label>
-                            <input type="text" id="recipient_bank_name_sort" name="recipient_bank_name_sort" value="<?php echo htmlspecialchars($form_data['recipient_bank_name_sort'] ?? ''); ?>">
+                            <input type="text" id="recipient_bank_name_sort" name="recipient_bank_name_sort" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_bank_name_sort'] ?? ''); ?>">
                         </div>
                         <div class="form-group">
                             <label for="recipient_sort_code">Recipient Sort Code (6 digits):</label>
-                            <input type="text" id="recipient_sort_code" name="recipient_sort_code" value="<?php echo htmlspecialchars($form_data['recipient_sort_code'] ?? ''); ?>" pattern="\d{6}" title="Sort Code must be 6 digits">
+                            <input type="text" id="recipient_sort_code" name="recipient_sort_code" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_sort_code'] ?? ''); ?>" pattern="\d{6}" title="Sort Code must be 6 digits">
                         </div>
                         <div class="form-group">
                             <label for="recipient_external_account_number">Recipient Account Number (8 digits):</label>
-                            <input type="text" id="recipient_external_account_number" name="recipient_external_account_number" value="<?php echo htmlspecialchars($form_data['recipient_external_account_number'] ?? ''); ?>" pattern="\d{8}" title="Account Number must be 8 digits">
+                            <input type="text" id="recipient_external_account_number" name="recipient_external_account_number" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_external_account_number'] ?? ''); ?>" pattern="\d{8}" title="Account Number must be 8 digits">
                         </div>
                     </div>
 
                     <div id="fields_external_usa_account" class="external-fields">
                         <div class="form-group">
                             <label for="recipient_bank_name_usa">Recipient Bank Name:</label>
-                            <input type="text" id="recipient_bank_name_usa" name="recipient_bank_name_usa" value="<?php echo htmlspecialchars($form_data['recipient_bank_name_usa'] ?? ''); ?>">
+                            <input type="text" id="recipient_bank_name_usa" name="recipient_bank_name_usa" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_bank_name_usa'] ?? ''); ?>">
                         </div>
                         <div class="form-group">
                             <label for="recipient_usa_routing_number">Recipient Routing Number (9 digits):</label>
-                            <input type="text" id="recipient_usa_routing_number" name="recipient_usa_routing_number" value="<?php echo htmlspecialchars($form_data['recipient_usa_routing_number'] ?? ''); ?>" pattern="\d{9}" title="Routing Number must be 9 digits">
+                            <input type="text" id="recipient_usa_routing_number" name="recipient_usa_routing_number" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_usa_routing_number'] ?? ''); ?>" pattern="\d{9}" title="Routing Number must be 9 digits">
                         </div>
                         <div class="form-group">
                             <label for="recipient_usa_account_number">Recipient Account Number:</label>
-                            <input type="text" id="recipient_usa_account_number" name="recipient_usa_account_number" value="<?php echo htmlspecialchars($form_data['recipient_usa_account_number'] ?? ''); ?>">
+                            <input type="text" id="recipient_usa_account_number" name="recipient_usa_account_number" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_usa_account_number'] ?? ''); ?>">
                         </div>
                         <div class="form-group">
                             <label for="recipient_account_type_usa">Recipient Account Type:</label>
-                            <select id="recipient_account_type_usa" name="recipient_account_type_usa">
+                            <select id="recipient_account_type_usa" name="recipient_account_type_usa" class="form-control">
                                 <option value="">Select Account Type</option>
                                 <option value="Checking" <?php echo (($form_data['recipient_account_type_usa'] ?? '') === 'Checking' ? 'selected' : ''); ?>>Checking</option>
                                 <option value="Savings" <?php echo (($form_data['recipient_account_type_usa'] ?? '') === 'Savings' ? 'selected' : ''); ?>>Savings</option>
@@ -236,30 +266,30 @@ $active_transfer_method = $_GET['type'] ?? ($form_data['transfer_method'] ?? 'in
                         </div>
                         <div class="form-group">
                             <label for="recipient_address_usa">Recipient Address:</label>
-                            <input type="text" id="recipient_address_usa" name="recipient_address_usa" value="<?php echo htmlspecialchars($form_data['recipient_address_usa'] ?? ''); ?>" placeholder="Street Address">
+                            <input type="text" id="recipient_address_usa" name="recipient_address_usa" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_address_usa'] ?? ''); ?>" placeholder="Street Address">
                         </div>
                         <div class="form-group">
                             <label for="recipient_city_usa">Recipient City:</label>
-                            <input type="text" id="recipient_city_usa" name="recipient_city_usa" value="<?php echo htmlspecialchars($form_data['recipient_city_usa'] ?? ''); ?>">
+                            <input type="text" id="recipient_city_usa" name="recipient_city_usa" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_city_usa'] ?? ''); ?>">
                         </div>
                         <div class="form-group">
                             <label for="recipient_state_usa">Recipient State:</label>
-                            <input type="text" id="recipient_state_usa" name="recipient_state_usa" value="<?php echo htmlspecialchars($form_data['recipient_state_usa'] ?? ''); ?>">
+                            <input type="text" id="recipient_state_usa" name="recipient_state_usa" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_state_usa'] ?? ''); ?>">
                         </div>
                         <div class="form-group">
                             <label for="recipient_zip_usa">Recipient Zip Code:</label>
-                            <input type="text" id="recipient_zip_usa" name="recipient_zip_usa" value="<?php echo htmlspecialchars($form_data['recipient_zip_usa'] ?? ''); ?>">
+                            <input type="text" id="recipient_zip_usa" name="recipient_zip_usa" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_zip_usa'] ?? ''); ?>">
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label for="amount">Amount:</label>
-                        <input type="number" id="amount" name="amount" step="0.01" min="0.01" value="<?php echo htmlspecialchars($form_data['amount'] ?? ''); ?>" required>
+                        <input type="number" id="amount" name="amount" step="0.01" min="0.01" class="form-control" value="<?php echo htmlspecialchars($form_data['amount'] ?? ''); ?>" required>
                         <span class="currency-symbol" id="amount_currency_symbol"></span>
                     </div>
                     <div class="form-group">
                         <label for="description">Description (Optional):</label>
-                        <textarea id="description" name="description" rows="3"><?php echo htmlspecialchars($form_data['description'] ?? ''); ?></textarea>
+                        <textarea id="description" name="description" rows="3" class="form-control"><?php echo htmlspecialchars($form_data['description'] ?? ''); ?></textarea>
                     </div>
 
                     <button type="submit" class="button-primary">Initiate Transfer</button>
@@ -315,22 +345,9 @@ $active_transfer_method = $_GET['type'] ?? ($form_data['transfer_method'] ?? 'in
         window.APP_DATA = {
             userAccountsData: <?php echo json_encode($user_accounts); ?>,
             initialSelectedFromAccount: '<?php echo htmlspecialchars($form_data['source_account_id'] ?? ''); ?>',
-            // Corrected: Map the incoming GET 'type' to the internal transfer method names for JS
+            // Map the incoming GET 'type' or form data to the consistent transfer method names for JS
             initialTransferMethod: '<?php
-                $js_transfer_method = 'internal_self'; // Default
-                if (isset($_GET['type'])) {
-                    switch ($_GET['type']) {
-                        case 'own_account': $js_transfer_method = 'internal_self'; break;
-                        case 'bank_to_bank': $js_transfer_method = 'internal_heritage'; break;
-                        case 'international_bank': $js_transfer_method = 'external_iban'; break;
-                        case 'ach':
-                        case 'wire':
-                        case 'domestic_wire': $js_transfer_method = 'external_usa_account'; break; // Assuming these map to USA transfer
-                        default: $js_transfer_method = 'internal_self'; break;
-                    }
-                } else if (isset($form_data['transfer_method'])) {
-                    $js_transfer_method = $form_data['transfer_method'];
-                }
+                $js_transfer_method = $active_transfer_method; // Use the already processed active_transfer_method
                 echo htmlspecialchars($js_transfer_method);
             ?>',
             showModal: <?php echo $show_modal_on_load ? 'true' : 'false'; ?>,
