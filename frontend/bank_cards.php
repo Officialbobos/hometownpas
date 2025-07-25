@@ -10,8 +10,8 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 
-require_once '../Config.php'; // This now handles session_start() and Composer autoloader.
-require_once '../functions.php'; // Ensure functions.php is included if it contains getMongoDBClient() or other helpers
+require_once '/../Config.php'; // This now handles session_start() and Composer autoloader.
+require_once '/../functions.php'; // Ensure functions.php is included if it contains getMongoDBClient() or other helpers
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
