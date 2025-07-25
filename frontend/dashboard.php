@@ -145,6 +145,19 @@ if ($mongoClient) {
 // the client connection is managed by the driver or garbage collection.
 // However, if you explicitly want to unset it:
 // unset($mongoClient);
+
+// Helper function to get currency symbol (moved here for local scope if not in functions.php)
+if (!function_exists('get_currency_symbol')) {
+    function get_currency_symbol($currency_code) {
+        switch (strtoupper($currency_code)) {
+            case 'GBP': return '£';
+            case 'USD': return '$';
+            case 'EUR': return '€';
+            case 'NGN': return '₦';
+            default: return '';
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -186,7 +199,6 @@ if ($mongoClient) {
                             <div class="account-balance">
                                 <p class="balance-amount">
                                     <?php
-                                    // Assuming get_currency_symbol() function exists in functions.php
                                     echo get_currency_symbol($account['currency'] ?? 'USD');
                                     ?> <?php echo number_format($account['balance'] ?? 0, 2); ?>
                                 </p>
@@ -220,7 +232,8 @@ if ($mongoClient) {
 
         <section class="bank-cards-section">
             <h2>My Cards</h2>
-            <div class="view-all-link"> <a href="<?php echo BASE_URL; ?>/frontend/bank_cards.php">
+            <div class="view-all-link">
+                <a href="<?php echo BASE_URL; ?>/bank_cards">
                     <i class="fas fa-credit-card"></i> View My Card
                 </a>
             </div>
@@ -232,7 +245,8 @@ if ($mongoClient) {
         <section class="activity-section">
             <div class="transactions-header">
                 <div class="transactions-header">
-        <h2>Transactions</h2> <span class="more-options" onclick="window.location.href='<?php echo BASE_URL; ?>/statements'">...</span></div>
+                <h2>Transactions</h2>
+                <span class="more-options" onclick="window.location.href='<?php echo BASE_URL; ?>/statements'">...</span></div>
             <div class="transaction-list">
                 <?php if (empty($recent_transactions)): ?>
                     <p class="loading-message" id="transactionsLoadingMessage">No recent transactions to display.</p>
@@ -243,10 +257,6 @@ if ($mongoClient) {
                                 <span class="transaction-description"><?php echo htmlspecialchars($transaction['description'] ?? 'N/A'); ?></span>
                                 <span class="transaction-account">
                                     <?php
-                                    // In MongoDB, you might not directly join like in SQL.
-                                    // You might store account_number and account_type directly in the transaction document,
-                                    // or fetch the account details separately for each transaction using its account_id.
-                                    // For simplicity here, assuming they are available in the transaction document.
                                     echo htmlspecialchars($transaction['account_type'] ?? 'N/A');
                                     if (isset($transaction['account_number'])) {
                                         echo ' x' . htmlspecialchars(substr($transaction['account_number'], -4));
@@ -258,17 +268,14 @@ if ($mongoClient) {
                                 <span class="transaction-amount <?php echo (($transaction['transaction_type'] ?? '') == 'Credit') ? 'credit' : 'debit'; ?>">
                                     <?php echo (($transaction['transaction_type'] ?? '') == 'Credit' ? '+' : '-'); ?>
                                     <?php
-                                    // Assuming get_currency_symbol() function exists in functions.php
                                     echo get_currency_symbol($transaction['currency'] ?? 'USD');
                                     ?> <?php echo number_format($transaction['amount'] ?? 0, 2); ?>
                                 </span>
                                 <span class="transaction-date">
                                     <?php
-                                    // MongoDB stores dates as BSON Date objects. Convert to a readable format.
                                     if (isset($transaction['initiated_at']) && $transaction['initiated_at'] instanceof MongoDB\BSON\UTCDateTime) {
                                         echo htmlspecialchars(date('M d', $transaction['initiated_at']->toDateTime()->getTimestamp()));
                                     } else if (isset($transaction['initiated_at'])) {
-                                        // Fallback if it's a string, or other format
                                         echo htmlspecialchars(date('M d', strtotime($transaction['initiated_at'])));
                                     } else {
                                         echo 'N/A';
@@ -289,7 +296,7 @@ if ($mongoClient) {
         <div class="transfer-modal-content">
             <h3>Choose Transfer Type</h3>
             <div class="transfer-options-list">
-                <button class="transfer-option" data-transfer-type="Own Account" onclick="window.location.href='<?php echo BASE_URL; ?>/frontend/transfer.php?type=own_account'">
+                <button class="transfer-option" data-transfer-type="Own Account" onclick="window.location.href='<?php echo BASE_URL; ?>/transfer?type=own_account'">
                     <i class="fas fa-wallet"></i> <p>Transfer to My Other Account</p>
                 </button>
 
