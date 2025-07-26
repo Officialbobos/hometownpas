@@ -270,14 +270,14 @@ document.addEventListener('DOMContentLoaded', () => {
         viewMyCardsButton.addEventListener('click', (e) => {
             e.preventDefault(); // Prevent default link behavior
 
-            // Check if BASE_URL_JS is defined (it should be, via the PHP script block)
-            if (typeof BASE_URL_JS !== 'undefined') {
-                window.location.href = `${BASE_URL_JS}/bank_cards`; // Ensure this matches your router
-            } else {
-                console.error("BASE_URL_JS is not defined. Cannot navigate to bank cards.");
-                // Fallback to relative path, though relying on BASE_URL_JS is better
-                window.location.href = './bank_cards';
-            }
-        });
+           // Check if BASE_URL_JS is defined (it should be, via the PHP script block)
+        if (typeof BASE_URL_JS !== 'undefined') {
+            window.location.href = `${BASE_URL_JS}/bank_cards`; // Ensure this matches your router
+        } else {
+            console.error("BASE_URL_JS is not defined. Cannot navigate to bank cards.");
+            // Fallback to relative path, though relying on BASE_URL_JS is better
+            window.location.href = './bank_cards';
+        }
+    });
     }
 });

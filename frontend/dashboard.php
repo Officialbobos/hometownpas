@@ -350,6 +350,6 @@ if (!function_exists('get_currency_symbol')) {
             <i class="fas fa-sign-out-alt"></i> Logout
         </button>
     </div>
-    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/user.dashboard.js"></script>
+    <script src="<?php echo BASE_URL; ?>/frontend/user.dashboard.js"></script>
 </body>
 </html>

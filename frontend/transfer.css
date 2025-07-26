@@ -168,6 +168,36 @@ body {
     color: #c9a0dc; /* Purple for balance */
 }
 
+/* --- NEW / MODIFIED RULES FOR TRANSACTION DISPLAY --- */
+
+/* Style for individual transaction items to display side-by-side */
+.transaction-item {
+    display: flex;
+    justify-content: space-between; /* Pushes description to left, amount to right */
+    align-items: center; /* Vertically aligns them */
+    margin-bottom: 10px; /* Space between each transaction item */
+    padding: 10px 0;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1); /* Subtle separator */
+}
+
+.transaction-description {
+    flex-grow: 1; /* Allows description to take available space */
+    color: #e0e0e0;
+    font-size: 1rem; /* Base font size for description */
+    margin-right: 15px; /* Space between description and amount */
+}
+
+/* Reduced font size for the transaction amount */
+.transaction-amount {
+    font-size: 1.1rem; /* Smaller font size for the amount */
+    font-weight: bold;
+    color: #c9a0dc; /* Consistent purple color */
+    white-space: nowrap; /* Prevents the amount from wrapping to next line */
+}
+
+/* --- END NEW / MODIFIED RULES --- */
+
+
 /* Messages */
 .message {
     padding: 15px;
@@ -527,6 +557,11 @@ body {
         padding: 10px;
     }
 
+    /* Responsive adjustments for transaction display */
+    .transaction-amount {
+        font-size: 1rem; /* Smaller on tablets */
+    }
+
     .sidebar {
         width: 230px;
         left: -250px;
@@ -578,5 +613,18 @@ body {
     .modal-button {
         padding: 10px 20px;
         font-size: 15px;
+    }
+
+    /* Stack description and amount vertically on very small screens */
+    .transaction-item {
+        flex-direction: column; /* Stack them vertically on very small screens */
+        align-items: flex-start; /* Align text to the left */
+    }
+    .transaction-description {
+        margin-bottom: 5px; /* Add small space when stacked */
+        margin-right: 0;
+    }
+    .transaction-amount {
+        font-size: 0.9rem; /* Even smaller on mobile */
     }
 }
