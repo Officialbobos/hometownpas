@@ -46,16 +46,14 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchUserAccounts() {
         accountIdSelect.innerHTML = '<option value="">-- Loading Accounts --</option>';
         try {
-            // CORRECTED AJAX call to fetch_user_accounts.php
-            const response = await fetch(`${PHP_BASE_URL}fetch_user_accounts.php`);
+            // UPDATED AJAX call to fetch accounts from a dedicated API endpoint
+            const response = await fetch(`${PHP_BASE_URL}api/get_user_accounts`);
 
             if (!response.ok) {
-                // If response is not OK (e.g., 404, 500), try to read it as text
                 const errorText = await response.text();
                 throw new Error(`HTTP error! status: ${response.status}, response: ${errorText}`);
             }
 
-            // Attempt to parse JSON; catch if it's not valid JSON
             const data = await response.json();
 
             if (data.success && data.accounts.length > 0) {
@@ -63,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.accounts.forEach(account => {
                     const option = document.createElement('option');
                     option.value = account.id;
-                    // Ensure 'currency' is available in your account data if you use it
                     const currency = account.currency ? `${account.currency} ` : '';
                     option.textContent = `${account.account_type} (${account.display_account_number}) - ${currency}${parseFloat(account.balance).toFixed(2)}`;
                     accountIdSelect.appendChild(option);
@@ -78,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Error fetching user accounts:", error);
             // Check if the error is due to a non-JSON response from the server (e.g., 404 HTML)
             if (error.message.includes("Unexpected token '<'")) {
-                 showMessageBox("Failed to load accounts: Server returned an unexpected response. This often means the server couldn't find the requested file or there's a PHP error. Please contact support.", false);
+                showMessageBox("Failed to load accounts: Server returned an unexpected response (HTML instead of JSON). This often means the server couldn't find the requested API endpoint or there's a PHP error on the API script. Please contact support.", false);
             } else {
                 showMessageBox(`Failed to load accounts: ${error.message}. Please try refreshing the page.`, false);
             }
@@ -92,8 +89,8 @@ document.addEventListener('DOMContentLoaded', () => {
         noCardsMessage.style.display = 'none'; // Hide "no cards" message initially
 
         try {
-            // This AJAX call correctly targets bank_cards.php for fetching cards
-            const response = await fetch(`${PHP_BASE_URL}bank_cards.php?action=fetch_cards`);
+            // UPDATED AJAX call to the new dedicated API endpoint for cards
+            const response = await fetch(`${PHP_BASE_URL}api/get_user_cards`);
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -140,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             noCardsMessage.style.display = 'block';
             // Check if the error is due to a non-JSON response from the server (e.g., 404 HTML)
             if (error.message.includes("Unexpected token '<'")) {
-                 showMessageBox("Failed to load cards: Server returned an unexpected response. This often means the server couldn't find the requested file or there's a PHP error. Please contact support.", false);
+                showMessageBox("Failed to load cards: Server returned an unexpected response (HTML instead of JSON). This often means the server couldn't find the requested API endpoint or there's a PHP error on the API script. Please contact support.", false);
             } else {
                 showMessageBox(`Failed to load cards: ${error.message}`, false);
             }
@@ -158,16 +155,15 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault(); // Prevent default form submission
 
         const formData = new FormData(orderCardForm);
-        formData.append('action', 'order_card'); // Ensure action is always present for bank_cards.php
+        // No need to append 'action', as the API endpoint will handle the specific action
+        // formData.append('action', 'order_card'); 
 
         try {
-            // This AJAX call correctly targets bank_cards.php for ordering cards
-            const response = await fetch(`${PHP_BASE_URL}bank_cards.php`, {
+            // UPDATED AJAX call to the new dedicated API endpoint for ordering cards
+            const response = await fetch(`${PHP_BASE_URL}api/order_card`, {
                 method: 'POST',
                 body: formData,
                 headers: {
-                    // This header is often automatically added by Fetch API with FormData,
-                    // but explicitly adding it can help with server-side checks like PHP's $_SERVER['HTTP_X_REQUESTED_WITH']
                     'X-Requested-With': 'XMLHttpRequest'
                 }
             });
@@ -191,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error ordering card:', error);
             // Check if the error is due to a non-JSON response from the server (e.g., 404 HTML)
             if (error.message.includes("Unexpected token '<'")) {
-                 showMessageBox("An unexpected error occurred: Server returned an invalid response. This often means the server couldn't process the request correctly. Please contact support.", false);
+                showMessageBox("An unexpected error occurred: Server returned an invalid response (HTML instead of JSON). This often means the server couldn't process the request correctly or there's a PHP error on the API script. Please contact support.", false);
             } else {
                 showMessageBox(`An unexpected error occurred while placing your order: ${error.message}. Please try again.`, false);
             }

@@ -1,25 +1,25 @@
 <?php
 // Config.php should be included first to ensure session and constants are available.
+// NOTE: In the current setup with index.php as a router, Config.php and session_start()
+// are handled by index.php before bank_cards.php is included.
+// So, the explicit session_start() and require_once __DIR__ . '/../Config.php'; are
+// technically redundant here if index.php handles them, but harmless if done carefully.
 
-// Ensure session is started only once. It's often best to handle this in Config.php
-// if Config.php is the first file included in every request.
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
-
+// For development:
 ini_set('display_errors', 1); // Enable error display for debugging
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// CORRECTED: Use __DIR__ for robust path resolution
-require_once __DIR__ . '/../Config.php';
-require_once __DIR__ . '/../functions.php'; // Ensure functions.php is included if it contains getMongoDBClient() or other helpers
+// Assuming these are included by index.php
+// require_once __DIR__ . '/../Config.php';
+// require_once __DIR__ . '/../functions.php';
 
-use MongoDB\Client;
+use MongoDB\Client; // May not be needed if $mongoDb is passed down
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // Check if the user is logged in. If not, redirect to login page.
+// This check is duplicated with index.php's routing, but harmless as a secondary check.
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . '/index.php'); // Use BASE_URL for redirects
     exit;
@@ -32,20 +32,19 @@ $user_email = $_SESSION['user_email'] ?? '';
 $message = '';
 $message_type = '';
 
-$client = null;
-$database = null;
-$usersCollection = null;
-$accountsCollection = null;
-$bankCardsCollection = null;
+// Assuming $mongoDb object is available from index.php's scope
+global $mongoDb; // Access the global variable set in index.php
+
+if (!$mongoDb) {
+    error_log("CRITICAL ERROR: MongoDB connection not available in bank_cards.php. Check index.php.");
+    die("<h1>Database connection error. Please try again later.</h1>");
+}
+
+$usersCollection = $mongoDb->selectCollection('users');
+$accountsCollection = $mongoDb->selectCollection('accounts');
+$bankCardsCollection = $mongoDb->selectCollection('bank_cards');
 
 try {
-    // Establish MongoDB connection using the CORRECTED CONSTANTS
-    $client = getMongoDBClient(); // Use the helper function from functions.php
-    $database = $client->selectDatabase(MONGODB_DB_NAME); // Use constant from Config.php
-    $usersCollection = $database->selectCollection('users');
-    $accountsCollection = $database->selectCollection('accounts');
-    $bankCardsCollection = $database->selectCollection('bank_cards');
-
     // Convert user_id from session string to MongoDB ObjectId
     $userObjectId = new ObjectId($user_id);
 
@@ -60,209 +59,27 @@ try {
             $_SESSION['user_full_name'] = $user_full_name;
             $_SESSION['user_email'] = $user_email;
         } else {
-            // Log error if user not found, but allow page to load with generic name
             error_log("User with ID " . $user_id . " not found in database for bank_cards.php.");
             $user_full_name = 'Bank Customer'; // Fallback if DB lookup fails
             $user_email = 'default@example.com';
         }
     }
 } catch (MongoDBDriverException $e) {
-    error_log("MongoDB connection or initial data fetch error in bank_cards.php: " . $e->getMessage());
-    $message = "Database connection error. Please try again later. (Code: MDB_INIT)";
+    error_log("MongoDB operation error in bank_cards.php (user data fetch): " . $e->getMessage());
+    $message = "Database error fetching user details. Please try again later.";
     $message_type = 'error';
-    // For AJAX requests, return JSON; otherwise, die with an HTML message.
-    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
-        die(json_encode(['success' => false, 'message' => $message]));
-    } else {
-        die("<h1>" . htmlspecialchars($message) . "</h1><p>Please check application logs for details.</p>");
-    }
 } catch (Exception $e) { // Catch for ObjectId conversion or other general errors
     error_log("General error during initial setup in bank_cards.php: " . $e->getMessage());
     $message = "An unexpected error occurred during page setup. Please try again later.";
     $message_type = 'error';
     // If user_id is invalid, it's safer to redirect to login
-    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
-        die(json_encode(['success' => false, 'message' => $message]));
-    } else {
-        header('Location: ' . BASE_URL . '/index.php?error=invalid_user_session'); // Redirect with an error indicator
-        exit;
-    }
+    header('Location: ' . BASE_URL . '/index.php?error=invalid_user_session'); // Redirect with an error indicator
+    exit;
 }
 
 // Ensure full name and email are set for display, even if database lookup failed
 $user_full_name = $user_full_name ?: 'Bank Customer';
 $user_email = $user_email ?: 'default@example.com';
-
-// --- Handle AJAX requests (fetching cards or ordering new card) ---
-if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
-    header('Content-Type: application/json');
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['action'] === 'fetch_cards') {
-        $bank_cards = [];
-        try {
-            $cursor = $bankCardsCollection->find(['user_id' => $userObjectId]);
-
-            foreach ($cursor as $row) {
-                $row_arr = (array) $row; // Convert BSON document to PHP array
-                $row_arr['id'] = (string) $row_arr['_id']; // Convert MongoDB _id to string for consistency
-                $row_arr['display_card_number'] = '**** **** **** ' . substr($row_arr['card_number'] ?? '', -4);
-                $row_arr['card_holder_name'] = strtoupper($user_full_name);
-                $row_arr['display_expiry'] = str_pad($row_arr['expiry_month'] ?? '', 2, '0', STR_PAD_LEFT) . '/' . substr($row_arr['expiry_year'] ?? '', 2, 2);
-                $row_arr['display_cvv'] = '***'; // Always mock CVV for security
-
-                // Determine the card logo path based on the network
-                $card_network_lower = strtolower($row_arr['card_network'] ?? 'default');
-
-                // Corrected image path for PHP file_exists check and for frontend URL
-                // Assuming images are in the 'frontend/images/card_logos/' directory
-                $file_system_logo_path = __DIR__ . '/../frontend/images/card_logos/' . $card_network_lower . '.png'; // Adjusted path
-                $card_logo_url = FRONTEND_BASE_URL . 'images/card_logos/' . $card_network_lower . '.png';
-
-                // Fallback to default.png if specific logo not found on server
-                if (!file_exists($file_system_logo_path)) {
-                    $card_logo_url = FRONTEND_BASE_URL . 'images/card_logos/default.png';
-                }
-                $row_arr['card_logo_src'] = $card_logo_url;
-
-                // Unset sensitive data before sending to frontend
-                unset($row_arr['card_number']);
-                unset($row_arr['cvv']);
-                unset($row_arr['pin']); // Assuming 'pin' field might exist
-                unset($row_arr['_id']); // Remove internal MongoDB ID from frontend
-                unset($row_arr['user_id']); // Remove internal MongoDB ID from frontend
-                unset($row_arr['account_id']); // Remove internal MongoDB ID from frontend
-
-                $bank_cards[] = $row_arr;
-            }
-            echo json_encode(['success' => true, 'cards' => $bank_cards]);
-        } catch (MongoDBDriverException $e) {
-            error_log("Error fetching bank cards (AJAX): " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => "Error fetching cards: " . $e->getMessage()]);
-        }
-        exit; // IMPORTANT: Exit after sending JSON
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'order_card') {
-        $cardType = filter_input(INPUT_POST, 'cardType', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $cardNetwork = filter_input(INPUT_POST, 'cardNetwork', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $shippingAddress = filter_input(INPUT_POST, 'shippingAddress', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $accountId = filter_input(INPUT_POST, 'accountId', FILTER_SANITIZE_FULL_SPECIAL_CHARS); // Account ID will also be ObjectId
-
-        if (empty($cardType) || empty($cardNetwork) || empty($shippingAddress) || empty($accountId)) {
-            echo json_encode(['success' => false, 'message' => 'All fields are required for ordering a new card, including the linked bank account.']);
-            exit;
-        }
-
-        try {
-            $accountObjectId = new ObjectId($accountId);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Invalid linked account ID format.']);
-            exit;
-        }
-
-        // Generate mock card details
-        $prefix = '';
-        if ($cardNetwork === 'Visa') {
-            $prefix = '4';
-        } elseif ($cardNetwork === 'Mastercard') {
-            $mc_prefixes = ['51', '52', '53', '54', '55'];
-            $prefix = $mc_prefixes[array_rand($mc_prefixes)];
-        } elseif ($cardNetwork === 'Amex') {
-            $prefix = (mt_rand(0, 1) === 0) ? '34' : '37';
-        } elseif ($cardNetwork === 'Verve') {
-            $prefix = '5061';
-        } else {
-            $prefix = '9'; // Default for unknown networks
-        }
-
-        $card_number_length = ($cardNetwork === 'Amex') ? 15 : 16;
-        $remaining_digits_length = $card_number_length - strlen($prefix);
-        $random_digits = '';
-        for ($i = 0; $i < $remaining_digits_length; $i++) {
-            $random_digits .= mt_rand(0, 9);
-        }
-        $mock_card_number = $prefix . $random_digits;
-
-        $mock_expiry_month = str_pad(mt_rand(1, 12), 2, '0', STR_PAD_LEFT);
-        $mock_expiry_year = date('Y') + mt_rand(3, 7);
-        $mock_cvv = str_pad(mt_rand(0, ($cardNetwork === 'Amex' ? 9999 : 999)), ($cardNetwork === 'Amex' ? 4 : 3), '0', STR_PAD_LEFT);
-        $mock_card_holder_name = strtoupper($user_full_name);
-        $initial_pin_hash = null; // Stored as null in MongoDB, PIN set on activation
-
-        try {
-            // Verify the linked account belongs to the user
-            $account_data = $accountsCollection->findOne([
-                '_id' => $accountObjectId,
-                'user_id' => $userObjectId
-            ]);
-
-            if (!$account_data) {
-                echo json_encode(['success' => false, 'message' => "Selected account not found or does not belong to your profile."]);
-                exit;
-            }
-
-            $linked_account_type = $account_data['account_type'] ?? 'N/A';
-            $linked_account_number = $account_data['account_number'] ?? 'N/A';
-
-            // Insert new card into MongoDB
-            $insertOneResult = $bankCardsCollection->insertOne([
-                'user_id' => $userObjectId, // Store as ObjectId
-                'account_id' => $accountObjectId, // Store as ObjectId
-                'card_number' => $mock_card_number,
-                'card_type' => $cardType,
-                'expiry_month' => $mock_expiry_month,
-                'expiry_year' => $mock_expiry_year,
-                'cvv' => $mock_cvv, // DANGER: Remove in production or encrypt. Only for mock purposes.
-                'card_holder_name' => $mock_card_holder_name,
-                'is_active' => false, // New cards are inactive until activated by user
-                'card_network' => $cardNetwork,
-                'shipping_address' => $shippingAddress,
-                'pin' => $initial_pin_hash, // Will be null initially
-                'created_at' => new MongoDB\BSON\UTCDateTime(), // Timestamp
-                'updated_at' => new MongoDB\BSON\UTCDateTime()  // Timestamp
-            ]);
-
-            if ($insertOneResult->getInsertedCount() === 1) {
-                $inserted_card_id = (string) $insertOneResult->getInsertedId(); // Get string representation of new ObjectId
-
-                // Email sending logic - using sendEmail function
-                $subject = "Your HomeTown Bank Card Order Confirmation";
-                $body = "Dear " . htmlspecialchars($user_full_name) . ",\n\n"
-                    . "Thank you for ordering a new " . htmlspecialchars($cardNetwork) . " " . htmlspecialchars($cardType) . " card linked to your " . htmlspecialchars($linked_account_type) . " account (" . htmlspecialchars($linked_account_number) . ") from HomeTown Bank PA.\n\n"
-                    . "Your order for a new card (ID: " . $inserted_card_id . ") has been successfully placed.\n"
-                    . "Card Type: " . htmlspecialchars($cardType) . "\n"
-                    . "Card Network: " . htmlspecialchars($cardNetwork) . "\n"
-                    . "Linked Account: " . htmlspecialchars($linked_account_type) . " (No: " . htmlspecialchars($linked_account_number) . ")\n"
-                    . "Shipping Address: " . htmlspecialchars($shippingAddress) . "\n\n"
-                    . "Your card is currently being processed and will be shipped to the address provided. You will receive it within 5-7 business days.\n\n"
-                    . "Once you receive your card, please log in to your dashboard to activate it and set your PIN.\n\n"
-                    . "If you have any questions, please contact our customer support.\n\n"
-                    . "Sincerely,\n"
-                    . "The HomeTown Bank PA Team";
-
-                if (sendEmail($user_email, $subject, nl2br($body), true)) { // Use nl2br for simple HTML formatting, true for isHtml
-                    $email_status = "Email sent successfully.";
-                } else {
-                    $email_status = "Failed to send email. Please check server logs.";
-                    error_log("Failed to send card order confirmation email to " . $user_email . " for user_id: " . $user_id);
-                }
-
-                echo json_encode(['success' => true, 'message' => 'Your card order has been placed successfully! ' . $email_status]);
-
-            } else {
-                throw new Exception("Failed to save card order to database.");
-            }
-        } catch (MongoDBDriverException $e) {
-            error_log("Error ordering new card (MongoDB): " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => "Database error placing order: " . $e->getMessage()]);
-        } catch (Exception $e) {
-            error_log("Error ordering new card (General): " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => "Error placing order: " . $e->getMessage()]);
-        }
-        exit; // IMPORTANT: Exit after sending JSON
-    }
-    // If an AJAX request comes in but no specific action is matched
-    echo json_encode(['success' => false, 'message' => 'Invalid AJAX action provided to bank_cards.php.']);
-    exit;
-}
 
 // --- Non-AJAX request, render the HTML page ---
 // We need to fetch the accounts for the dropdown in the form
@@ -283,11 +100,11 @@ try {
         ];
     }
 } catch (MongoDBDriverException $e) {
-    error_log("Error fetching accounts for dropdown: " . $e->getMessage());
+    error_log("Error fetching accounts for dropdown (MongoDB): " . $e->getMessage());
     $message = "Could not load accounts for linking cards.";
     $message_type = 'error';
 } catch (Exception $e) {
-    error_log("Error processing user ID for accounts dropdown: " . $e->getMessage());
+    error_log("Error processing user ID for accounts dropdown (General): " . $e->getMessage());
     $message = "Error loading user data.";
     $message_type = 'error';
 }
@@ -824,17 +641,15 @@ try {
 <body>
 
     <header class="header">
-        <div class="logo">
-            <a href="<?php echo BASE_URL; ?>/dashboard">
-                <img src="https://i.imgur.com/UeqGGSn.png" alt="Hometown Bank PA Logo">
-            </a>
-        </div>
-        <h1>Manage My Cards</h1>
         <nav class="header-nav">
             <a href="<?php echo BASE_URL; ?>/dashboard" class="back-to-dashboard">
-                <i class="fas fa-arrow-left"></i> Back to Dashboard
+                <i class="fas fa-arrow-circle-left"></i> Back to Dashboard
             </a>
         </nav>
+        <h1>Manage My Cards</h1>
+        <div class="logo">
+            <img src="<?= BASE_URL ?>/frontend/assets/images/logo.png" alt="Hometown Bank PA Logo">
+        </div>
     </header>
 
     <main class="main-content">
@@ -855,7 +670,11 @@ try {
         <section class="order-card-section">
             <h2>Order a New Card</h2>
             <form id="orderCardForm">
-                <input type="hidden" name="action" value="order_card">
+                <div class="form-group">
+                    <label for="cardHolderName">Card Holder Name:</label>
+                    <input type="text" id="cardHolderName" name="cardHolderName" value="<?= htmlspecialchars($user_full_name) ?>" required readonly>
+                </div>
+
                 <div class="form-group">
                     <label for="cardType">Card Type:</label>
                     <select id="cardType" name="cardType" required>
@@ -879,12 +698,15 @@ try {
                 <div class="form-group">
                     <label for="accountId">Link to Account:</label>
                     <select id="accountId" name="accountId" required>
-                        <option value="">Select an Account</option>
+                        <option value="">-- Select an Account --</option>
                         <?php foreach ($user_accounts_for_dropdown as $account): ?>
                             <option value="<?php echo htmlspecialchars($account['id']); ?>">
                                 <?php echo htmlspecialchars($account['account_type'] . ' (' . $account['display_account_number'] . ') - ' . $account['currency'] . sprintf('%.2f', $account['balance'])); ?>
                             </option>
                         <?php endforeach; ?>
+                        <?php if (empty($user_accounts_for_dropdown)): ?>
+                            <option value="" disabled>No accounts available to link</option>
+                        <?php endif; ?>
                     </select>
                 </div>
 
@@ -911,14 +733,15 @@ try {
             <button id="messageBoxButton">OK</button>
         </div>
     </div>
-<script>
-    // These variables must be defined before cards.js is loaded
-    const PHP_BASE_URL = <?php echo json_encode(BASE_URL); ?>;
-    // Assuming 'frontend' is directly under your BASE_URL for frontend assets
-    const FRONTEND_BASE_URL = <?php echo json_encode(BASE_URL . '/frontend/'); ?>;
-    const currentUserId = <?php echo json_encode($user_id); ?>;
-    const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
-</script>
-<script src="<?php echo BASE_URL; ?>/frontend/cards.js"></script>
+    <script>
+        // These variables must be defined before cards.js is loaded
+        const PHP_BASE_URL = <?php echo json_encode(BASE_URL); ?>;
+        // Assuming 'frontend' is directly under your BASE_URL for frontend assets
+        const FRONTEND_BASE_URL = <?php echo json_encode(BASE_URL . '/frontend/'); ?>;
+        const currentUserId = <?php echo json_encode($user_id); ?>;
+        const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
+        const currentUserEmail = <?php echo json_encode($user_email); ?>; // Add current user email
+    </script>
+    <script src="<?php echo BASE_URL; ?>/frontend/cards.js"></script>
 </body>
 </html>
