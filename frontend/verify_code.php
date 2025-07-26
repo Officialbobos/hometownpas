@@ -1,6 +1,5 @@
 <?php
 // C:\xampp\htdocs\heritagebank\frontend\verify_code.php
-session_start();
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
