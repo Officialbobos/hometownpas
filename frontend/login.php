@@ -1,10 +1,21 @@
 <?php
 // This is frontend/login.php
-session_start();
+
+// Start output buffering as the very first thing.
+// This captures any output (including PHP notices/warnings)
+// so that header() calls can be made without the "headers already sent" error.
+ob_start();
+
+session_start(); // ALWAYS at the very top of scripts that use sessions
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
+// This error_log line is helpful for debugging and won't cause "headers already sent" due to ob_start()
+error_log("--- login.php Start ---");
+error_log("Session ID: " . session_id());
+error_log("Session Contents (login.php initial load): " . print_r($_SESSION, true));
 
 require_once __DIR__ . '/../vendor/autoload.php'; // Correct path to autoload.php
 
@@ -127,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                             </html>";
                         sendEmail($user['email'], $emailSubject, $emailBodyHtml, "Your verification code for HomeTown Bank is: " . $verificationCode);
                     }
+                    ob_end_clean(); // Discard any buffered output
                     header('Location: ' . BASE_URL . '/verify_code');
                     exit;
 
@@ -135,6 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                     $_SESSION['user_logged_in'] = true; // Mark as fully logged in
                     $_SESSION['2fa_verified'] = true; // No 2FA, so consider it verified immediately
 
+                    ob_end_clean(); // Discard any buffered output
                     header('Location: ' . BASE_URL . '/dashboard');
                     exit;
                 }
@@ -223,3 +236,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     <script src="script.js"></script>
 </body>
 </html>
+<?php
+// Ensure any buffered output is sent to the browser if the script finishes without a redirect.
+// This is important for when the login fails and the form is displayed with an error message.
+if (ob_get_level() > 0) {
+    ob_end_flush();
+}
+?>
