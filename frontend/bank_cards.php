@@ -1,25 +1,26 @@
 <?php
-// Config.php should be included first to ensure session and constants are available.
-// NOTE: In the current setup with index.php as a router, Config.php and session_start()
-// are handled by index.php before bank_cards.php is included.
-// So, the explicit session_start() and require_once __DIR__ . '/../Config.php'; are
-// technically redundant here if index.php handles them, but harmless if done carefully.
+// Path: C:\xampp\htdocs\hometownbank\frontend\bank_cards.php
 
 // For development:
 ini_set('display_errors', 1); // Enable error display for debugging
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Assuming these are included by index.php
-// require_once __DIR__ . '/../Config.php';
-// require_once __DIR__ . '/../functions.php';
+// Ensure session is started and Config/functions are available.
+// In a production setup with index.php as a router, these might be handled globally.
+// We'll keep them here for standalone testing flexibility, but comment out if index.php handles them.
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+// These might be handled by your main index.php router already
+require_once __DIR__ . '/../Config.php';
+require_once __DIR__ . '/../functions.php'; // For getMongoDBClient() or similar
 
-use MongoDB\Client; // May not be needed if $mongoDb is passed down
+use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // Check if the user is logged in. If not, redirect to login page.
-// This check is duplicated with index.php's routing, but harmless as a secondary check.
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . '/index.php'); // Use BASE_URL for redirects
     exit;
@@ -33,10 +34,12 @@ $message = '';
 $message_type = '';
 
 // Assuming $mongoDb object is available from index.php's scope
+// If not, uncomment and initialize here:
+// $mongoDb = getMongoDBClient(); // Assuming getMongoDBClient() is in functions.php
 global $mongoDb; // Access the global variable set in index.php
 
 if (!$mongoDb) {
-    error_log("CRITICAL ERROR: MongoDB connection not available in bank_cards.php. Check index.php.");
+    error_log("CRITICAL ERROR: MongoDB connection not available in bank_cards.php. Check index.php or getMongoDBClient().");
     die("<h1>Database connection error. Please try again later.</h1>");
 }
 
@@ -88,15 +91,15 @@ try {
     // Re-use $userObjectId from the initial connection block
     $cursor = $accountsCollection->find(
         ['user_id' => $userObjectId],
-        ['projection' => ['account_number' => 1, 'account_type' => 1, 'balance' => 1, 'currency' => 1]] // Added balance and currency for display in JS
+        ['projection' => ['account_number' => 1, 'account_type' => 1, 'balance' => 1, 'currency' => 1]]
     );
     foreach ($cursor as $accountDoc) {
         $user_accounts_for_dropdown[] = [
             'id' => (string) $accountDoc['_id'], // Convert ObjectId to string for HTML value
             'account_type' => $accountDoc['account_type'] ?? 'Account',
             'display_account_number' => '****' . substr($accountDoc['account_number'] ?? '', -4),
-            'balance' => $accountDoc['balance'] ?? 0.00, // Make sure to fetch balance
-            'currency' => $accountDoc['currency'] ?? 'USD' // Make sure to fetch currency
+            'balance' => $accountDoc['balance'] ?? 0.00,
+            'currency' => $accountDoc['currency'] ?? 'USD'
         ];
     }
 } catch (MongoDBDriverException $e) {
@@ -119,7 +122,8 @@ try {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* Specific styles for cards.html - Now inline in bank_cards.php */
+        /* Your existing inline CSS is kept here for now.
+           Consider moving this to an external CSS file like bank_cards.css for better organization. */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
@@ -724,7 +728,7 @@ try {
         <section class="manage-pin-section">
             <h2>Manage Card PIN & Activation</h2>
             <p>To activate a new card or set/change your existing card's PIN, please visit the <a href="<?php echo BASE_URL; ?>/my_cards">Card Activation & PIN Management page</a>.</p>
-        </section>
+            </section>
     </main>
 
     <div class="message-box-overlay" id="messageBoxOverlay">
@@ -737,10 +741,10 @@ try {
         // These variables must be defined before cards.js is loaded
         const PHP_BASE_URL = <?php echo json_encode(BASE_URL); ?>;
         // Assuming 'frontend' is directly under your BASE_URL for frontend assets
-        const FRONTEND_BASE_URL = <?php echo json_encode(BASE_URL . '/frontend/'); ?>;
+        const FRONTEND_BASE_URL = <?php echo json_encode(BASE_URL . '/frontend'); ?>; // Removed trailing slash as you might add it in JS
         const currentUserId = <?php echo json_encode($user_id); ?>;
         const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
-        const currentUserEmail = <?php echo json_encode($user_email); ?>; // Add current user email
+        const currentUserEmail = <?php echo json_encode($user_email); ?>;
     </script>
     <script src="<?php echo BASE_URL; ?>/frontend/cards.js"></script>
 </body>

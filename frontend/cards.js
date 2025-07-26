@@ -3,27 +3,22 @@ function showMessageBox(message, isSuccess) {
     const messageBoxOverlay = document.getElementById('messageBoxOverlay');
     const messageBoxContent = document.getElementById('messageBoxContent');
     messageBoxContent.textContent = message;
-    // Use classList.add/remove for display/visibility for better animation potential
-    messageBoxOverlay.classList.add('show');
 
-    // Apply inline styles based on success/error
-    // It's generally better to manage these styles via CSS classes
-    // but keeping it as per your existing code for consistency.
+    // Remove any existing status classes
+    messageBoxContent.classList.remove('message-box-success', 'message-box-error');
+
+    // Apply status-specific classes
     if (isSuccess) {
-        messageBoxContent.style.color = '#155724'; // Dark green text
-        messageBoxContent.style.backgroundColor = '#d4edda'; // Light green background
-        messageBoxContent.style.borderColor = '#c3e6cb'; // Green border
+        messageBoxContent.classList.add('message-box-success');
     } else {
-        messageBoxContent.style.color = '#721c24'; // Dark red text
-        messageBoxContent.style.backgroundColor = '#f8d7da'; // Light red background
-        messageBoxContent.style.borderColor = '#f5c6cb'; // Red border
+        messageBoxContent.classList.add('message-box-error');
     }
 
-    // Add padding, border, and border-radius for styling
-    messageBoxContent.style.padding = '20px';
-    messageBoxContent.style.border = '1px solid';
-    messageBoxContent.style.borderRadius = '5px';
-    messageBoxContent.style.textAlign = 'center';
+    // Add base styling class (assuming these styles are in CSS now)
+    messageBoxContent.classList.add('message-box-base'); // A new class for common padding, border, etc.
+
+    // Show the overlay
+    messageBoxOverlay.classList.add('show');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -39,14 +34,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const noCardsMessage = document.getElementById('noCardsMessage');
     const orderCardForm = document.getElementById('orderCardForm');
     const accountIdSelect = document.getElementById('accountId');
-    const messageBoxButton = document.getElementById('messageBoxButton'); // Get the OK button
-    const messageBoxOverlay = document.getElementById('messageBoxOverlay'); // Get the overlay directly
+    const messageBoxButton = document.getElementById('messageBoxButton');
+    const messageBoxOverlay = document.getElementById('messageBoxOverlay');
+    const orderCardSubmitButton = orderCardForm.querySelector('button[type="submit"]'); // Get the submit button
 
     // Function to fetch and populate user's bank accounts for the order form
     async function fetchUserAccounts() {
         accountIdSelect.innerHTML = '<option value="">-- Loading Accounts --</option>';
         try {
-            // UPDATED AJAX call to fetch accounts from a dedicated API endpoint
             const response = await fetch(`${PHP_BASE_URL}api/get_user_accounts`);
 
             if (!response.ok) {
@@ -73,7 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             accountIdSelect.innerHTML = '<option value="">Error Loading Accounts</option>';
             console.error("Error fetching user accounts:", error);
-            // Check if the error is due to a non-JSON response from the server (e.g., 404 HTML)
             if (error.message.includes("Unexpected token '<'")) {
                 showMessageBox("Failed to load accounts: Server returned an unexpected response (HTML instead of JSON). This often means the server couldn't find the requested API endpoint or there's a PHP error on the API script. Please contact support.", false);
             } else {
@@ -89,7 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
         noCardsMessage.style.display = 'none'; // Hide "no cards" message initially
 
         try {
-            // UPDATED AJAX call to the new dedicated API endpoint for cards
             const response = await fetch(`${PHP_BASE_URL}api/get_user_cards`);
 
             if (!response.ok) {
@@ -105,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const networkClass = card.card_network ? card.card_network.toLowerCase() : 'default';
                     cardItem.className = `card-item ${networkClass}`;
 
-                    // Construct card HTML - DIRECTLY USE card.card_logo_src from the server response
                     cardItem.innerHTML = `
                         <h4>HOMETOWN BANK</h4>
                         <div class="chip"></div>
@@ -135,7 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error fetching cards:', error);
             noCardsMessage.textContent = `Error loading cards: ${error.message}. Please try again.`;
             noCardsMessage.style.display = 'block';
-            // Check if the error is due to a non-JSON response from the server (e.g., 404 HTML)
             if (error.message.includes("Unexpected token '<'")) {
                 showMessageBox("Failed to load cards: Server returned an unexpected response (HTML instead of JSON). This often means the server couldn't find the requested API endpoint or there's a PHP error on the API script. Please contact support.", false);
             } else {
@@ -154,12 +145,13 @@ document.addEventListener('DOMContentLoaded', () => {
     orderCardForm.addEventListener('submit', async (e) => {
         e.preventDefault(); // Prevent default form submission
 
+        // Disable submit button and show loading state
+        orderCardSubmitButton.disabled = true;
+        orderCardSubmitButton.textContent = 'Ordering...'; // Or add a spinner icon
+
         const formData = new FormData(orderCardForm);
-        // No need to append 'action', as the API endpoint will handle the specific action
-        // formData.append('action', 'order_card'); 
 
         try {
-            // UPDATED AJAX call to the new dedicated API endpoint for ordering cards
             const response = await fetch(`${PHP_BASE_URL}api/order_card`, {
                 method: 'POST',
                 body: formData,
@@ -173,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`HTTP error! status: ${response.status}, response: ${errorText}`);
             }
 
-            const data = await response.json(); // Parse the JSON response
+            const data = await response.json();
 
             if (data.success) {
                 showMessageBox(data.message, true); // Show success message
@@ -185,17 +177,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Error ordering card:', error);
-            // Check if the error is due to a non-JSON response from the server (e.g., 404 HTML)
             if (error.message.includes("Unexpected token '<'")) {
                 showMessageBox("An unexpected error occurred: Server returned an invalid response (HTML instead of JSON). This often means the server couldn't process the request correctly or there's a PHP error on the API script. Please contact support.", false);
             } else {
                 showMessageBox(`An unexpected error occurred while placing your order: ${error.message}. Please try again.`, false);
             }
+        } finally {
+            // Re-enable submit button and revert text
+            orderCardSubmitButton.disabled = false;
+            orderCardSubmitButton.textContent = 'Order Card';
         }
     });
 
     // Handle message box dismissal
     messageBoxButton.addEventListener('click', () => {
         messageBoxOverlay.classList.remove('show'); // Hide the overlay using classList
+        // Optionally, remove the success/error classes from content when hidden
+        document.getElementById('messageBoxContent').classList.remove('message-box-success', 'message-box-error', 'message-box-base');
     });
 });
