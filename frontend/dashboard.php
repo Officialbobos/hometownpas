@@ -2,8 +2,6 @@
 // Path: C:\xampp\htdocs\hometownbank\frontend\dashboard.php
 // Assuming dashboard.php is in the 'frontend' folder, so paths to Config and functions need to go up one level.
 
-session_start();
-
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
