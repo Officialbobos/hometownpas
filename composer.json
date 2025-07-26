@@ -5,7 +5,8 @@
         "mongodb/mongodb": "^2.1",
         "vlucas/phpdotenv": "^5.0",
         "spomky-labs/otphp": "^11.3",
-        "bacon/bacon-qr-code": "^3.0"  
+        "bacon/bacon-qr-code": "^3.0",
+        "aws/aws-sdk-php": "^3.351"  
     },
     "config": {
         "platform": {

@@ -1,14 +1,18 @@
 <?php
 session_start();
-// Ensure Config.php is correctly included. It should be one level up from admin/users/
-require_once __DIR__ . '/../../Config.php';
+// Ensure Composer autoload is included
+require_once __DIR__ . '/../../vendor/autoload.php'; // Corrected path assuming vendor is in project root
+require_once __DIR__ . '/../../Config.php'; // Correctly include Config.php
 require_once '../../functions.php'; // This is good to have for future database operations
-
 
 // Use the MongoDB Client class
 use MongoDB\Client;
 use MongoDB\Exception\Exception as MongoDBException; // Catch general MongoDB exceptions
 use MongoDB\Driver\Exception\BulkWriteException; // Specific exception for write errors (e.g., duplicate key)
+
+// AWS SDK for PHP
+use Aws\S3\S3Client;
+use Aws\S3\Exception\S3Exception;
 
 // Check if admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
@@ -19,39 +23,22 @@ if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SES
 $message = '';
 $message_type = ''; // 'success' or 'error'
 
-// Define the upload directory using an absolute path relative to the Railway /app root
-define('UPLOAD_DIR', '/app/uploads/profile_images/');
-
-// Attempt to create the upload directory if it doesn't exist
-if (!is_dir(UPLOAD_DIR)) {
-    if (!mkdir(UPLOAD_DIR, 0777, true)) {
-        error_log('PHP Error: Failed to create upload directory: ' . UPLOAD_DIR . '. Please check underlying permissions or path.');
-        // If directory creation fails, set an error message and prevent further processing.
-        $message = 'Server configuration error: Could not create upload directory. Contact administrator.';
-        $message_type = 'error';
-        // We'll handle this with `goto` later if it's set here.
-    }
-}
+// --- REMOVED LOCAL UPLOAD_DIR DEFINITION AND MKDIR ATTEMPT ---
+// define('UPLOAD_DIR', '/app/uploads/profile_images/');
+// if (!is_dir(UPLOAD_DIR)) {
+//     if (!mkdir(UPLOAD_DIR, 0777, true)) {
+//         error_log('PHP Error: Failed to create upload directory: ' . UPLOAD_DIR . '. Please check underlying permissions or path.');
+//         $message = 'Server configuration error: Could not create upload directory. Contact administrator.';
+//         $message_type = 'error';
+//     }
+// }
 
 // --- Define HomeTown Bank's Fixed Identifiers (Fictional) ---
-// These would be real bank details in a production system.
-// For simulation, these are consistent for "HomeTown Bank" for a given currency/region.
-
-// For UK (GBP) accounts - BIC must be 11 chars
-define('HOMETOWN_BANK_UK_BIC', 'HOMTGB2LXXX'); // Fictional BIC for HomeTown Bank UK
-// UK Sort Code is 6 digits. We will generate the last 4.
-define('HOMETOWN_BANK_UK_SORT_CODE_PREFIX', '90'); // Example: '90xxxx'
-
-// For EURO (EUR) accounts (e.g., simulating a German branch for Euro operations) - BIC must be 11 chars
-define('HOMETOWN_BANK_EUR_BIC', 'HOMTDEFFXXX'); // Fictional BIC for HomeTown Bank Europe (Germany)
-// Fictional German Bankleitzahl (BLZ) part of BBAN for EUR IBANs.
-// German BLZ is 8 digits.
+define('HOMETOWN_BANK_UK_BIC', 'HOMTGB2LXXX');
+define('HOMETOWN_BANK_UK_SORT_CODE_PREFIX', '90');
+define('HOMETOWN_BANK_EUR_BIC', 'HOMTDEFFXXX');
 define('HOMETOWN_BANK_EUR_BANK_CODE_BBAN', '50070010');
-
-// For US (USD) accounts - BIC must be 11 chars
-define('HOMETOWN_BANK_USD_BIC', 'HOMTUS33XXX'); // Fictional BIC for HomeTown Bank USA
-// ABA Routing Transit Number (RTN) is 9 digits for US banks
-// We will generate the full 9 digits dynamically per account to make them unique.
+define('HOMETOWN_BANK_USD_BIC', 'HOMTUS33XXX');
 
 /**
  * Helper function to generate a unique numeric ID of a specific length.
@@ -280,6 +267,25 @@ function generateUniqueUsdIban($accountsCollection, string $internalAccountNumbe
     return false;
 }
 
+// --- NEW HELPER FUNCTION FOR GENERATING PRESIGNED B2 URLS ---
+function getPresignedB2Url(string $objectKey, S3Client $b2Client, string $b2BucketName): string {
+    if (empty($objectKey)) {
+        return ''; // Return empty string if no object key
+    }
+    try {
+        $command = $b2Client->getCommand('GetObject', [
+            'Bucket' => $b2BucketName,
+            'Key'    => $objectKey
+        ]);
+        // Generate a URL that expires in 1 hour (3600 seconds)
+        $request = $b2Client->createPresignedRequest($command, '+1 hour');
+        return (string) $request->getUri();
+    } catch (S3Exception $e) {
+        error_log("Error generating pre-signed URL for {$objectKey}: " . $e->getMessage());
+        return ''; // Or return a placeholder image URL, e.g., '/images/placeholder.png'
+    }
+}
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Collect and sanitize user data
@@ -313,17 +319,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $admin_created_at_dt = new DateTime();
     }
     // Store as MongoDB Date object (or ISO 8601 string)
-    // For MongoDB, it's best to store dates as BSON Date type or ISO 8601 strings.
-    // The PHP driver handles DateTime objects directly for BSON Date.
     $admin_created_at = $admin_created_at_dt; // Keep as DateTime object for MongoDB
 
-    $profile_image_path = null;
-    $uploaded_file_full_path = null;
+    // --- NEW: Variable to store B2 object key, not a local path ---
+    $profile_image_b2_key = null;
+    $b2Client = null; // Declare B2 client early for use in rollback
 
     // Initial validation
-    if (!empty($message_type) && $message_type == 'error') { // Check if UPLOAD_DIR creation failed earlier
-        goto end_of_post_processing;
-    }
     if (empty($first_name) || empty($last_name) || empty($email) || empty($password) || empty($home_address) || empty($phone_number) || empty($nationality) || empty($date_of_birth) || empty($gender) || empty($occupation) || empty($admin_created_at)) {
         $message = 'All required fields (marked with *) must be filled.';
         $message_type = 'error';
@@ -349,7 +351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = 'If an initial balance is provided, you must select an account type to fund.';
         $message_type = 'error';
     } else {
-        // --- Handle Profile Image Upload (Optional) ---
+        // --- START B2 PROFILE IMAGE UPLOAD LOGIC ---
         if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK) {
             $file_tmp_path = $_FILES['profile_image']['tmp_name'];
             $file_name = $_FILES['profile_image']['name'];
@@ -358,33 +360,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
 
             $allowed_ext = ['jpg', 'jpeg', 'png', 'gif'];
+            $max_file_size = 5 * 1024 * 1024; // 5MB limit
+
             if (!in_array($file_ext, $allowed_ext)) {
                 $message = 'Invalid image file type. Only JPG, JPEG, PNG, GIF are allowed.';
                 $message_type = 'error';
-            } elseif ($file_size > 5 * 1024 * 1024) { // 5MB limit
+            } elseif ($file_size > $max_file_size) {
                 $message = 'Image file size exceeds 5MB limit.';
                 $message_type = 'error';
             } else {
-                $new_file_name = uniqid('profile_', true) . '.' . $file_ext;
-                $target_file_path = UPLOAD_DIR . $new_file_name;
+                try {
+                    // Initialize S3Client for Backblaze B2 using environment variables
+                    $b2Client = new S3Client([
+                        'version'     => 'latest',
+                        'region'      => getenv('B2_REGION'),
+                        'endpoint'    => getenv('B2_S3_ENDPOINT'),
+                        'credentials' => [
+                            'key'    => getenv('B2_ACCOUNT_ID'),
+                            'secret' => getenv('B2_APPLICATION_KEY'),
+                        ],
+                        'use_path_style_endpoint' => true, // Often necessary for S3-compatible services
+                    ]);
 
-                if (move_uploaded_file($file_tmp_path, $target_file_path)) {
-                    $profile_image_path = 'uploads/profile_images/' . $new_file_name;
-                    $uploaded_file_full_path = $target_file_path;
-                } else {
-                    $message = 'Failed to upload profile image.';
+                    // Define the object key (path/filename) in the B2 bucket
+                    $new_file_name = uniqid('profile_', true) . '.' . $file_ext;
+                    // Store in a 'profile_images' virtual folder within your bucket
+                    $profile_image_b2_key = 'profile_images/' . $new_file_name;
+
+                    $result = $b2Client->putObject([
+                        'Bucket'     => getenv('B2_BUCKET_NAME'),
+                        'Key'        => $profile_image_b2_key,
+                        'SourceFile' => $file_tmp_path, // Path to the temporary uploaded file
+                        'ContentType' => $file_type, // Set content type for proper browser display
+                    ]);
+
+                    // At this point, the file is uploaded to B2. We store its key in MongoDB.
+                    // The actual public URL will be generated using a pre-signed URL later when displaying.
+
+                } catch (S3Exception $e) {
+                    $message = "Failed to upload profile image to cloud storage: " . $e->getMessage();
                     $message_type = 'error';
+                    error_log("B2 Upload Error: " . $e->getMessage()); // Log detailed error
+                } catch (Exception $e) {
+                    $message = "An unexpected error occurred during image upload: " . $e->getMessage();
+                    $message_type = 'error';
+                    error_log("Image Upload General Error: " . $e->getMessage());
                 }
             }
         }
+        // --- END B2 PROFILE IMAGE UPLOAD LOGIC ---
+
         if ($message_type == 'error') {
-            goto end_of_post_processing;
+            goto end_of_post_processing; // Jump to end if image upload failed
         }
 
         // --- MongoDB Operations ---
         $mongoClient = null; // Declare outside try for finally block scope
         $session = null;
         $transaction_success = true; // Assume success until an error occurs
+        $new_user_id = null; // To hold the user ID for potential B2 rollback
 
         try {
             // Establish MongoDB connection
@@ -440,13 +474,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'gender' => $gender,
                 'occupation' => $occupation,
                 'membership_number' => $membership_number,
-                'profile_image' => $profile_image_path,
+                // --- Store the B2 object key instead of local path ---
+                'profile_image_key' => $profile_image_b2_key,
                 'created_at' => new MongoDB\BSON\UTCDateTime($admin_created_at->getTimestamp() * 1000), // Store as BSON Date
                 'status' => 'active', // Default status for new users
                 'last_login' => null,
                 'email_verified' => false,
                 'kyc_status' => 'pending',
-                'two_factor_enabled' => true // <-- ADDED THIS LINE: 2FA is enabled by default for new users
+                'two_factor_enabled' => true
             ];
 
             // Insert user document
@@ -471,14 +506,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $common_swift_bic = HOMETOWN_BANK_UK_BIC;
             } elseif ($currency === 'EUR') {
-                $common_sort_code = NULL; // Not applicable for EUR IBAN (uses BLZ which is part of IBAN BBAN)
+                $common_sort_code = NULL;
                 $common_swift_bic = HOMETOWN_BANK_EUR_BIC;
             } elseif ($currency === 'USD') {
-                $common_sort_code = NULL; // Not applicable for US sort code
+                $common_sort_code = NULL;
                 $common_swift_bic = HOMETOWN_BANK_USD_BIC;
-                // For USD, the routing number is generated *inside* generateUniqueUsdIban and returned.
-                // We will store this generated routing number in the 'routing_number' field.
-                // We'll capture it here to potentially reuse for multiple USD accounts if applicable.
             }
 
             // 1. Create Checking Account
@@ -503,7 +535,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($usd_iban_details !== false) {
                     $checking_iban = $usd_iban_details['iban'];
                     $checking_routing_number = $usd_iban_details['routing_number'];
-                    $common_routing_number = $checking_routing_number; // Store for reuse
+                    $common_routing_number = $checking_routing_number;
                 } else {
                     throw new Exception("Failed to generate unique USD 'IBAN' and Routing Number for Checking account.");
                 }
@@ -555,10 +587,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $usd_iban_details_savings = generateUniqueUsdIban($accountsCollection, $savings_account_number);
                 if ($usd_iban_details_savings !== false) {
                     $savings_iban = $usd_iban_details_savings['iban'];
-                    // Important: For USD, we should reuse the same routing number for all accounts under a user/bank if they are truly linked.
-                    // If you want a *different* routing number per account, then you would use $usd_iban_details_savings['routing_number'].
-                    // Your original logic implies reuse by assigning $common_routing_number for checking.
-                    // If common_routing_number is set, use it, otherwise use the one just generated for savings (shouldn't happen if checking succeeded)
                     $savings_routing_number = $common_routing_number ?? $usd_iban_details_savings['routing_number'];
                 } else {
                     throw new Exception("Failed to generate unique USD 'IBAN' for Savings account.");
@@ -600,53 +628,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST = array(); // Clear form fields on success
 
         } catch (BulkWriteException $e) {
-            // This exception is thrown for write concerns or duplicate key errors during bulk operations.
-            // For single inserts, it typically means a unique index constraint violation.
             $error_code = $e->getCode();
-            if ($error_code === 11000) { // MongoDB duplicate key error code
+            if ($error_code === 11000) {
                 $message = "Error creating user/account: A unique value (like email, membership number, or account number) already exists. Please check and try again.";
             } else {
                 $message = "Database write error: " . $e->getMessage();
             }
             $message_type = 'error';
-            $transaction_success = false; // Mark transaction as failed
+            $transaction_success = false;
             error_log("MongoDB BulkWriteException: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
         } catch (MongoDBException $e) {
             $message = "MongoDB Error: " . $e->getMessage();
             $message_type = 'error';
             $transaction_success = false;
             error_log("MongoDB General Error: " . $e->getMessage());
-           } catch (Exception $e) {
-            // Catch any other general PHP exceptions (e.g., from our helper functions)
+        } catch (Exception $e) {
             $message = "An unexpected error occurred: " . $e->getMessage();
             $message_type = 'error';
             $transaction_success = false;
             error_log("General Exception: " . $e->getMessage());
-
-            // Abort transaction here on general error if it was started
-            if (isset($session)) { // Ensure $session object was created
-                try {
-                    $session->abortTransaction();
-                    error_log("MongoDB Transaction Aborted due to general error.");
-                } catch (MongoDBException $abortE) {
-                    error_log("Error during transaction abort (general error catch): " . $abortE->getMessage());
-                }
-            }
         } finally {
             // Always end the session, whether committed, aborted, or an error occurred before transaction start
-            if (isset($session)) { // Ensure $session object was created
+            if (isset($session)) {
                 $session->endSession();
             }
-        }
-            // If profile image was uploaded and transaction failed, delete it
-            if (!$transaction_success && $uploaded_file_full_path && file_exists($uploaded_file_full_path)) {
-                unlink($uploaded_file_full_path);
-                error_log("Uploaded file deleted due to transaction rollback: " . $uploaded_file_full_path);
+
+            // --- NEW: Rollback B2 upload if MongoDB transaction failed ---
+            if (!$transaction_success && $profile_image_b2_key && $b2Client) {
+                try {
+                    $b2Client->deleteObject([
+                        'Bucket' => getenv('B2_BUCKET_NAME'),
+                        'Key'    => $profile_image_b2_key,
+                    ]);
+                    error_log("Uploaded B2 object deleted due to transaction rollback: " . $profile_image_b2_key);
+                } catch (S3Exception $deleteE) {
+                    error_log("Error deleting B2 object on rollback: " . $deleteE->getMessage());
+                } catch (Exception $deleteE) {
+                    error_log("General error deleting B2 object on rollback: " . $deleteE->getMessage());
+                }
             }
-            // No need to explicitly close MongoDB client, PHP cleans up
         }
     }
     end_of_post_processing:; // Label for goto statement
+}
 ?>
 
 <!DOCTYPE html>

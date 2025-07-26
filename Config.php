@@ -37,10 +37,10 @@ error_log("--- PHP Environment Variable Debug Start ---");
 error_log("Listing contents of \$_ENV:");
 foreach ($_ENV as $key => $value) {
     // Sanitize sensitive values for logs
-    if (strpos($key, 'PASS') !== false || strpos($key, 'URI') !== false || strpos($key, 'KEY') !== false) {
-        error_log("  _ENV: " . $key . " = [SENSITIVE VALUE]");
+    if (strpos($key, 'PASS') !== false || strpos($key, 'URI') !== false || strpos($key, 'KEY') !== false || strpos($key, 'SECRET') !== false) {
+        error_log("   _ENV: " . $key . " = [SENSITIVE VALUE]");
     } else {
-        error_log("  _ENV: " . $key . " = " . $value);
+        error_log("   _ENV: " . $key . " = " . $value);
     }
 }
 
@@ -54,18 +54,24 @@ $varsToCheck = [
     'SMTP_PASSWORD',
     'EXCHANGE_RATE_API_KEY',
     'APP_DEBUG',
-    'APP_TIMEZONE'
+    'APP_TIMEZONE',
+    // New B2 variables
+    'B2_APPLICATION_KEY_ID',
+    'B2_APPLICATION_KEY',
+    'B2_BUCKET_NAME',
+    'B2_REGION',
+    'B2_ENDPOINT'
 ];
 foreach ($varsToCheck as $varName) {
     $value = getenv($varName);
     if ($value !== false) {
-        if (strpos($varName, 'PASS') !== false || strpos($varName, 'URI') !== false || strpos($varName, 'KEY') !== false) {
-            error_log("  getenv(): " . $varName . " = [SENSITIVE VALUE]");
+        if (strpos($varName, 'PASS') !== false || strpos($varName, 'URI') !== false || strpos($varName, 'KEY') !== false || strpos($varName, 'SECRET') !== false) {
+            error_log("   getenv(): " . $varName . " = [SENSITIVE VALUE]");
         } else {
-            error_log("  getenv(): " . $varName . " = " . $value);
+            error_log("   getenv(): " . $varName . " = " . $value);
         }
     } else {
-        error_log("  getenv(): " . $varName . " = NOT SET");
+        error_log("   getenv(): " . $varName . " = NOT SET");
     }
 }
 error_log("--- PHP Environment Variable Debug End ---");
@@ -150,3 +156,19 @@ if (session_status() === PHP_SESSION_NONE) {
 date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? getenv('APP_TIMEZONE') ?? 'Africa/Lagos');
 
 // --- END: Required for Currency Exchange and Transfer Rules ---
+
+// --- START: Backblaze B2 S3 Compatible API Configuration ---
+// These will be used by edit_user.php for profile image storage.
+define('B2_APPLICATION_KEY_ID', $_ENV['B2_APPLICATION_KEY_ID'] ?? getenv('B2_APPLICATION_KEY_ID') ?? null);
+define('B2_APPLICATION_KEY', $_ENV['B2_APPLICATION_KEY'] ?? getenv('B2_APPLICATION_KEY') ?? null);
+define('B2_BUCKET_NAME', $_ENV['B2_BUCKET_NAME'] ?? getenv('B2_BUCKET_NAME') ?? null);
+define('B2_REGION', $_ENV['B2_REGION'] ?? getenv('B2_REGION') ?? null); // e.g., 'us-west-004'
+define('B2_ENDPOINT', $_ENV['B2_ENDPOINT'] ?? getenv('B2_ENDPOINT') ?? null); // e.g., 'https://s3.us-west-004.backblazeb2.com'
+
+// Add a final check for critical B2 configuration
+if (empty(B2_APPLICATION_KEY_ID) || empty(B2_APPLICATION_KEY) || empty(B2_BUCKET_NAME) || empty(B2_REGION) || empty(B2_ENDPOINT)) {
+    error_log("WARNING: One or more Backblaze B2 constants are not set. Profile image functionality may be impaired.");
+    // Optionally, you could die here if B2 storage is absolutely critical for your app.
+    // For now, it's a warning, and edit_user.php will also handle S3Client initialization errors.
+}
+// --- END: Backblaze B2 S3 Compatible API Configuration ---
