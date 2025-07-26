@@ -9,11 +9,17 @@ RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev \
     git \
     unzip \
+    # --- ADD THIS LINE TO INSTALL THE BCMATH SYSTEM PACKAGE ---
+    php-bcmath \
+    # --- END OF ADDITION ---
     && rm -rf /var/lib/apt/lists/*
 
 # Install the MongoDB PHP extension using PECL
 RUN pecl install mongodb \
-    && docker-php-ext-enable mongodb
+    && docker-php-ext-enable mongodb \
+    # --- ADD THIS LINE TO ENABLE THE BCMATH PHP EXTENSION ---
+    && docker-php-ext-enable bcmath
+    # --- END OF ADDITION ---
 
 # Install Composer globally (PHP's dependency manager)
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -21,14 +27,12 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory inside the container to your application's root
 WORKDIR /var/www/html
 
-# --- THESE ARE THE CRITICAL LINES YOU NEED TO ADD/ENSURE ARE IN YOUR DOCKERFILE ---
 # Copy custom Apache configuration to enable .htaccess
 # Make sure you have created the .docker folder and 000-default.conf file
 COPY ./.docker/000-default.conf /etc/apache2/sites-available/000-default.conf
 
 # Disable the default site and enable our custom one (which allows .htaccess)
 RUN a2dissite 000-default.conf && a2ensite 000-default.conf
-# --- END OF CRITICAL ADDITIONS ---
 
 # Copy your entire application code into the container
 COPY . /var/www/html/
