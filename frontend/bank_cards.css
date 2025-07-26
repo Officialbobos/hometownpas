@@ -1,526 +1,585 @@
-  /* Specific styles for cards.html - Now inline in bank_cards.php */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f0f2f5;
-            color: #333;
-            line-height: 1.6;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
+/* Specific styles for cards.html - Now inline in bank_cards.php */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f2f5;
+    color: #333;
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
 
-        .header {
-            background-color: #ffffff;
-            padding: 20px 30px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid #eee;
-        }
+.header {
+    background: linear-gradient(45deg, #6a11cb, #2575fc); /* Glow purple gradient from first input */
+    padding: 20px 30px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #eee;
+}
 
-        .header .logo img {
-            max-height: 55px;
-            width: auto;
-        }
+.header .logo img {
+    max-height: 45px; /* Reduced logo size from first input */
+    width: auto;
+}
 
-        .header h1 {
-            background: linear-gradient(45deg, #6a11cb, #2575fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-size: 2rem;
-            margin: 0;
-            flex-grow: 1;
-            text-align: center;
-            font-weight: 700;
-        }
+.header h1 {
+    color: #ffffff; /* White text for header title from first input */
+    font-size: 1.8rem; /* Reduced font size for "Manage My Cards" from first input */
+    margin: 0;
+    flex-grow: 1;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    /* Removed -webkit-background-clip and -webkit-text-fill-color as color is now white */
+}
 
-        /* Back to Dashboard Button Styling */
-        .back-to-dashboard {
-            display: inline-flex;
-            align-items: center;
-            padding: 10px 15px;
-            background-color: #007bff; /* A nice blue */
-            color: #fff;
-            text-decoration: none;
-            border-radius: 8px;
-            font-size: 0.95rem; /* Reduced font size */
-            font-weight: 600;
-            transition: background-color 0.3s ease, transform 0.2s ease;
-            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
-            white-space: nowrap; /* Prevent text wrapping */
-        }
+/* Back to Dashboard Button Styling */
+.back-to-dashboard {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 15px;
+    background-color: rgba(255, 255, 255, 0.2); /* Semi-transparent white from first input */
+    color: #fff;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Adjusted shadow from first input */
+    white-space: nowrap;
+}
 
-        .back-to-dashboard i {
-            margin-right: 8px;
-        }
+.back-to-dashboard i {
+    margin-right: 8px;
+}
 
-        .back-to-dashboard:hover {
-            background-color: #0056b3;
-            transform: translateY(-1px);
-        }
+.back-to-dashboard:hover {
+    background-color: rgba(255, 255, 255, 0.3); /* Adjusted hover from first input */
+    transform: translateY(-1px);
+}
 
+.main-content {
+    flex-grow: 1;
+    padding: 30px 20px;
+    max-width: 900px;
+    margin: 30px auto;
+    background-color: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    border: 1px solid #e0e0e0;
+    width: calc(100% - 40px);
+    box-sizing: border-box;
+}
 
-        .main-content {
-            flex-grow: 1;
-            padding: 30px 20px;
-            max-width: 900px;
-            margin: 30px auto;
-            background-color: #ffffff;
-            border-radius: 18px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-            border: 1px solid #e0e0e0;
-            /* Added for better centering and fitting on smaller screens */
-            width: calc(100% - 40px); /* Adjust width to account for padding */
-            box-sizing: border-box; /* Include padding in width calculation */
-        }
+h2 {
+    color: #4a0d93;
+    font-size: 2rem;
+    margin-bottom: 30px;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
 
-        h2 {
-            color: #4a0d93;
-            font-size: 2rem; /* Reduced font size */
-            margin-bottom: 30px;
-            text-align: center;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }
+.cards-section, .order-card-section {
+    margin-bottom: 40px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
 
-        .cards-section, .order-card-section {
-            margin-bottom: 40px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #eee;
-        }
+.cards-section:last-child, .order-card-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
 
-        .cards-section:last-child, .order-card-section:last-child {
-            border-bottom: none;
-            margin-bottom: 0;
-            padding-bottom: 0;
-        }
+.card-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Adjusted min card width for better visuals from first input */
+    gap: 25px; /* Adjusted gap from first input */
+    margin-top: 25px; /* Adjusted margin from first input */
+    justify-content: center; /* Center cards in grid from first input */
+}
 
-        .card-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Min card width reduced */
-            gap: 20px; /* Reduced gap */
-            margin-top: 20px;
-        }
+.card-item {
+    background: linear-gradient(135deg, #f8f8f8, #e0e0e0);
+    border: 1px solid #dcdcdc;
+    border-radius: 18px; /* Slightly larger border-radius from first input */
+    padding: 25px; /* Adjusted padding from first input */
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1); /* Adjusted shadow from first input */
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 200px; /* Adjusted min-height from first input */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
 
-        .card-item {
-            background: linear-gradient(135deg, #f8f8f8, #e0e0e0);
-            border: 1px solid #dcdcdc;
-            border-radius: 15px;
-            padding: 20px; /* Reduced padding */
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            min-height: 180px; /* Reduced min-height */
-        }
+.card-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+}
 
-        .card-item.frozen {
-            background: linear-gradient(135deg, #ffdddd, #f8baba);
-            border-color: #f08080;
-        }
+/* Specific card network styles for background and text (from first input) */
+.card-item.visa { background: linear-gradient(135deg, #2a4b8d, #3f60a9); color: white;}
+.card-item.mastercard { background: linear-gradient(135deg, #eb001b, #ff5f00); color: white;}
+.card-item.amex { background: linear-gradient(135deg, #0081c7, #26a5d4); color: white;}
+.card-item.verve { background: linear-gradient(135deg, #006633, #009933); color: white;}
 
-        .card-item.lost, .card-item.stolen {
-            background: linear-gradient(135deg, #eee, #ddd);
-            border-color: #bbb;
-            opacity: 0.7;
-        }
+/* Ensure text is readable on dark backgrounds (from first input) */
+.card-item.visa h4, .card-item.visa .card-number, .card-item.visa .card-footer .label, .card-item.visa .card-footer .value, .card-item.visa .card-status,
+.card-item.mastercard h4, .card-item.mastercard .card-number, .card-item.mastercard .card-footer .label, .card-item.mastercard .card-footer .value, .card-item.mastercard .card-status,
+.card-item.amex h4, .card-item.amex .card-number, .card-item.amex .card-footer .label, .card-item.amex .card-footer .value, .card-item.amex .card-status,
+.card-item.verve h4, .card-item.verve .card-number, .card-item.verve .card-footer .label, .card-item.verve .card-footer .value, .card-item.verve .card-status {
+    color: white;
+}
+/* Adjust specific elements to a slightly transparent white for better subtle contrast on dark cards */
+.card-item.visa h4, .card-item.mastercard h4, .card-item.amex h4, .card-item.verve h4 {
+    color: rgba(255,255,255,0.9);
+}
+.card-item.visa .card-footer .label, .card-item.mastercard .card-footer .label, .card-item.amex .card-footer .label, .card-item.verve .card-footer .label {
+    color: rgba(255,255,255,0.7);
+}
+.card-item.visa p.card-cvv-mock, .card-item.mastercard p.card-cvv-mock, .card-item.amex p.card-cvv-mock, .card-item.verve p.card-cvv-mock {
+    color: rgba(255,255,255,0.7);
+}
 
-        .card-network-logo {
-            position: absolute;
-            top: 15px; /* Adjusted position */
-            right: 15px; /* Adjusted position */
-            font-weight: bold;
-            font-size: 1.6rem; /* Reduced font size */
-            color: #555;
-            opacity: 0.7;
-        }
-        .visa-card .card-network-logo { color: #1a1f71; }
-        .mastercard-card .card-network-logo { color: #eb001b; }
-        .amex-card .card-network-logo { color: #2671B6; }
+.card-item h4 {
+    margin-top: 0;
+    font-size: 1.1em;
+    color: #333; /* Default text color for card issuer name */
+}
 
-        .card-chip {
-            width: 40px; /* Reduced size */
-            height: 30px; /* Reduced size */
-            background-color: #b0a56f;
-            border-radius: 6px;
-            margin-bottom: 10px; /* Reduced margin */
-        }
+.card-logo-img { /* This is the actual logo image from the backend */
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    height: 45px; /* Slightly larger for better visibility from first input */
+    width: auto;
+    max-width: 80px; /* Ensure it doesn't get too big from first input */
+}
 
-        .card-number {
-            font-family: 'Space Mono', monospace;
-            font-size: 1.3rem; /* Reduced font size */
-            letter-spacing: 1.5px; /* Reduced letter spacing */
-            margin-bottom: 12px; /* Reduced margin */
-            color: #444;
-            text-align: center;
-        }
-
-        .card-details-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px; /* Reduced margin */
-            font-size: 0.9rem; /* Reduced font size */
-            color: #666;
-        }
-
-        .card-details-row p span {
-            font-weight: 600;
-            color: #333;
-        }
-
-        .card-holder-name {
-            font-size: 1rem; /* Reduced font size */
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 3px; /* Reduced margin */
-        }
-
-        .card-expiry {
-            font-size: 0.85rem; /* Reduced font size */
-            color: #777;
-        }
-        
-        .card-type-status {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            margin-top: 10px; /* Reduced margin */
-        }
-
-        .card-type {
-            font-size: 0.95rem; /* Reduced font size */
-            font-weight: 600;
-            color: #555;
-        }
-
-        .card-status {
-            font-size: 0.8rem; /* Reduced font size */
-            font-weight: 700;
-            padding: 4px 8px; /* Reduced padding */
-            border-radius: 5px;
-            text-transform: capitalize;
-        }
-
-        .card-status.active { background-color: #e6ffe6; color: #28a745; }
-        .card-status.frozen { background-color: #fff3cd; color: #ffc107; }
-        .card-status.lost, .card-status.stolen { background-color: #f8d7da; color: #dc3545; }
-
-        .card-actions {
-            margin-top: 15px; /* Reduced margin */
-            display: flex;
-            gap: 8px; /* Reduced gap */
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .card-actions button {
-            padding: 8px 12px; /* Reduced padding */
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.85rem; /* Reduced font size */
-            font-weight: 600;
-            transition: background-color 0.3s ease, transform 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 4px; /* Reduced gap */
-            background-color: #e9ecef;
-            color: #495057;
-        }
-
-        .card-actions button:hover {
-            background-color: #dee2e6;
-            transform: translateY(-2px);
-        }
-
-        .card-actions button.freeze-btn { background-color: #ffc107; color: #fff; }
-        .card-actions button.freeze-btn:hover { background-color: #e0a800; }
-        .card-actions button.unfreeze-btn { background-color: #28a745; color: #fff; }
-        .card-actions button.unfreeze-btn:hover { background-color: #218838; }
-        .card-actions button.report-btn { background-color: #dc3545; color: #fff; }
-        .card-actions button.report-btn:hover { background-color: #c82333; }
+/* Renamed from .card-chip to .chip as per first input, assuming structure */
+.card-item .chip {
+    width: 50px; /* Standard chip size from first input */
+    height: 35px;
+    background-color: #d4af37; /* Adjusted color for a more golden look */
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
 
 
-        /* Order New Card Section */
-        .order-card-section form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px; /* Reduced gap */
-            margin-top: 15px; /* Reduced margin */
-        }
+.card-number {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.6em; /* Adjusted font size for impact from first input */
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    color: #444; /* Default card number color */
+    text-align: center;
+    word-break: break-all;
+}
+/* White for card numbers on colored cards (from first input) */
+.card-item.visa .card-number, .card-item.mastercard .card-number, .card-item.amex .card-number, .card-item.verve .card-number {
+    color: #fff;
+}
 
-        .order-card-section .form-group {
-            margin-bottom: 0;
-        }
+.card-footer { /* This section now holds details that were in card-details-row and card-type-status */
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-size: 0.9em;
+    width: 100%;
+}
 
-        .order-card-section label {
-            display: block;
-            margin-bottom: 6px; /* Reduced margin */
-            font-weight: 600;
-            color: #444;
-            font-size: 0.95rem; /* Reduced font size */
-        }
+.card-footer .label {
+    font-size: 0.7em;
+    opacity: 0.7;
+    margin-bottom: 3px;
+    color: #666; /* Default label color */
+}
+.card-footer .value {
+    font-weight: bold;
+    color: #333; /* Default value color */
+}
 
-        .order-card-section input[type="text"],
-        .order-card-section select,
-        .order-card-section textarea {
-            width: 100%;
-            padding: 10px; /* Reduced padding */
-            border: 1px solid #ccd0d5;
-            border-radius: 8px; /* Reduced border-radius */
-            font-size: 0.9rem; /* Reduced font size */
-            box-sizing: border-box;
-            transition: border-color 0.3s ease, box-shadow 0.3s ease;
-            background-color: #fcfcfc;
-        }
+p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
+    font-size: 0.8em;
+    text-align: center;
+    margin-top: 10px;
+    color: #888;
+}
 
-        .order-card-section input:focus,
-        .order-card-section select:focus,
-        .order-card-section textarea:focus {
-            border-color: #6a11cb;
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.2); /* Reduced shadow */
-            background-color: #ffffff;
-        }
+/* Re-introducing the full card-status styling from the first input for consistency */
+.card-status {
+    font-size: 0.9em;
+    text-align: right;
+    margin-top: 10px;
+    opacity: 0.9;
+    font-weight: bold;
+    padding: 5px 10px;
+    border-radius: 5px;
+    display: inline-block;
+}
+.card-status.active { background-color: #d4edda; color: #155724; }
+.card-status.frozen { background-color: #fff3cd; color: #ffc107; } /* Kept frozen status from previous css */
+.card-status.lost, .card-status.stolen { background-color: #f8d7da; color: #721c24; } /* Kept lost/stolen from previous css */
 
-        .order-card-section .submit-button {
-            padding: 12px 20px; /* Reduced padding */
-            border: none;
-            border-radius: 10px; /* Reduced border-radius */
-            font-size: 1rem; /* Reduced font size */
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: linear-gradient(45deg, #2ecc71, #27ae60);
-            color: #ffffff;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); /* Reduced shadow */
-        }
+/* For colored cards, status text should also be white (from first input) */
+.card-item.visa .card-status, .card-item.mastercard .card-status, .card-item.amex .card-status, .card-item.verve .card-status {
+    color: white; /* Make status text white on dark cards */
+}
+.card-item.visa .card-status.active { background-color: rgba(100, 255, 100, 0.3); border: 1px solid rgba(100, 255, 100, 0.5); }
+.card-item.visa .card-status.inactive { background-color: rgba(255, 100, 100, 0.3); border: 1px solid rgba(255, 100, 100, 0.5); } /* Renamed to inactive based on context */
+.card-item.visa .card-status.frozen { background-color: rgba(255, 255, 100, 0.3); border: 1px solid rgba(255, 255, 100, 0.5); } /* Added frozen for visa */
+.card-item.visa .card-status.lost, .card-item.visa .card-status.stolen { background-color: rgba(255, 100, 100, 0.3); border: 1px solid rgba(255, 100, 100, 0.5); } /* Added lost/stolen for visa */
 
-        .order-card-section .submit-button:hover {
-            background: linear-gradient(45deg, #27ae60, #2ecc71);
-            transform: translateY(-2px); /* Reduced transform */
-            box-shadow: 0 7px 20px rgba(46, 204, 113, 0.4); /* Reduced shadow */
-        }
-
-        /* Loading and No Data Messages */
-        .loading-message, .no-data-message {
-            text-align: center;
-            font-style: italic;
-            color: #666;
-            margin: 20px 0;
-            font-size: 0.9rem; /* Reduced font size */
-        }
-
-        .loading-message i {
-            margin-right: 8px; /* Reduced margin */
-        }
-        
-        /* Custom Message Box */
-        .message-box-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.6);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-
-        .message-box-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .message-box-content {
-            background: #fff;
-            padding: 25px; /* Reduced padding */
-            border-radius: 12px; /* Reduced border-radius */
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2); /* Reduced shadow */
-            text-align: center;
-            max-width: 350px; /* Reduced max-width */
-            width: 90%;
-            transform: translateY(-20px); /* Reduced transform */
-            transition: transform 0.3s ease;
-            border: 1px solid #eee;
-        }
-
-        .message-box-overlay.active .message-box-content {
-            transform: translateY(0);
-        }
-
-        .message-box-content p {
-            font-size: 1.1rem; /* Reduced font size */
-            color: #333;
-            margin-bottom: 20px; /* Reduced margin */
-        }
-
-        .message-box-content button {
-            background: linear-gradient(45deg, #2575fc, #6a11cb);
-            color: #fff;
-            border: none;
-            padding: 10px 25px; /* Reduced padding */
-            border-radius: 8px; /* Reduced border-radius */
-            cursor: pointer;
-            font-size: 0.95rem; /* Reduced font size */
-            font-weight: 600;
-            transition: all 0.2s ease;
-        }
-        .message-box-content button:hover {
-            opacity: 0.9;
-            transform: translateY(-1px);
-        }
+/* Apply similar rgba backgrounds for other colored cards (from first input) */
+.card-item.mastercard .card-status.active, .card-item.amex .card-status.active, .card-item.verve .card-status.active {
+    background-color: rgba(100, 255, 100, 0.3); border: 1px solid rgba(100, 255, 100, 0.5);
+}
+.card-item.mastercard .card-status.inactive, .card-item.amex .card-status.inactive, .card-item.verve .card-status.inactive { /* Renamed to inactive based on context */
+    background-color: rgba(255, 100, 100, 0.3); border: 1px solid rgba(255, 100, 100, 0.5);
+}
+.card-item.mastercard .card-status.frozen, .card-item.amex .card-status.frozen, .card-item.verve .card-status.frozen {
+    background-color: rgba(255, 255, 100, 0.3); border: 1px solid rgba(255, 255, 100, 0.5);
+}
+.card-item.mastercard .card-status.lost, .card-item.amex .card-status.lost, .card-item.verve .card-status.lost,
+.card-item.mastercard .card-status.stolen, .card-item.amex .card-status.stolen, .card-item.verve .card-status.stolen {
+    background-color: rgba(255, 100, 100, 0.3); border: 1px solid rgba(255, 100, 100, 0.5);
+}
 
 
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .header {
-                flex-direction: column;
-                padding: 15px 20px;
-                align-items: center; /* Center items when stacked */
-            }
-            .header .logo {
-                margin-bottom: 10px;
-            }
-            .header h1 {
-                font-size: 1.6rem; /* Further reduced font size for mobile header */
-                text-align: center;
-                margin-top: 10px; /* Space after logo */
-            }
-            .header-nav {
-                width: 100%; /* Make nav take full width */
-                text-align: center; /* Center the button */
-                margin-top: 15px;
-            }
-            .back-to-dashboard {
-                padding: 8px 12px;
-                font-size: 0.85rem;
-            }
-            .main-content {
-                margin: 20px 10px; /* Smaller side margins for better fit */
-                padding: 20px; /* Reduced padding */
-                border-radius: 12px;
-                width: calc(100% - 20px); /* Adjust width for 10px side margins */
-            }
-            h2 {
-                font-size: 1.8rem; /* Further reduced font size for mobile */
-                margin-bottom: 25px;
-            }
-            .card-list {
-                grid-template-columns: 1fr; /* Stack cards vertically on small screens */
-                gap: 15px; /* Reduced gap */
-            }
-            .card-item {
-                min-height: auto; /* Adjust height for smaller screens */
-                padding: 15px; /* Further reduced padding */
-            }
-            .card-network-logo {
-                top: 10px;
-                right: 10px;
-                font-size: 1.4rem;
-            }
-            .card-chip {
-                width: 35px;
-                height: 25px;
-            }
-            .card-number {
-                font-size: 1.2rem;
-                letter-spacing: 1px;
-            }
-            .card-holder-name, .card-expiry {
-                font-size: 0.9rem;
-            }
-            .card-type, .card-status {
-                font-size: 0.8rem;
-            }
-            .card-actions {
-                flex-direction: column; /* Stack action buttons vertically */
-                gap: 8px;
-            }
-            .card-actions button {
-                width: 100%; /* Make buttons full width */
-                justify-content: center; /* Center text/icon */
-            }
+/* Card actions remain similar, adjusted for first input's button styles */
+.card-actions {
+    margin-top: 15px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
 
-            .order-card-section input,
-            .order-card-section select,
-            .order-card-section textarea {
-                padding: 10px;
-                font-size: 0.9rem;
-            }
-            .order-card-section .submit-button {
-                padding: 12px 15px;
-                font-size: 0.95rem;
-            }
-            .message-box-content {
-                max-width: 300px; /* Even smaller for very small screens */
-                padding: 20px;
-            }
-            .message-box-content p {
-                font-size: 1rem;
-            }
-            .message-box-content button {
-                padding: 8px 20px;
-                font-size: 0.9rem;
-            }
-        }
+.card-actions button {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background-color: #e9ecef; /* Default button color */
+    color: #495057; /* Default text color */
+}
 
-        /* Specific styles for very small mobile devices (e.g., iPhone SE) */
-        @media (max-width: 400px) {
-            .header h1 {
-                font-size: 1.4rem;
-            }
-            .main-content {
-                margin: 15px 5px;
-                padding: 15px;
-                width: calc(100% - 10px);
-            }
-            h2 {
-                font-size: 1.6rem;
-                margin-bottom: 20px;
-            }
-            .card-item {
-                padding: 12px;
-            }
-            .card-number {
-                font-size: 1.1rem;
-            }
-            .card-holder-name, .card-expiry, .card-type, .card-status, .card-actions button {
-                font-size: 0.8rem;
-            }
-            .order-card-section label {
-                font-size: 0.85rem;
-            }
-            .order-card-section input,
-            .order-card-section select,
-            .order-card-section textarea {
-                padding: 8px;
-                font-size: 0.85rem;
-            }
-            .order-card-section .submit-button {
-                padding: 10px 12px;
-                font-size: 0.85rem;
-            }
-            .message-box-content {
-                max-width: 280px;
-                padding: 15px;
-            }
-            .message-box-content p {
-                font-size: 0.9rem;
-            }
-            .message-box-content button {
-                padding: 6px 15px;
-                font-size: 0.8rem;
-            }
-        }
+.card-actions button:hover {
+    background-color: #dee2e6;
+    transform: translateY(-2px);
+}
+
+.card-actions button.freeze-btn { background-color: #ffc107; color: #fff; }
+.card-actions button.freeze-btn:hover { background-color: #e0a800; }
+.card-actions button.unfreeze-btn { background-color: #28a745; color: #fff; }
+.card-actions button.unfreeze-btn:hover { background-color: #218838; }
+.card-actions button.report-btn { background-color: #dc3545; color: #fff; }
+.card-actions button.report-btn:hover { background-color: #c82333; }
+
+
+/* Order New Card Section - Form and button styling (largely from first input) */
+.order-card-section form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.form-group { margin-bottom: 18px; } /* From first input */
+.form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #444; font-size: 0.95rem; } /* From first input */
+.form-group input[type="text"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 12px; /* From first input */
+    border: 1px solid #ccd0d5;
+    border-radius: 8px;
+    font-size: 0.95rem; /* From first input */
+    box-sizing: border-box;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    background-color: #fcfcfc;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    border-color: #6a11cb;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.2);
+    background-color: #ffffff;
+}
+
+.submit-button { /* From first input, applied to .submit-button */
+    padding: 14px 25px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: linear-gradient(45deg, #2ecc71, #27ae60);
+    color: #ffffff;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 220px;
+    margin-top: 20px;
+}
+
+.submit-button:hover { /* From first input, applied to .submit-button */
+    background: linear-gradient(45deg, #27ae60, #2ecc71);
+    transform: translateY(-2px);
+    box-shadow: 0 7px 20px rgba(46, 204, 113, 0.4);
+}
+
+
+/* Loading and No Data Messages (from first input) */
+.loading-message, .no-data-message {
+    text-align: center;
+    font-style: italic;
+    color: #666;
+    margin: 20px 0;
+    font-size: 1.0rem;
+}
+
+.loading-message i {
+    margin-right: 8px;
+}
+
+/* Custom Message Box (from first input, with slight adjustments for consistency) */
+.message-box-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.message-box-overlay.show { /* Adjusted from .active to .show as per cards.js in first input */
+    opacity: 1;
+    visibility: visible;
+}
+
+.message-box-content {
+    background: #fff;
+    padding: 30px; /* From first input */
+    border-radius: 15px; /* From first input */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); /* From first input */
+    text-align: center;
+    max-width: 400px; /* From first input */
+    width: 90%;
+    transform: translateY(-20px);
+    transition: transform 0.3s ease;
+    border: 1px solid #eee;
+}
+
+.message-box-overlay.show .message-box-content { /* Adjusted from .active to .show as per cards.js in first input */
+    transform: translateY(0);
+}
+
+.message-box-content p {
+    font-size: 1.1rem;
+    color: #333;
+    margin-bottom: 25px; /* From first input */
+}
+
+.message-box-content button {
+    background: linear-gradient(45deg, #2575fc, #6a11cb);
+    color: #fff;
+    border: none;
+    padding: 12px 30px; /* From first input */
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.0rem; /* From first input */
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+.message-box-content button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+
+/* Responsive Design (combined and refined) */
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        padding: 15px 20px;
+        align-items: center;
+    }
+    .header .logo {
+        margin-bottom: 10px;
+    }
+    .header h1 {
+        font-size: 1.5rem; /* Further reduced for smaller screens */
+        text-align: center;
+        margin-top: 10px;
+    }
+    .header-nav {
+        width: 100%;
+        text-align: center;
+        margin-top: 15px;
+    }
+    .back-to-dashboard {
+        padding: 8px 12px;
+        font-size: 0.85rem;
+    }
+    .main-content {
+        margin: 20px 10px;
+        padding: 20px;
+        border-radius: 12px;
+        width: calc(100% - 20px);
+    }
+    h2 {
+        font-size: 1.8rem;
+        margin-bottom: 25px;
+    }
+    .card-list {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    .card-item {
+        min-height: auto;
+        padding: 20px;
+    }
+    .card-logo-img { /* Used this instead of .card-network-logo for the image */
+        height: 40px;
+        bottom: 15px;
+        right: 15px;
+    }
+    /* Removed .card-network-logo specific font sizing as it's for text in the second snippet */
+    .card-item .chip {
+        width: 45px;
+        height: 30px;
+        margin-bottom: 15px;
+    }
+    .card-number {
+        font-size: 1.4rem;
+        letter-spacing: 1.5px;
+        margin-bottom: 15px;
+    }
+    .card-footer { /* Consolidated from .card-details-row and .card-type-status logic */
+        font-size: 0.85em;
+    }
+    p.card-cvv-mock {
+        font-size: 0.75em;
+    }
+    .card-status {
+        font-size: 0.8em;
+        padding: 4px 8px;
+    }
+    .card-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+    .card-actions button {
+        width: 100%;
+        justify-content: center;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+    .submit-button {
+        padding: 12px 15px;
+        font-size: 0.95rem;
+    }
+    .message-box-content {
+        max-width: 350px;
+        padding: 25px;
+    }
+    .message-box-content p {
+        font-size: 1rem;
+    }
+    .message-box-content button {
+        padding: 10px 20px;
+        font-size: 0.9rem;
+    }
+}
+
+/* Specific styles for very small mobile devices (e.g., iPhone SE) */
+@media (max-width: 400px) {
+    .header h1 {
+        font-size: 1.3rem;
+    }
+    .main-content {
+        margin: 15px 5px;
+        padding: 15px;
+        width: calc(100% - 10px);
+    }
+    h2 {
+        font-size: 1.6rem;
+        margin-bottom: 20px;
+    }
+    .card-item {
+        padding: 15px;
+    }
+    .card-logo-img {
+        height: 35px;
+    }
+    .card-item .chip {
+        width: 40px;
+        height: 25px;
+    }
+    .card-number {
+        font-size: 1.2rem;
+    }
+    .card-footer {
+        font-size: 0.8em;
+    }
+    p.card-cvv-mock {
+        font-size: 0.7em;
+    }
+    .card-status {
+        font-size: 0.75em;
+    }
+    .form-group label {
+        font-size: 0.85rem;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 8px;
+        font-size: 0.85rem;
+    }
+    .submit-button {
+        padding: 10px 12px;
+        font-size: 0.85rem;
+    }
+    .message-box-content {
+        max-width: 280px;
+        padding: 15px;
+    }
+    .message-box-content p {
+        font-size: 0.9rem;
+    }
+    .message-box-content button {
+        padding: 6px 15px;
+        font-size: 0.8rem;
+    }
+}
