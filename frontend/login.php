@@ -148,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                         sendEmail($user['email'], $emailSubject, $emailBodyHtml, "Your verification code for HomeTown Bank is: " . $verificationCode);
                     }
                     ob_end_clean(); // Discard any buffered output
-                    header('Location: ' . BASE_URL . '/verify_code');
+                    header('Location: ' . BASE_URL . 'verify_code');
                     exit;
 
                 } else {
