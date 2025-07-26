@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     git \
     unzip \
     # --- ADD THIS LINE TO INSTALL THE BCMATH SYSTEM PACKAGE ---
-    php-bcmath \
+    php8.3-bcmath \
     # --- END OF ADDITION ---
     && rm -rf /var/lib/apt/lists/*
 
