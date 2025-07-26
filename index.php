@@ -7,8 +7,7 @@
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/functions.php';
 
-// Start the session if not already started (Config.php handles session_start, but double check)
-// This check is good practice, but Config.php should ideally be the sole place for session_start().
+// Start the session if not already started. Config.php should ideally be the sole place for session_start().
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -20,11 +19,18 @@ $userRole = $_SESSION['role'] ?? 'guest'; // Default to 'guest' if not set
 // Get the requested URL path (e.g., /login, /dashboard, /admin/users)
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
+// --- FIX FOR DEPRECATION WARNING ON $requestUri ---
+// Ensure $requestUri is a string, defaulting to '/' if parse_url returns null
+if ($requestUri === null) {
+    $requestUri = '/';
+}
+// --- END FIX ---
+
 // Determine the base path of the application from BASE_URL constant
 // This ensures routing works whether the app is at the root or in a subfolder (e.g., /phpfile-main)
 $baseUrlPath = parse_url(BASE_URL, PHP_URL_PATH);
 
-// --- UPDATED CODE START ---
+// --- Your existing UPDATED CODE START ---
 // Ensure $baseUrlPath is a string (even empty) before performing string operations
 // This prevents 'Deprecated: substr(): Passing null to parameter #1 ($string) of type string is deprecated'
 if ($baseUrlPath === null) {
@@ -32,7 +38,7 @@ if ($baseUrlPath === null) {
     // This often happens if BASE_URL is just a domain like 'http://example.com' without a path
     $baseUrlPath = '/';
 }
-// --- UPDATED CODE END ---
+// --- Your existing UPDATED CODE END ---
 
 // Ensure $baseUrlPath ends with a slash if it's not just '/'
 if ($baseUrlPath !== '/' && substr($baseUrlPath, -1) !== '/') {
@@ -41,7 +47,7 @@ if ($baseUrlPath !== '/' && substr($baseUrlPath, -1) !== '/') {
 
 // Remove the BASE_URL_PATH from the request URI
 // This effectively gives us the clean route like 'login', 'dashboard', 'admin/users/create_user'
-if (strpos($requestUri, $baseUrlPath) === 0) {
+if (strpos($requestUri, $baseUrlPath) === 0) { // Line 44 - now $requestUri and $baseUrlPath are guaranteed strings
     $route = substr($requestUri, strlen($baseUrlPath));
 } else {
     // Fallback if BASE_URL_PATH is not found at the beginning (shouldn't happen with correct config)
@@ -49,7 +55,7 @@ if (strpos($requestUri, $baseUrlPath) === 0) {
 }
 
 // Remove leading/trailing slashes for consistent routing
-$route = trim($route, '/');
+$route = trim($route, '/'); // Line 52 - now $route is guaranteed a string (from $requestUri)
 
 // Default page for logged-in users is the dashboard
 if ($isLoggedIn) {
