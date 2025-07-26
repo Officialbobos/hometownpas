@@ -1,14 +1,14 @@
 <?php
 // C:\xampp\htdocs\heritagebank\frontend\verify_code.php
-session_start(); // ALWAYS at the very top!
+session_start();
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 error_log("--- verify_code.php Start ---");
-error_log("Session ID: " . session_id());
-error_log("Session Contents (verify_code.php initial load): " . print_r($_SESSION, true)); // CRITICAL check on page entry
+error_log("Session ID (verify_code.php entry): " . session_id()); // Added for clarity
+error_log("Session Contents (verify_code.php entry): " . print_r($_SESSION, true)); // CRITICAL check on page entry
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../Config.php';
@@ -27,10 +27,9 @@ if (isset($_SESSION['message'])) {
 }
 
 // --- Session State Validation ---
-// This block ensures that a user is genuinely in the 2FA verification flow.
-// If not, they are redirected to login.
+error_log("Verify_code.php: Checking session state. auth_step: " . ($_SESSION['auth_step'] ?? 'N/A') . ", temp_user_id: " . ($_SESSION['temp_user_id'] ?? 'N/A')); // Added detailed log
 if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' || !isset($_SESSION['temp_user_id'])) {
-    error_log("Verify_code.php: Invalid session state for 2FA. Auth step: " . ($_SESSION['auth_step'] ?? 'N/A') . ", Temp User ID: " . ($_SESSION['temp_user_id'] ?? 'N/A') . ". Redirecting to login.");
+    error_log("Verify_code.php: Invalid session state for 2FA. Redirecting to login.");
     $_SESSION['message'] = "Your session has expired or is invalid. Please log in again.";
     $_SESSION['message_type'] = "error";
     header('Location: ' . BASE_URL . '/login');
@@ -40,6 +39,7 @@ if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' 
 $user_id = $_SESSION['temp_user_id'];
 // Use the email from the session for display. It should have been set in login.php
 $user_email_display = $_SESSION['email'] ?? 'your email';
+error_log("Verify_code.php: User ID from session: " . $user_id . ", Email for display: " . $user_email_display); // Added
 
 // Try-catch block for database operations and general errors
 try {
@@ -57,7 +57,6 @@ try {
         header('Location: ' . BASE_URL . '/login');
         exit;
     }
-
     $twoFactorEnabled = $user['two_factor_enabled'] ?? false;
     $twoFactorMethod = $user['two_factor_method'] ?? 'email';
 
