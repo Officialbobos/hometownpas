@@ -169,15 +169,18 @@ switch ($route) {
         break;
 
     case 'verify_code':
-        // This page is for 2FA verification. It's a "half-logged-in" state.
-        // The user_id might be set in session but user_logged_in and 2fa_verified won't be true yet.
-        // We only require user_id to be set to access this page.
-        if (!isset($_SESSION['user_id'])) {
-            header('Location: ' . BASE_URL . '/login');
-            exit;
-        }
-        include 'frontend/verify_code.php';
-        break;
+    // For 2FA, we expect 'auth_step' to be 'awaiting_2fa' and 'temp_user_id' to be set.
+    // 'user_id' is only set *after* 2FA is successfully completed.
+    // If these conditions are not met, redirect to login.
+    if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' || !isset($_SESSION['temp_user_id'])) {
+        error_log("Index.php: Verify_code route accessed without proper 2FA session state. Redirecting to login. Reason: auth_step=" . ($_SESSION['auth_step'] ?? 'NOT SET') . ", temp_user_id=" . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
+        $_SESSION['message'] = "Your session has expired or is invalid. Please log in again."; // Optional: set message for login page
+        $_SESSION['message_type'] = "error"; // Optional: set message type
+        header('Location: ' . BASE_URL . '/login');
+        exit;
+    }
+    include 'frontend/verify_code.php';
+    break;
 
     case 'bank_cards':
         if (!$isLoggedIn) {
