@@ -6,7 +6,7 @@
 // so that header() calls can be made without the "headers already sent" error.
 ob_start();
 
-session_start(); // ALWAYS at the very top of scripts that use sessions
+//session_start(); // ALWAYS at the very top of scripts that use sessions
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
