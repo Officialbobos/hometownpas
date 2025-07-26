@@ -9,17 +9,15 @@ RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev \
     git \
     unzip \
-    # --- ADD THIS LINE TO INSTALL THE BCMATH SYSTEM PACKAGE ---
-    php8.3-bcmath \
-    # --- END OF ADDITION ---
+    # --- REMOVE THE 'php8.3-bcmath' LINE FROM HERE ---
     && rm -rf /var/lib/apt/lists/*
 
 # Install the MongoDB PHP extension using PECL
 RUN pecl install mongodb \
     && docker-php-ext-enable mongodb \
-    # --- ADD THIS LINE TO ENABLE THE BCMATH PHP EXTENSION ---
-    && docker-php-ext-enable bcmath
-    # --- END OF ADDITION ---
+    # --- CHANGE THIS: Use 'docker-php-ext-install' for bcmath ---
+    && docker-php-ext-install bcmath
+    # --- END OF CHANGE ---
 
 # Install Composer globally (PHP's dependency manager)
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
