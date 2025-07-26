@@ -244,7 +244,7 @@ if (!function_exists('maskEmail')) {
                 <div id="login-message" class="message-box" style="display: none;"></div>
             <?php endif; ?>
 
-            <form class="login-form" id="verifyCodeForm" action="<?php echo BASE_URL; ?>/verify_code" method="POST">
+                <form class="login-form" id="verifyCodeForm" action="<?php echo rtrim(BASE_URL, '/'); ?>/verify_code" method="POST">
                 <div class="form-group">
                     <label for="two_factor_code" class="sr-only">Verification Code</label>
                     <p class="input-label">Verification Code</p>
@@ -255,13 +255,13 @@ if (!function_exists('maskEmail')) {
 
                 <div class="buttons-group">
                     <button type="submit" name="verify_code" class="btn btn-primary">Verify Code</button>
-                    <a href="<?php echo BASE_URL; ?>/login" class="btn btn-secondary cancel-button">Cancel Login</a>
+                <a href="<?php echo rtrim(BASE_URL, '/'); ?>/login" class="btn btn-secondary cancel-button">Cancel Login</a>
                 </div>
             </form>
 
             <div class="resend-code-section">
                 <p>Didn't receive the code?</p>
-                <form action="<?php echo BASE_URL; ?>/resend_code" method="POST">
+                <form action="<?php echo rtrim(BASE_URL, '/'); ?>/resend_code" method="POST">
                     <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($user_id); ?>">
                     <button type="submit" name="resend_code" class="btn btn-link">Resend Code</button>
                 </form>
