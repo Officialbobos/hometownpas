@@ -21,8 +21,8 @@ use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // Check if the user is logged in. If not, redirect to login page.
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: ' . BASE_URL . '/index.php'); // Use BASE_URL for redirects
+if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] != true || !isset($_SESSION['user_id'])) {
+    header('Location: ' . BASE_URL . '/index.php'); // Or wherever your login page is
     exit;
 }
 
