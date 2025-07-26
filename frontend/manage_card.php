@@ -31,8 +31,8 @@ $message_type = $_GET['message_type'] ?? ''; // Get message type from GET
 $mongoClient = null; // Initialize to null for finally block
 try {
     // Establish MongoDB connection using details from Config.php
-    $mongoClient = new Client(MONGO_URI);
-    $database = $mongoClient->selectDatabase(MONGO_DB_NAME);
+    $mongoClient = new Client(MONGODB_CONNECTION_URI);
+    $database = $mongoClient->selectDatabase(MONGODB_DB_NAME);
     $cardsCollection = $database->bank_cards;
 
     // Handle form submission for card management

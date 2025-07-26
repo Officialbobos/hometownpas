@@ -3,9 +3,12 @@ function showMessageBox(message, isSuccess) {
     const messageBoxOverlay = document.getElementById('messageBoxOverlay');
     const messageBoxContent = document.getElementById('messageBoxContent');
     messageBoxContent.textContent = message;
-    messageBoxOverlay.style.display = 'flex'; // Make the overlay visible
+    // Use classList.add/remove for display/visibility for better animation potential
+    messageBoxOverlay.classList.add('show');
 
     // Apply inline styles based on success/error
+    // It's generally better to manage these styles via CSS classes
+    // but keeping it as per your existing code for consistency.
     if (isSuccess) {
         messageBoxContent.style.color = '#155724'; // Dark green text
         messageBoxContent.style.backgroundColor = '#d4edda'; // Light green background
@@ -37,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const orderCardForm = document.getElementById('orderCardForm');
     const accountIdSelect = document.getElementById('accountId');
     const messageBoxButton = document.getElementById('messageBoxButton'); // Get the OK button
+    const messageBoxOverlay = document.getElementById('messageBoxOverlay'); // Get the overlay directly
 
     // Function to fetch and populate user's bank accounts for the order form
     async function fetchUserAccounts() {
@@ -104,17 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const networkClass = card.card_network ? card.card_network.toLowerCase() : 'default';
                     cardItem.className = `card-item ${networkClass}`;
 
-                    // Helper function to get card logo path
-                    const cardLogoPath = (network) => {
-                        // Use FRONTEND_BASE_URL for images, assuming your logos are like /frontend/images/visa_logo.png
-                        if (network === 'Visa') return `${FRONTEND_BASE_URL}images/visa_logo.png`;
-                        if (network === 'Mastercard') return `${FRONTEND_BASE_URL}images/mastercard_logo.png`;
-                        if (network === 'Amex') return `${FRONTEND_BASE_URL}images/amex_logo.png`;
-                        if (network === 'Verve') return `${FRONTEND_BASE_URL}images/verve_logo.png`;
-                        return ''; // Return empty string if no specific logo
-                    };
-
-                    // Construct card HTML
+                    // Construct card HTML - DIRECTLY USE card.card_logo_src from the server response
                     cardItem.innerHTML = `
                         <h4>HOMETOWN BANK</h4>
                         <div class="chip"></div>
@@ -133,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             CVV: ${card.display_cvv} (Mock)
                         </p>
                         ${card.is_active == 1 ? '<div class="card-status active">Active</div>' : '<div class="card-status inactive">Inactive</div>'}
-                        ${cardLogoPath(card.card_network) ? `<img src="${cardLogoPath(card.card_network)}" alt="${card.card_network} Logo" class="card-logo">` : ''}
+                        ${card.card_logo_src ? `<img src="${card.card_logo_src}" alt="${card.card_network} Logo" class="card-logo-img">` : ''}
                     `;
                     userCardList.appendChild(cardItem);
                 });
@@ -206,6 +200,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle message box dismissal
     messageBoxButton.addEventListener('click', () => {
-        document.getElementById('messageBoxOverlay').style.display = 'none';
+        messageBoxOverlay.classList.remove('show'); // Hide the overlay using classList
     });
 });

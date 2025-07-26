@@ -21,7 +21,7 @@ $userId = $_SESSION['user_id']; // Get user ID from session
 $mongoClient = null;
 try {
     $client = getMongoDBClient(); // Use your helper function to get MongoDB client
-    $database = $client->selectDatabase(MONGO_DB_NAME); // Use MONGO_DB_NAME from Config.php
+    $database = $client->selectDatabase(MONGODB_DB_NAME); // Use MONGO_DB_NAME from Config.php
     $bankCardsCollection = $database->selectCollection('bank_cards');
     $usersCollection = $database->selectCollection('users'); // To get user name for cards
 
