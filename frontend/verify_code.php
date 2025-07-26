@@ -135,7 +135,7 @@ try {
 
                 error_log("Verify_code.php: 2FA code verified successfully for user " . $user_id . ". Redirecting to dashboard/admin.");
                 $redirect_path = ($_SESSION['is_admin'] ?? false) ? '/admin' : '/dashboard';
-                header('Location: ' . BASE_URL . $redirect_path);
+            header('Location: ' . rtrim(BASE_URL, '/') . $redirect_path);
                 exit;
             } else {
                 // Code is incorrect or expired
