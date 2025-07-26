@@ -6,7 +6,7 @@
 // so that header() calls can be made without the "headers already sent" error.
 ob_start();
 
-//session_start(); // ALWAYS at the very top of scripts that use sessions
+session_start(); // ALWAYS at the very top of scripts that use sessions
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -73,14 +73,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                 $twoFactorEnabled = $user['two_factor_enabled'] ?? false;
                 $twoFactorMethod = $user['two_factor_method'] ?? 'email'; // Default to 'email' if not set
 
-                // Set user-related session variables that are safe to set even before 2FA
-                $_SESSION['user_id'] = (string) $user['_id']; // Store ObjectId as string
-                $_SESSION['role'] = $user['role'] ?? 'user';
-                $_SESSION['first_name'] = $user['first_name'] ?? '';
-                $_SESSION['last_name'] = $user['last_name'] ?? '';
-                $_SESSION['full_name'] = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
-                $_SESSION['email'] = $user['email'] ?? '';
-                $_SESSION['is_admin'] = $user['is_admin'] ?? false; // Assuming 'is_admin' field exists
+                // --- IMPORTANT SECURITY CHANGE for USER-ONLY LOGIN ---
+                // If this login.php is ONLY for regular users, we should NOT be checking or setting
+                // $_SESSION['is_admin'] here, as an admin should log in via a separate portal/page.
+                // For a user login, the 'role' would typically be 'user' or 'customer'.
+                // If a user *happens* to have 'is_admin' true in the DB, this frontend login should still
+                // treat them as a regular user for this interface, or prevent them from logging in here.
+
+                // For the purpose of separating user/admin login flows:
+                // Let's assume ANY user successfully logging in via this specific frontend/login.php
+                // will be treated as a standard user for this frontend.
+                // If you *must* block admin accounts from logging in here, you'd add:
+                // if (($user['role'] ?? 'user') === 'admin' || ($user['is_admin'] ?? false)) {
+                //     $message = "Administrators must log in via the admin portal.";
+                //     $message_type = "error";
+                //     // Maybe log this attempt
+                // } else { ... proceed with user login }
+
 
                 if ($twoFactorEnabled && $twoFactorMethod !== 'none') {
                     // 2FA is enabled for this user. Redirect to verification page.
