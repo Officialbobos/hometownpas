@@ -93,7 +93,7 @@ switch ($route) {
     case 'login':
         if ($isLoggedIn) {
             // If already logged in, redirect to dashboard
-            header('Location: ' . BASE_URL . '/dashboard');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/dashboard'); // Corrected
             exit;
         }
         include 'frontend/login.php';
@@ -101,7 +101,7 @@ switch ($route) {
 
     case 'dashboard':
         if (!$isLoggedIn) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         include 'frontend/dashboard.php';
@@ -119,13 +119,13 @@ switch ($route) {
                 $params["secure"], $params["httponly"]
             );
         }
-        header('Location: ' . BASE_URL . '/login');
+        header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
         exit;
 
     case 'admin':
         // Admin dashboard or default admin view
         if (!$isLoggedIn || $userRole !== 'admin') {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         include 'heritagebank_admin/dashboard.php';
@@ -140,7 +140,7 @@ switch ($route) {
     case 'admin/users/transactions_management':
     case 'admin/users/generate_mock_transaction':
         if (!$isLoggedIn || $userRole !== 'admin') {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         // Include admin user management pages
@@ -159,7 +159,7 @@ switch ($route) {
     // Frontend user routes
     case 'accounts':
         if (!$isLoggedIn) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         include 'frontend/accounts.php';
@@ -167,7 +167,7 @@ switch ($route) {
 
     case 'my_cards': // Corrected path to point to a new my_cards.php for frontend
         if (!$isLoggedIn) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         include 'frontend/my_cards.php';
@@ -181,7 +181,7 @@ switch ($route) {
             error_log("Index.php: Verify_code route accessed without proper 2FA session state. Redirecting to login. Reason: auth_step=" . ($_SESSION['auth_step'] ?? 'NOT SET') . ", temp_user_id=" . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
             $_SESSION['message'] = "Your session has expired or is invalid. Please log in again."; // Optional: set message for login page
             $_SESSION['message_type'] = "error"; // Optional: set message type
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         error_log("Index.php: 2FA session state valid. Including verify_code.php."); // Added this for clear success logging
@@ -190,7 +190,7 @@ switch ($route) {
 
     case 'bank_cards':
         if (!$isLoggedIn) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         // This is the full HTML page for displaying and ordering cards
@@ -199,7 +199,7 @@ switch ($route) {
 
     case 'set_card_pin': // New route for setting card PIN
         if (!$isLoggedIn) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         include 'frontend/set_card_pin.php';
@@ -207,7 +207,7 @@ switch ($route) {
     
     case 'transfer': // Route for transfers
         if (!$isLoggedIn) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         include 'frontend/transfer.php';
@@ -215,7 +215,7 @@ switch ($route) {
 
     case 'statements': // Route for statements
         if (!$isLoggedIn) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         include 'frontend/statements.php';
@@ -223,7 +223,7 @@ switch ($route) {
     
     case 'profile': // Route for user profile
         if (!$isLoggedIn) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         include 'frontend/profile.php';
@@ -232,7 +232,7 @@ switch ($route) {
     case 'settings': // Route for user settings
         if (!$isLoggedIn) {
             // Note: Assuming BASE_ENV_URL is defined and correct for settings page redirect
-            header('Location: ' . BASE_URL . '/login'); // Changed BASE_ENV_URL back to BASE_URL for consistency unless specified otherwise
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected (was BASE_ENV_URL back to BASE_URL)
             exit;
         }
         include 'frontend/settings.php';
@@ -240,7 +240,7 @@ switch ($route) {
 
     case 'customer-service': // Route for customer service
         if (!$isLoggedIn) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
             exit;
         }
         include 'frontend/customer_service.php';
@@ -332,7 +332,6 @@ switch ($route) {
     case 'api/order_card': // New API endpoint for submitting a new card order
         if (!$isLoggedIn) {
             http_response_code(403);
-            // CORRECTED: Fixed the syntax error here
             echo json_encode(['success' => false, 'message' => 'Unauthorized']);
             exit;
         }
@@ -364,7 +363,6 @@ switch ($route) {
     case 'api/admin/delete_user':
         if (!$isLoggedIn || $userRole !== 'admin') {
             http_response_code(403);
-            // CORRECTED: Fixed the syntax error here
             echo json_encode(['success' => false, 'message' => 'Unauthorized']);
             exit;
         }
