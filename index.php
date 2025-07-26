@@ -3,6 +3,8 @@
 // It includes essential configuration, defines the base URL, and handles routing
 // to different parts of the application based on the user's authentication status.
 
+ob_start(); // Start output buffering at the very beginning to prevent "headers already sent" errors.
+
 // Load essential configuration and constants
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/functions.php';
@@ -12,6 +14,13 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// --- NEW DEBUGGING LOGS FOR SESSION ---
+error_log("--- index.php Start ---");
+error_log("Index.php: Session ID on arrival: " . session_id());
+error_log("Index.php: Session Contents on arrival: " . print_r($_SESSION, true));
+// --- END NEW DEBUGGING LOGS ---
+
+
 // Check if the user is logged in
 $isLoggedIn = isset($_SESSION['user_id']) && isset($_SESSION['user_logged_in']) && $_SESSION['user_logged_in'] === true;
 $userRole = $_SESSION['role'] ?? 'guest'; // Default to 'guest' if not set
@@ -19,35 +28,28 @@ $userRole = $_SESSION['role'] ?? 'guest'; // Default to 'guest' if not set
 // Get the requested URL path (e.g., /login, /dashboard, /admin/users)
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// --- FIX FOR DEPRECATION WARNING ON $requestUri ---
 // Ensure $requestUri is a string, defaulting to '/' if parse_url returns null
 if ($requestUri === null) {
     $requestUri = '/';
 }
-// --- END FIX ---
 
 // Determine the base path of the application from BASE_URL constant
 // This ensures routing works whether the app is at the root or in a subfolder (e.g., /phpfile-main)
 $baseUrlPath = parse_url(BASE_URL, PHP_URL_PATH);
 
-// --- Your existing UPDATED CODE START ---
 // Ensure $baseUrlPath is a string (even empty) before performing string operations
-// This prevents 'Deprecated: substr(): Passing null to parameter #1 ($string) of type string is deprecated'
+// This often happens if BASE_URL is just a domain like 'http://example.com' without a path
 if ($baseUrlPath === null) {
-    // If parse_url returns null for the path, default to '/'
-    // This often happens if BASE_URL is just a domain like 'http://example.com' without a path
     $baseUrlPath = '/';
 }
-// --- Your existing UPDATED CODE END ---
 
 // Ensure $baseUrlPath ends with a slash if it's not just '/'
 if ($baseUrlPath !== '/' && substr($baseUrlPath, -1) !== '/') {
     $baseUrlPath .= '/';
 }
 
-// Remove the BASE_URL_PATH from the request URI
-// This effectively gives us the clean route like 'login', 'dashboard', 'admin/users/create_user'
-if (strpos($requestUri, $baseUrlPath) === 0) { // Line 44 - now $requestUri and $baseUrlPath are guaranteed strings
+// Remove the BASE_URL_PATH from the request URI to get the clean route
+if (strpos($requestUri, $baseUrlPath) === 0) {
     $route = substr($requestUri, strlen($baseUrlPath));
 } else {
     // Fallback if BASE_URL_PATH is not found at the beginning (shouldn't happen with correct config)
@@ -55,7 +57,7 @@ if (strpos($requestUri, $baseUrlPath) === 0) { // Line 44 - now $requestUri and 
 }
 
 // Remove leading/trailing slashes for consistent routing
-$route = trim($route, '/'); // Line 52 - now $route is guaranteed a string (from $requestUri)
+$route = trim($route, '/');
 
 // Default page for logged-in users is the dashboard
 if ($isLoggedIn) {
@@ -67,6 +69,9 @@ if ($isLoggedIn) {
 
 // If the route is empty, use the default page based on login status
 $route = $route === '' ? $defaultPage : $route;
+
+// Include Composer's autoloader for MongoDB classes, etc.
+require_once __DIR__ . '/vendor/autoload.php';
 
 // --- Establish MongoDB connection once for all requests that might need it ---
 // This is more efficient than connecting in every included file.
@@ -169,18 +174,19 @@ switch ($route) {
         break;
 
     case 'verify_code':
-    // For 2FA, we expect 'auth_step' to be 'awaiting_2fa' and 'temp_user_id' to be set.
-    // 'user_id' is only set *after* 2FA is successfully completed.
-    // If these conditions are not met, redirect to login.
-    if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' || !isset($_SESSION['temp_user_id'])) {
-        error_log("Index.php: Verify_code route accessed without proper 2FA session state. Redirecting to login. Reason: auth_step=" . ($_SESSION['auth_step'] ?? 'NOT SET') . ", temp_user_id=" . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
-        $_SESSION['message'] = "Your session has expired or is invalid. Please log in again."; // Optional: set message for login page
-        $_SESSION['message_type'] = "error"; // Optional: set message type
-        header('Location: ' . BASE_URL . '/login');
-        exit;
-    }
-    include 'frontend/verify_code.php';
-    break;
+        // For 2FA, we expect 'auth_step' to be 'awaiting_2fa' and 'temp_user_id' to be set.
+        // 'user_id' is only set *after* 2FA is successfully completed.
+        // If these conditions are not met, redirect to login.
+        if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' || !isset($_SESSION['temp_user_id'])) {
+            error_log("Index.php: Verify_code route accessed without proper 2FA session state. Redirecting to login. Reason: auth_step=" . ($_SESSION['auth_step'] ?? 'NOT SET') . ", temp_user_id=" . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
+            $_SESSION['message'] = "Your session has expired or is invalid. Please log in again."; // Optional: set message for login page
+            $_SESSION['message_type'] = "error"; // Optional: set message type
+            header('Location: ' . BASE_URL . '/login');
+            exit;
+        }
+        error_log("Index.php: 2FA session state valid. Including verify_code.php."); // Added this for clear success logging
+        include 'frontend/verify_code.php';
+        break;
 
     case 'bank_cards':
         if (!$isLoggedIn) {
@@ -225,7 +231,7 @@ switch ($route) {
     
     case 'settings': // Route for user settings
         if (!$isLoggedIn) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . BASE_ENV_URL . '/login'); // Changed from BASE_URL to BASE_ENV_URL (assuming this is correct from your Config.php)
             exit;
         }
         include 'frontend/settings.php';
@@ -325,7 +331,7 @@ switch ($route) {
     case 'api/order_card': // New API endpoint for submitting a new card order
         if (!$isLoggedIn) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            echo json_encode(['success'] => false, 'message' => 'Unauthorized']);
             exit;
         }
         // Pass the MongoDB object to the API handler
@@ -356,7 +362,7 @@ switch ($route) {
     case 'api/admin/delete_user':
         if (!$isLoggedIn || $userRole !== 'admin') {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            echo json_encode(['success'] => false, 'message' => 'Unauthorized']);
             exit;
         }
         // Pass the MongoDB object to the API handler
@@ -439,4 +445,6 @@ if ($mongoClient) {
     unset($mongoClient);
     unset($mongoDb);
 }
+
+ob_end_flush(); // Flush the output buffer at the very end
 ?>
