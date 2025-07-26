@@ -50,7 +50,7 @@ if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true 
     unset($_SESSION['auth_step']);
     unset($_SESSION['temp_user_id']);
     // Redirect to the base URL (login page)
-    header('Location: ' . BASE_URL);
+    header('Location: ' . rtrim(BASE_URL, '/')); // Corrected
     exit;
 }
 
@@ -163,7 +163,7 @@ if (!function_exists('get_currency_symbol')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeTown Bank Pa - Dashboard</title>
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/frontend/dashboard.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/dashboard.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
@@ -181,7 +181,7 @@ if (!function_exists('get_currency_symbol')) {
             <div class="accounts-header-row">
                 <h2>Accounts</h2>
                 <div class="view-all-link">
-                    <a href="<?php echo BASE_URL; ?>/accounts">View all</a>
+                    <a href="<?php echo rtrim(BASE_URL, '/'); ?>/accounts">View all</a>
                 </div>
             </div>
             <div class="account-cards-container">
@@ -223,7 +223,7 @@ if (!function_exists('get_currency_symbol')) {
                 <i class="fas fa-dollar-sign"></i>
                 <p>Pay</p>
             </div>
-            <div class="action-button" id="messageButton" onclick="window.location.href='<?php echo BASE_URL; ?>/customer-service'">
+            <div class="action-button" id="messageButton" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/customer-service'">
                 <i class="fas fa-headset"></i> <p>Customer Service</p>
             </div>
         </section>
@@ -231,7 +231,7 @@ if (!function_exists('get_currency_symbol')) {
         <section class="bank-cards-section">
             <h2>My Cards</h2>
             <div class="view-all-link">
-        <a href="<?php echo BASE_URL; ?>/bank_cards" id="viewMyCardsButton"> <i class="fas fa-credit-card"></i> View My Card
+        <a href="<?php echo rtrim(BASE_URL, '/'); ?>/bank_cards" id="viewMyCardsButton"> <i class="fas fa-credit-card"></i> View My Card
                 </a>
             </div>
             <div class="card-list-container" id="userCardList" style="display: none;">
@@ -243,7 +243,7 @@ if (!function_exists('get_currency_symbol')) {
             <div class="transactions-header">
                 <div class="transactions-header">
                 <h2>Transactions</h2>
-                <span class="more-options" onclick="window.location.href='<?php echo BASE_URL; ?>/statements'">...</span></div>
+                <span class="more-options" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/statements'">...</span></div>
             <div class="transaction-list">
                 <?php if (empty($recent_transactions)): ?>
                     <p class="loading-message" id="transactionsLoadingMessage">No recent transactions to display.</p>
@@ -284,7 +284,7 @@ if (!function_exists('get_currency_symbol')) {
                     <?php endforeach; ?>
                 <?php endif; ?>
             </div>
-            <button class="see-more-button" onclick="window.location.href='<?php echo BASE_URL; ?>/statements'">See more</button>
+            <button class="see-more-button" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/statements'">See more</button>
         </section>
 
     </div>
@@ -293,27 +293,27 @@ if (!function_exists('get_currency_symbol')) {
         <div class="transfer-modal-content">
             <h3>Choose Transfer Type</h3>
             <div class="transfer-options-list">
-                <button class="transfer-option" data-transfer-type="Own Account" onclick="window.location.href='<?php echo BASE_URL; ?>/transfer?type=own_account'">
+                <button class="transfer-option" data-transfer-type="Own Account" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=own_account'">
                     <i class="fas fa-wallet"></i> <p>Transfer to My Other Account</p>
                 </button>
 
-                <button class="transfer-option" data-transfer-type="Bank to Bank" onclick="window.location.href='<?php echo BASE_URL; ?>/transfer?type=bank_to_bank'">
+                <button class="transfer-option" data-transfer-type="Bank to Bank" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=bank_to_bank'">
                     <i class="fas fa-university"></i>
                     <p>Bank to Bank Transfer</p>
                 </button>
-                <button class="transfer-option" data-transfer-type="ACH" onclick="window.location.href='<?php echo BASE_URL; ?>/transfer?type=ach'">
+                <button class="transfer-option" data-transfer-type="ACH" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=ach'">
                     <i class="fas fa-exchange-alt"></i>
                     <p>ACH Transfer</p>
                 </button>
-                <button class="transfer-option" data-transfer-type="Wire" onclick="window.location.href='<?php echo BASE_URL; ?>/transfer?type=wire'">
+                <button class="transfer-option" data-transfer-type="Wire" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=wire'">
                     <i class="fas fa-ethernet"></i>
                     <p>Wire Transfer</p>
                 </button>
-                <button class="transfer-option" data-transfer-type="International Bank" onclick="window.location.href='<?php echo BASE_URL; ?>/transfer?type=international_bank'">
+                <button class="transfer-option" data-transfer-type="International Bank" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=international_bank'">
                     <i class="fas fa-globe"></i>
                     <p>International Bank Transfer</p>
                 </button>
-                <button class="transfer-option" data-transfer-type="Domestic Wire" onclick="window.location.href='<?php echo BASE_URL; ?>/transfer?type=domestic_wire'">
+                <button class="transfer-option" data-transfer-type="Domestic Wire" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=domestic_wire'">
                     <i class="fas fa-home"></i>
                     <p>Domestic Wire Transfer</p>
                 </button>
@@ -330,26 +330,26 @@ if (!function_exists('get_currency_symbol')) {
                 <i class="fas fa-times"></i>
             </button>
             <div class="sidebar-profile">
-                <img src="<?php echo BASE_URL; ?>/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
+                <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
                 <h3><span id="sidebarUserName"><?php echo htmlspecialchars($full_name); ?></span></h3>
                 <p><span id="sidebarUserEmail"><?php echo htmlspecialchars($user_email); ?></span></p>
             </div>
         </div>
         <nav class="sidebar-nav">
             <ul>
-                <li><a href="<?php echo BASE_URL; ?>/dashboard" class="active"><i class="fas fa-home"></i> Dashboard</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/accounts"><i class="fas fa-wallet"></i> Accounts</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/transfer"><i class="fas fa-exchange-alt"></i> Transfers</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/statements"><i class="fas fa-file-invoice"></i> Statements</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/profile"><i class="fas fa-user"></i> Profile</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/settings"><i class="fas fa-cog"></i> Settings</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/bank_cards"><i class="fas fa-credit-card"></i> Bank Cards</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="active"><i class="fas fa-home"></i> Dashboard</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/accounts"><i class="fas fa-wallet"></i> Accounts</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer"><i class="fas fa-exchange-alt"></i> Transfers</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/statements"><i class="fas fa-file-invoice"></i> Statements</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/profile"><i class="fas fa-user"></i> Profile</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/settings"><i class="fas fa-cog"></i> Settings</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/bank_cards"><i class="fas fa-credit-card"></i> Bank Cards</a></li>
             </ul>
         </nav>
-        <button class="logout-button" id="logoutButton" onclick="window.location.href='<?php echo BASE_URL; ?>/logout'">
+        <button class="logout-button" id="logoutButton" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/logout'">
             <i class="fas fa-sign-out-alt"></i> Logout
         </button>
     </div>
-    <script src="<?php echo BASE_URL; ?>/frontend/user.dashboard.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/user.dashboard.js"></script>
 </body>
 </html>
