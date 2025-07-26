@@ -1,18 +1,56 @@
-/* Specific styles for cards.html - Now inline in bank_cards.php */
+/* bank_cards.css - Combined Styles */
+
+/* CSS Variables for easier theming (combined from both, favoring the second's dominant colors) */
+:root {
+    /* Colors from the first block's original variables */
+    --primary-blue: #007bff; /* Original primary blue */
+    --dark-blue: #0056b3;
+    --light-grey: #f4f7f6;
+    --text-color-dark: #333;
+    --text-color-light: #fff;
+    --border-color: #eee;
+    --box-shadow-light: 0 1px 3px rgba(0,0,0,0.08);
+    --box-shadow-medium: 0 4px 8px rgba(0,0,0,0.1);
+    --success-color: #28a745;
+    --error-color: #dc3545;
+    --info-color: #17a2b8; /* Added for 'info' message type */
+
+    /* New/dominant colors from the second block for header/buttons */
+    --header-purple: #6a11cb;
+    --header-blue: #2575fc;
+    --submit-green-start: #2ecc71;
+    --submit-green-end: #27ae60;
+    --form-border: #ccd0d5;
+    --form-focus-shadow: rgba(106, 17, 203, 0.2);
+
+    /* Fonts */
+    --font-family-body: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-family-card-number: 'Space Mono', monospace;
+    --font-family-dashboard: 'Roboto', sans-serif; /* Keep if needed elsewhere for dashboard elements */
+
+    /* Dashboard layout variables (kept but might not be used directly on this page) */
+    --sidebar-width: 260px;
+    --navbar-height: 60px;
+}
+
+/* Base Styles (prioritizing the second block's body styles) */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: var(--font-family-body);
     margin: 0;
     padding: 0;
-    background-color: #f0f2f5;
-    color: #333;
+    background-color: #f0f2f5; /* Light grey background */
+    color: var(--text-color-dark);
     line-height: 1.6;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased; /* From first block */
+    -moz-osx-font-smoothing: grayscale; /* From first block */
 }
 
+/* Header Styles (from second block) */
 .header {
-    background: linear-gradient(45deg, #6a11cb, #2575fc); /* Glow purple gradient from first input */
+    background: linear-gradient(45deg, var(--header-purple), var(--header-blue));
     padding: 20px 30px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
     display: flex;
@@ -22,34 +60,33 @@ body {
 }
 
 .header .logo img {
-    max-height: 45px; /* Reduced logo size from first input */
+    max-height: 45px;
     width: auto;
 }
 
 .header h1 {
-    color: #ffffff; /* White text for header title from first input */
-    font-size: 1.8rem; /* Reduced font size for "Manage My Cards" from first input */
+    color: var(--text-color-light); /* White text */
+    font-size: 1.8rem;
     margin: 0;
     flex-grow: 1;
     text-align: center;
     font-weight: 700;
     letter-spacing: -0.5px;
-    /* Removed -webkit-background-clip and -webkit-text-fill-color as color is now white */
 }
 
-/* Back to Dashboard Button Styling */
+/* Back to Dashboard Button Styling (from second block) */
 .back-to-dashboard {
     display: inline-flex;
     align-items: center;
     padding: 10px 15px;
-    background-color: rgba(255, 255, 255, 0.2); /* Semi-transparent white from first input */
-    color: #fff;
+    background-color: rgba(255, 255, 255, 0.2);
+    color: var(--text-color-light);
     text-decoration: none;
     border-radius: 8px;
     font-size: 0.95rem;
     font-weight: 600;
     transition: background-color 0.3s ease, transform 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Adjusted shadow from first input */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     white-space: nowrap;
 }
 
@@ -58,16 +95,17 @@ body {
 }
 
 .back-to-dashboard:hover {
-    background-color: rgba(255, 255, 255, 0.3); /* Adjusted hover from first input */
+    background-color: rgba(255, 255, 255, 0.3);
     transform: translateY(-1px);
 }
 
+/* Main Content Area (from second block) */
 .main-content {
     flex-grow: 1;
     padding: 30px 20px;
     max-width: 900px;
     margin: 30px auto;
-    background-color: #ffffff;
+    background-color: var(--text-color-light);
     border-radius: 18px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
     border: 1px solid #e0e0e0;
@@ -75,8 +113,9 @@ body {
     box-sizing: border-box;
 }
 
+/* Headings (from second block) */
 h2 {
-    color: #4a0d93;
+    color: var(--header-purple); /* Using header purple for headings */
     font-size: 2rem;
     margin-bottom: 30px;
     text-align: center;
@@ -84,6 +123,7 @@ h2 {
     letter-spacing: -0.5px;
 }
 
+/* Sections (from second block) */
 .cards-section, .order-card-section {
     margin-bottom: 40px;
     padding-bottom: 20px;
@@ -96,26 +136,28 @@ h2 {
     padding-bottom: 0;
 }
 
+/* Card List Grid (from second block) */
 .card-list {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Adjusted min card width for better visuals from first input */
-    gap: 25px; /* Adjusted gap from first input */
-    margin-top: 25px; /* Adjusted margin from first input */
-    justify-content: center; /* Center cards in grid from first input */
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 25px;
+    margin-top: 25px;
+    justify-content: center;
 }
 
+/* Individual Card Item (from second block) */
 .card-item {
-    background: linear-gradient(135deg, #f8f8f8, #e0e0e0);
+    background: linear-gradient(135deg, #f8f8f8, #e0e0e0); /* Default grey gradient */
     border: 1px solid #dcdcdc;
-    border-radius: 18px; /* Slightly larger border-radius from first input */
-    padding: 25px; /* Adjusted padding from first input */
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1); /* Adjusted shadow from first input */
+    border-radius: 18px;
+    padding: 25px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
     position: relative;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 200px; /* Adjusted min-height from first input */
+    min-height: 200px;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -124,13 +166,13 @@ h2 {
     box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
 }
 
-/* Specific card network styles for background and text (from first input) */
+/* Specific card network styles for background and text (from second block) */
 .card-item.visa { background: linear-gradient(135deg, #2a4b8d, #3f60a9); color: white;}
 .card-item.mastercard { background: linear-gradient(135deg, #eb001b, #ff5f00); color: white;}
 .card-item.amex { background: linear-gradient(135deg, #0081c7, #26a5d4); color: white;}
 .card-item.verve { background: linear-gradient(135deg, #006633, #009933); color: white;}
 
-/* Ensure text is readable on dark backgrounds (from first input) */
+/* Ensure text is readable on dark backgrounds (from second block) */
 .card-item.visa h4, .card-item.visa .card-number, .card-item.visa .card-footer .label, .card-item.visa .card-footer .value, .card-item.visa .card-status,
 .card-item.mastercard h4, .card-item.mastercard .card-number, .card-item.mastercard .card-footer .label, .card-item.mastercard .card-footer .value, .card-item.mastercard .card-status,
 .card-item.amex h4, .card-item.amex .card-number, .card-item.amex .card-footer .label, .card-item.amex .card-footer .value, .card-item.amex .card-status,
@@ -154,40 +196,41 @@ h2 {
     color: #333; /* Default text color for card issuer name */
 }
 
-.card-logo-img { /* This is the actual logo image from the backend */
+.card-logo-img { /* This is the actual logo image from the backend (from second block) */
     position: absolute;
     bottom: 20px;
     right: 20px;
-    height: 45px; /* Slightly larger for better visibility from first input */
+    height: 45px;
     width: auto;
-    max-width: 80px; /* Ensure it doesn't get too big from first input */
+    max-width: 80px;
 }
 
-/* Renamed from .card-chip to .chip as per first input, assuming structure */
+/* Chip (from second block) */
 .card-item .chip {
-    width: 50px; /* Standard chip size from first input */
+    width: 50px;
     height: 35px;
     background-color: #d4af37; /* Adjusted color for a more golden look */
     border-radius: 5px;
     margin-bottom: 20px;
 }
 
-
+/* Card Number (from second block) */
 .card-number {
-    font-family: 'Space Mono', monospace;
-    font-size: 1.6em; /* Adjusted font size for impact from first input */
+    font-family: var(--font-family-card-number);
+    font-size: 1.6em;
     letter-spacing: 2px;
     margin-bottom: 20px;
     color: #444; /* Default card number color */
     text-align: center;
     word-break: break-all;
 }
-/* White for card numbers on colored cards (from first input) */
+/* White for card numbers on colored cards (from second block) */
 .card-item.visa .card-number, .card-item.mastercard .card-number, .card-item.amex .card-number, .card-item.verve .card-number {
     color: #fff;
 }
 
-.card-footer { /* This section now holds details that were in card-details-row and card-type-status */
+/* Card Footer (from second block) */
+.card-footer {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
@@ -206,14 +249,14 @@ h2 {
     color: #333; /* Default value color */
 }
 
-p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
+p.card-cvv-mock { /* Styling for the CVV mock text (from second block) */
     font-size: 0.8em;
     text-align: center;
     margin-top: 10px;
     color: #888;
 }
 
-/* Re-introducing the full card-status styling from the first input for consistency */
+/* Card Status (from second block) */
 .card-status {
     font-size: 0.9em;
     text-align: right;
@@ -225,35 +268,29 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
     display: inline-block;
 }
 .card-status.active { background-color: #d4edda; color: #155724; }
-.card-status.frozen { background-color: #fff3cd; color: #ffc107; } /* Kept frozen status from previous css */
-.card-status.lost, .card-status.stolen { background-color: #f8d7da; color: #721c24; } /* Kept lost/stolen from previous css */
+.card-status.inactive { background-color: #f8d7da; color: #721c24; } /* Renamed from error, using default error colors */
+.card-status.frozen { background-color: #fff3cd; color: #ffc107; }
+.card-status.lost, .card-status.stolen { background-color: #f8d7da; color: #721c24; }
 
-/* For colored cards, status text should also be white (from first input) */
+/* For colored cards, status text should also be white (from second block) */
 .card-item.visa .card-status, .card-item.mastercard .card-status, .card-item.amex .card-status, .card-item.verve .card-status {
-    color: white; /* Make status text white on dark cards */
+    color: white;
 }
-.card-item.visa .card-status.active { background-color: rgba(100, 255, 100, 0.3); border: 1px solid rgba(100, 255, 100, 0.5); }
-.card-item.visa .card-status.inactive { background-color: rgba(255, 100, 100, 0.3); border: 1px solid rgba(255, 100, 100, 0.5); } /* Renamed to inactive based on context */
-.card-item.visa .card-status.frozen { background-color: rgba(255, 255, 100, 0.3); border: 1px solid rgba(255, 255, 100, 0.5); } /* Added frozen for visa */
-.card-item.visa .card-status.lost, .card-item.visa .card-status.stolen { background-color: rgba(255, 100, 100, 0.3); border: 1px solid rgba(255, 100, 100, 0.5); } /* Added lost/stolen for visa */
-
-/* Apply similar rgba backgrounds for other colored cards (from first input) */
-.card-item.mastercard .card-status.active, .card-item.amex .card-status.active, .card-item.verve .card-status.active {
+.card-item.visa .card-status.active, .card-item.mastercard .card-status.active, .card-item.amex .card-status.active, .card-item.verve .card-status.active {
     background-color: rgba(100, 255, 100, 0.3); border: 1px solid rgba(100, 255, 100, 0.5);
 }
-.card-item.mastercard .card-status.inactive, .card-item.amex .card-status.inactive, .card-item.verve .card-status.inactive { /* Renamed to inactive based on context */
+.card-item.visa .card-status.inactive, .card-item.mastercard .card-status.inactive, .card-item.amex .card-status.inactive, .card-item.verve .card-status.inactive {
     background-color: rgba(255, 100, 100, 0.3); border: 1px solid rgba(255, 100, 100, 0.5);
 }
-.card-item.mastercard .card-status.frozen, .card-item.amex .card-status.frozen, .card-item.verve .card-status.frozen {
+.card-item.visa .card-status.frozen, .card-item.mastercard .card-status.frozen, .card-item.amex .card-status.frozen, .card-item.verve .card-status.frozen {
     background-color: rgba(255, 255, 100, 0.3); border: 1px solid rgba(255, 255, 100, 0.5);
 }
-.card-item.mastercard .card-status.lost, .card-item.amex .card-status.lost, .card-item.verve .card-status.lost,
-.card-item.mastercard .card-status.stolen, .card-item.amex .card-status.stolen, .card-item.verve .card-status.stolen {
+.card-item.visa .card-status.lost, .card-item.mastercard .card-status.lost, .card-item.amex .card-status.lost, .card-item.verve .card-status.lost,
+.card-item.visa .card-status.stolen, .card-item.mastercard .card-status.stolen, .card-item.amex .card-status.stolen, .card-item.verve .card-status.stolen {
     background-color: rgba(255, 100, 100, 0.3); border: 1px solid rgba(255, 100, 100, 0.5);
 }
 
-
-/* Card actions remain similar, adjusted for first input's button styles */
+/* Card Actions (from second block) */
 .card-actions {
     margin-top: 15px;
     display: flex;
@@ -282,15 +319,14 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
     transform: translateY(-2px);
 }
 
-.card-actions button.freeze-btn { background-color: #ffc107; color: #fff; }
+.card-actions button.freeze-btn { background-color: #ffc107; color: var(--text-color-light); }
 .card-actions button.freeze-btn:hover { background-color: #e0a800; }
-.card-actions button.unfreeze-btn { background-color: #28a745; color: #fff; }
+.card-actions button.unfreeze-btn { background-color: var(--success-color); color: var(--text-color-light); }
 .card-actions button.unfreeze-btn:hover { background-color: #218838; }
-.card-actions button.report-btn { background-color: #dc3545; color: #fff; }
+.card-actions button.report-btn { background-color: var(--error-color); color: var(--text-color-light); }
 .card-actions button.report-btn:hover { background-color: #c82333; }
 
-
-/* Order New Card Section - Form and button styling (largely from first input) */
+/* Order New Card Section - Form and button styling (from second block) */
 .order-card-section form {
     display: flex;
     flex-direction: column;
@@ -298,16 +334,16 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
     margin-top: 15px;
 }
 
-.form-group { margin-bottom: 18px; } /* From first input */
-.form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #444; font-size: 0.95rem; } /* From first input */
+.form-group { margin-bottom: 18px; }
+.form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #444; font-size: 0.95rem; }
 .form-group input[type="text"],
 .form-group select,
 .form-group textarea {
     width: 100%;
-    padding: 12px; /* From first input */
-    border: 1px solid #ccd0d5;
+    padding: 12px;
+    border: 1px solid var(--form-border);
     border-radius: 8px;
-    font-size: 0.95rem; /* From first input */
+    font-size: 0.95rem;
     box-sizing: border-box;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
     background-color: #fcfcfc;
@@ -316,13 +352,13 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
-    border-color: #6a11cb;
+    border-color: var(--header-purple);
     outline: none;
-    box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.2);
-    background-color: #ffffff;
+    box-shadow: 0 0 0 3px var(--form-focus-shadow);
+    background-color: var(--text-color-light);
 }
 
-.submit-button { /* From first input, applied to .submit-button */
+.submit-button {
     padding: 14px 25px;
     border: none;
     border-radius: 10px;
@@ -330,8 +366,8 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
     font-weight: 700;
     cursor: pointer;
     transition: all 0.3s ease;
-    background: linear-gradient(45deg, #2ecc71, #27ae60);
-    color: #ffffff;
+    background: linear-gradient(45deg, var(--submit-green-start), var(--submit-green-end));
+    color: var(--text-color-light);
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
     display: flex;
     align-items: center;
@@ -341,14 +377,39 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
     margin-top: 20px;
 }
 
-.submit-button:hover { /* From first input, applied to .submit-button */
-    background: linear-gradient(45deg, #27ae60, #2ecc71);
+.submit-button:hover {
+    background: linear-gradient(45deg, var(--submit-green-end), var(--submit-green-start));
     transform: translateY(-2px);
     box-shadow: 0 7px 20px rgba(46, 204, 113, 0.4);
 }
 
+/* General Message Styles (from first block, adjusted for consistency) */
+.message {
+    padding: 12px 20px;
+    margin: 15px auto 20px auto;
+    border-radius: 8px;
+    font-weight: bold;
+    text-align: center;
+    max-width: 600px;
+    box-shadow: var(--box-shadow-light);
+}
+.message.success {
+    background-color: #d4edda;
+    color: var(--success-color);
+    border: 1px solid #c3e6cb;
+}
+.message.error {
+    background-color: #f8d7da;
+    color: var(--error-color);
+    border: 1px solid #f5c6cb;
+}
+.message.info {
+    background-color: #d1ecf1;
+    color: var(--info-color);
+    border: 1px solid #bee5eb;
+}
 
-/* Loading and No Data Messages (from first input) */
+/* Loading and No Data Messages (from second block) */
 .loading-message, .no-data-message {
     text-align: center;
     font-style: italic;
@@ -361,7 +422,7 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
     margin-right: 8px;
 }
 
-/* Custom Message Box (from first input, with slight adjustments for consistency) */
+/* Custom Message Box (from second block) */
 .message-box-overlay {
     position: fixed;
     top: 0;
@@ -378,42 +439,42 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
     transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
-.message-box-overlay.show { /* Adjusted from .active to .show as per cards.js in first input */
+.message-box-overlay.show {
     opacity: 1;
     visibility: visible;
 }
 
 .message-box-content {
-    background: #fff;
-    padding: 30px; /* From first input */
-    border-radius: 15px; /* From first input */
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); /* From first input */
+    background: var(--text-color-light);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
     text-align: center;
-    max-width: 400px; /* From first input */
+    max-width: 400px;
     width: 90%;
     transform: translateY(-20px);
     transition: transform 0.3s ease;
     border: 1px solid #eee;
 }
 
-.message-box-overlay.show .message-box-content { /* Adjusted from .active to .show as per cards.js in first input */
+.message-box-overlay.show .message-box-content {
     transform: translateY(0);
 }
 
 .message-box-content p {
     font-size: 1.1rem;
-    color: #333;
-    margin-bottom: 25px; /* From first input */
+    color: var(--text-color-dark);
+    margin-bottom: 25px;
 }
 
 .message-box-content button {
-    background: linear-gradient(45deg, #2575fc, #6a11cb);
-    color: #fff;
+    background: linear-gradient(45deg, var(--header-blue), var(--header-purple)); /* Using header gradient for this button */
+    color: var(--text-color-light);
     border: none;
-    padding: 12px 30px; /* From first input */
+    padding: 12px 30px;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 1.0rem; /* From first input */
+    font-size: 1.0rem;
     font-weight: 600;
     transition: all 0.2s ease;
 }
@@ -422,8 +483,45 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
     transform: translateY(-1px);
 }
 
+/* No Data Found (from first block, general utility) */
+.no-data-found {
+    text-align: center;
+    padding: 40px;
+    background-color: var(--text-color-light);
+    border-radius: 8px;
+    margin: 30px auto;
+    color: #666;
+    font-style: italic;
+    max-width: 600px;
+    box-shadow: var(--box-shadow-light);
+}
+.no-data-found .back-link {
+    display: inline-block;
+    margin-top: 15px;
+    font-weight: normal;
+}
 
-/* Responsive Design (combined and refined) */
+.back-link-container {
+    text-align: center;
+    margin-top: 30px;
+}
+
+.back-link { /* Distinct from back-to-dashboard */
+    display: inline-block;
+    padding: 10px 20px;
+    border-radius: 5px;
+    background-color: var(--primary-blue); /* Using original primary blue here */
+    color: var(--text-color-light) !important;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+.back-link:hover {
+    background-color: var(--dark-blue);
+    text-decoration: none;
+}
+
+/* --- Mobile Responsiveness (merged and refined) --- */
 @media (max-width: 768px) {
     .header {
         flex-direction: column;
@@ -434,11 +532,11 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
         margin-bottom: 10px;
     }
     .header h1 {
-        font-size: 1.5rem; /* Further reduced for smaller screens */
+        font-size: 1.5rem;
         text-align: center;
         margin-top: 10px;
     }
-    .header-nav {
+    .header-nav { /* If you have a separate nav element in header, this applies */
         width: 100%;
         text-align: center;
         margin-top: 15px;
@@ -465,12 +563,11 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
         min-height: auto;
         padding: 20px;
     }
-    .card-logo-img { /* Used this instead of .card-network-logo for the image */
+    .card-logo-img {
         height: 40px;
         bottom: 15px;
         right: 15px;
     }
-    /* Removed .card-network-logo specific font sizing as it's for text in the second snippet */
     .card-item .chip {
         width: 45px;
         height: 30px;
@@ -481,7 +578,7 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
         letter-spacing: 1.5px;
         margin-bottom: 15px;
     }
-    .card-footer { /* Consolidated from .card-details-row and .card-type-status logic */
+    .card-footer {
         font-size: 0.85em;
     }
     p.card-cvv-mock {
@@ -522,7 +619,6 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
     }
 }
 
-/* Specific styles for very small mobile devices (e.g., iPhone SE) */
 @media (max-width: 400px) {
     .header h1 {
         font-size: 1.3rem;
@@ -583,3 +679,190 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from first input) */
         font-size: 0.8rem;
     }
 }
+
+/* Original dashboard layout elements from first CSS block - kept but likely not used if this is a standalone page */
+/* If you are also using this CSS for a full dashboard, ensure these elements exist in your HTML */
+/*
+.dashboard-container {
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+}
+.top-navbar {
+    background-color: var(--text-color-light);
+    padding: 10px 20px;
+    box-shadow: var(--box-shadow-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: var(--navbar-height);
+    box-sizing: border-box;
+    position: fixed;
+    width: 100%;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+}
+.top-navbar .logo img { height: 40px; }
+.top-navbar h2 {
+    margin: 0;
+    font-size: 1.4em;
+    color: var(--dark-blue);
+}
+.top-navbar .user-info {
+    display: flex; align-items: center; gap: 10px; font-size: 0.9em;
+}
+.top-navbar .user-info .profile-icon { font-size: 1.2em; color: var(--primary-blue); }
+.top-navbar .user-info a { color: var(--primary-blue); text-decoration: none; font-weight: 500; }
+.top-navbar .user-info a:hover { text-decoration: underline; }
+.menu-toggle {
+    display: none; font-size: 1.8em; color: var(--primary-blue); cursor: pointer; z-index: 1001;
+}
+.sidebar {
+    width: var(--sidebar-width); background-color: var(--primary-blue); color: var(--text-color-light);
+    padding-top: var(--navbar-height); position: fixed; height: 100vh; overflow-y: auto;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 999; transform: translateX(0);
+    transition: transform 0.3s ease-in-out;
+}
+.sidebar ul { list-style: none; padding: 0; margin: 0; }
+.sidebar ul li a {
+    display: flex; align-items: center; padding: 15px 20px; color: var(--text-color-light);
+    text-decoration: none; font-size: 1.1em; transition: background-color 0.3s ease;
+}
+.sidebar ul li a i { margin-right: 10px; font-size: 1.2em; }
+.sidebar ul li a:hover, .sidebar ul li.active a { background-color: var(--dark-blue); }
+
+.main-content-wrapper {
+    flex-grow: 1; padding: 20px; margin-top: var(--navbar-height);
+    margin-left: var(--sidebar-width); box-sizing: border-box;
+    background-color: var(--light-grey); min-height: calc(100vh - var(--navbar-height));
+}
+.main-content-wrapper h3 {
+    color: var(--text-color-dark); margin-bottom: 25px; font-size: 1.8em; text-align: center;
+}
+
+.bank-card-display {
+    width: 320px; height: 200px; aspect-ratio: 1.6 / 1;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: var(--text-color-light); border-radius: 15px;
+    box-shadow: var(--box-shadow-medium); margin: 30px auto;
+    padding: 20px; display: flex; flex-direction: column;
+    justify-content: space-between; box-sizing: border-box;
+    position: relative; overflow: hidden;
+}
+.bank-card-display::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="rgba(255,255,255,0.05)"/><rect x="0" y="0" width="5" height="5" fill="rgba(255,255,255,0.05)"/></svg>');
+    background-size: 10px 10px; opacity: 0.8; pointer-events: none;
+}
+.bank-card-display .card-header-logo {
+    text-align: left; font-size: 1.1em; font-weight: 700; opacity: 0.9;
+}
+.bank-card-display .card-number {
+    font-size: 1.8em; text-align: center; letter-spacing: 2px; margin-bottom: 10px; font-weight: 400;
+}
+.bank-card-display .card-details-row {
+    display: flex; justify-content: space-between; align-items: flex-end; font-size: 0.9em; margin-top: auto;
+}
+.bank-card-display .card-cvv-row {
+    display: flex; justify-content: flex-end; font-size: 0.9em; margin-top: 5px;
+}
+.bank-card-display .card-details-group {
+    display: flex; flex-direction: column; text-align: left;
+}
+.bank-card-display .card-details-group.right { text-align: right; }
+.bank-card-display .card-details-label {
+    font-weight: 300; opacity: 0.8; margin-bottom: 3px; font-size: 0.8em;
+}
+.bank-card-display .card-details-value { font-weight: 500; }
+.status-badge {
+    padding: 4px 8px; border-radius: 4px; font-weight: bold; color: var(--text-color-light);
+    font-size: 0.8em; display: inline-block;
+}
+.status-approved { background-color: var(--success-color); }
+.status-declined { background-color: var(--error-color); }
+.card-actions-section {
+    background-color: var(--text-color-light); padding: 25px; border-radius: 8px;
+    box-shadow: var(--box-shadow-light); max-width: 500px; margin: 20px auto; text-align: center;
+}
+.card-actions-section h4 {
+    color: var(--dark-blue); margin-bottom: 20px; font-size: 1.5em;
+}
+.form-group.switch-container {
+    display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 20px;
+}
+.form-group.switch-container label {
+    margin-bottom: 0; font-weight: 500; color: var(--text-color-dark);
+}
+.switch { position: relative; display: inline-block; width: 60px; height: 34px; vertical-align: middle; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc; transition: .4s; border-radius: 34px;
+}
+.slider:before {
+    position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px;
+    background-color: white; transition: .4s; border-radius: 50%;
+}
+input:checked + .slider { background-color: var(--primary-blue); }
+input:focus + .slider { box-shadow: 0 0 1px var(--primary-blue); }
+input:checked + .slider:before { -webkit-transform: translateX(26px); -ms-transform: translateX(26px); transform: translateX(26px); }
+
+.button-primary {
+    display: block; width: calc(100% - 40px); max-width: 300px; margin: 15px auto;
+    padding: 12px 20px; border-radius: 8px; text-decoration: none;
+    color: var(--text-color-light); background-color: var(--primary-blue);
+    border: none; cursor: pointer; font-size: 1em;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    text-align: center; font-weight: 500; box-shadow: var(--box-shadow-light);
+}
+.button-primary:hover { background-color: var(--dark-blue); transform: translateY(-2px); }
+.button-primary i { margin-right: 8px; }
+.button-danger { background-color: var(--error-color); }
+.button-danger:hover { background-color: #c82333; }
+
+@media (max-width: 768px) {
+    .dashboard-container { flex-direction: column; }
+    .top-navbar {
+        position: sticky; top: 0; flex-wrap: wrap; justify-content: center; height: auto; padding: 10px;
+    }
+    .top-navbar .logo { order: 1; margin-right: auto; }
+    .top-navbar h2 {
+        order: 3; width: 100%; text-align: center; font-size: 1.2em; margin-top: 10px; margin-bottom: 5px;
+    }
+    .top-navbar .user-info {
+        order: 4; width: 100%; justify-content: center; margin-top: 5px; font-size: 0.85em;
+    }
+    .menu-toggle { display: block; order: 2; margin-left: auto; }
+    .sidebar {
+        transform: translateX(-100%); position: fixed; top: 0; left: 0; height: 100vh; width: 250px; padding-top: 0;
+    }
+    .sidebar.active { transform: translateX(0); box-shadow: 4px 0 10px rgba(0,0,0,0.3); }
+    .sidebar-overlay {
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.5); z-index: 998;
+    }
+    .sidebar-overlay.active { display: block; }
+    .main-content-wrapper {
+        margin-left: 0; padding-top: 15px; min-height: calc(100vh - var(--navbar-height));
+    }
+    .bank-card-display {
+        width: 280px; height: 175px; padding: 15px;
+    }
+    .bank-card-display .card-number { font-size: 1.6em; }
+    .bank-card-display .card-details-row { font-size: 0.8em; }
+    .bank-card-display .card-cvv-row { font-size: 0.8em; }
+    .card-actions-section { padding: 20px; margin: 20px 10px; }
+    .button-primary { width: calc(100% - 30px); padding: 10px 15px; }
+}
+
+@media (max-width: 480px) {
+    .top-navbar .logo img { height: 30px; }
+    .top-navbar h2 { font-size: 1.1em; }
+    .bank-card-display { width: 260px; height: 160px; padding: 10px; }
+    .bank-card-display .card-number { font-size: 1.5em; }
+    .bank-card-display .card-details-row { font-size: 0.75em; }
+    .bank-card-display .card-cvv-row { font-size: 0.7em; }
+    .message { padding: 10px; font-size: 0.9em; }
+}
+*/

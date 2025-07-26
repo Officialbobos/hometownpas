@@ -189,7 +189,14 @@ if (!function_exists('get_currency_symbol')) {
                     <p class="loading-message" id="accountsLoadingMessage">No accounts found. Please contact support.</p>
                 <?php else: ?>
                     <?php foreach ($user_accounts as $account): ?>
-                        <div class="account-card">
+                        <?php
+                            // Add a special class for savings accounts to target with CSS
+                            $card_class = 'account-card';
+                            if (strtolower($account['account_type'] ?? '') === 'savings') {
+                                $card_class .= ' savings-account-card';
+                            }
+                        ?>
+                        <div class="<?php echo htmlspecialchars($card_class); ?>">
                             <div class="account-details">
                                 <p class="account-type"><?php echo htmlspecialchars(strtoupper($account['account_type'] ?? 'N/A')); ?></p>
                                 <p class="account-number">**** **** **** <?php echo htmlspecialchars(substr($account['account_number'] ?? 'N/A', -4)); ?></p>

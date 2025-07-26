@@ -27,10 +27,14 @@ try {
 require_once __DIR__ . '/../Config.php'; // Your database configuration and other constants
 require_once __DIR__ . '/../functions.php'; // If you have a sanitize_input function here
 
+use MongoDB\Client; // Make sure this is imported if using new MongoDB\Client
+use MongoDB\BSON\ObjectId; // For converting string IDs to MongoDB ObjectIds
+
 // Check if the user is logged in. If not, redirect to login page.
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
     // Corrected: Use BASE_URL for redirect to login page
-    header('Location: ' . BASE_URL . '/index.php'); // Assuming index.php is your login page
+    // Assuming index.php is your login page. Adjust if your login page is e.g., login.php
+    header('Location: ' . BASE_URL . '/index.php');
     exit;
 }
 
@@ -46,8 +50,12 @@ $usersCollection = null;
 $accountsCollection = null;
 
 try {
-    // Connect to MongoDB using the constants defined in Config.php
-    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);
+    // OPTION 1: Using the helper function (recommended for consistency)
+    $client = getMongoDBClient(); // Assuming getMongoDBClient() exists in functions.php and returns a MongoDB\Client instance
+
+    // OPTION 2: Direct connection (if you prefer, but less consistent with make_transfer.php)
+    // $client = new MongoDB\Client(MONGODB_CONNECTION_URI);
+
     $database = $client->selectDatabase(MONGODB_DB_NAME);
     $usersCollection = $database->selectCollection('users');
     $accountsCollection = $database->selectCollection('accounts');
@@ -59,7 +67,7 @@ try {
 // Fetch user's name and email for display in header/sidebar
 try {
     // Convert session user_id to MongoDB\BSON\ObjectId for database query
-    $userObjectId = new MongoDB\BSON\ObjectId($user_id);
+    $userObjectId = new ObjectId($user_id);
     $user_doc = $usersCollection->findOne(
         ['_id' => $userObjectId],
         ['projection' => ['first_name' => 1, 'last_name' => 1, 'username' => 1, 'email' => 1]]
@@ -73,20 +81,24 @@ try {
         if (empty($full_name)) { // Fallback to username if first/last name are empty
             $full_name = $user_doc['username'] ?? 'User';
         }
+        // Update session with more complete name/email if available from DB
+        $_SESSION['first_name'] = $first_name;
+        $_SESSION['last_name'] = $last_name;
+        $_SESSION['email'] = $user_email;
     } else {
         // Fallback if user data not found in DB (should ideally not happen if user_id is valid)
         $full_name = $_SESSION['username'] ?? 'User';
-        $user_email = $_SESSION['temp_user_email'] ?? ''; // Assuming you might have a temporary email in session
+        $user_email = $_SESSION['email'] ?? $_SESSION['temp_user_email'] ?? ''; // Prioritize 'email', then 'temp_user_email'
         error_log("User with ID " . $user_id . " not found in database when fetching profile details for accounts.php.");
     }
 } catch (MongoDB\Driver\Exception\Exception $e) {
     error_log("MongoDB user fetch error in accounts.php: " . $e->getMessage());
     $full_name = $_SESSION['username'] ?? 'User'; // Fallback to session username
-    $user_email = $_SESSION['temp_user_email'] ?? '';
+    $user_email = $_SESSION['email'] ?? $_SESSION['temp_user_email'] ?? '';
 } catch (Exception $e) { // Catch for potential ObjectId conversion error if $user_id is malformed
     error_log("Invalid user ID format in accounts.php: " . $e->getMessage());
     $full_name = $_SESSION['username'] ?? 'User'; // Fallback
-    $user_email = $_SESSION['temp_user_email'] ?? '';
+    $user_email = $_SESSION['email'] ?? $_SESSION['temp_user_email'] ?? '';
 }
 
 
@@ -105,7 +117,9 @@ try {
 } catch (MongoDB\Driver\Exception\Exception $e) {
     error_log("MongoDB accounts fetch error in accounts.php: " . $e->getMessage());
     // Optionally display an error message to the user, e.g.:
-    // echo "<p class='error-message'>Failed to load accounts. Please try again.</p>";
+    $_SESSION['message'] = "Failed to load your accounts. Please try again later.";
+    $_SESSION['message_type'] = "error";
+    // No redirect here, just show a message on the current page.
 }
 
 // Helper to format currency (moved here to ensure it's defined only once if functions.php doesn't have it)
@@ -123,7 +137,7 @@ if (!function_exists('formatCurrency')) {
     }
 }
 
-// Helper to get currency symbol (used in the new section)
+// Helper to get currency symbol (used in the new section) - Redundant if formatCurrency handles it, but kept for explicit use if needed elsewhere.
 if (!function_exists('get_currency_symbol')) {
     function get_currency_symbol($currency_code) {
         switch (strtoupper($currency_code)) {
@@ -318,70 +332,22 @@ if (!function_exists('get_currency_symbol')) {
             text-align: center;
         }
 
-        /* --- NEW ACCOUNTS SECTION STYLES --- */
-        .accounts-section {
-            background-color: var(--white);
-            border-radius: 12px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-            padding: 30px;
-            margin-bottom: 30px; /* Spacing below the section */
-            border: 1px solid rgba(var(--glow-color-rgb), 0.1);
-            transition: box-shadow 0.3s ease;
-        }
-
-        .accounts-section:hover {
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), 0 0 20px rgba(var(--glow-color-rgb), 0.4);
-        }
-
-        .accounts-header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            border-bottom: 2px solid var(--light-purple); /* Match card h2 border */
-            padding-bottom: 10px;
-        }
-
-        .accounts-header-row h2 {
-            margin: 0;
-            color: var(--dark-purple);
-            font-size: 1.8em; /* Slightly smaller than main h2, but prominent */
-            text-align: left; /* Align to left */
-            border-bottom: none; /* Remove duplicate border */
-            padding-bottom: 0;
-        }
-
-        .accounts-header-row .view-all-link a {
-            color: var(--light-purple);
-            text-decoration: none;
-            font-weight: bold;
-            padding: 5px 10px;
-            border-radius: 5px;
-            transition: color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .accounts-header-row .view-all-link a:hover {
-            color: var(--white);
-            background-color: var(--light-purple);
-            box-shadow: 0 0 10px var(--glow-color);
-        }
-
-        .account-cards-container {
+        /* --- ACCOUNTS DISPLAY SECTION STYLES (for the main account list) --- */
+        .account-card-container { /* Corrected class name here */
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Adjusted for summary view */
-            gap: 20px; /* Slightly smaller gap for denser display */
-            margin-top: 0; /* Remove top margin as header handles spacing */
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Adjusted for full account cards */
+            gap: 25px; /* Spacing between account cards */
         }
 
-        .account-card {
+        .account-card { /* These are the individual full-page account cards */
             background: linear-gradient(145deg, var(--white), var(--off-white));
             border-radius: 15px;
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1), 0 0 15px rgba(var(--light-purple-rgb), 0.3);
-            padding: 20px; /* Smaller padding for summary cards */
+            padding: 30px; /* Ample padding for full details */
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            min-height: 150px; /* Smaller min-height for summary cards */
+            min-height: 200px; /* Sufficient height for details */
             transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
             position: relative;
             overflow: hidden;
@@ -408,51 +374,65 @@ if (!function_exists('get_currency_symbol')) {
         }
 
         .account-card:hover {
-            transform: translateY(-8px); /* Less pronounced lift than full page cards */
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2), 0 0 20px rgba(var(--glow-color-rgb), 0.5); /* Stronger glow on hover */
+            transform: translateY(-10px); /* More pronounced lift */
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25), 0 0 25px rgba(var(--glow-color-rgb), 0.6); /* Stronger glow on hover */
         }
         .account-card:hover::before {
             opacity: 1; /* Show glowing border on hover */
         }
 
-        .account-card .account-details {
-            flex-grow: 1;
+        .account-card h3 {
+            font-size: 1.5em;
+            color: var(--dark-purple);
+            margin-top: 0;
+            margin-bottom: 15px;
+            display: flex; /* For icon alignment */
+            align-items: center;
+            justify-content: flex-start;
+            font-family: 'Orbitron', sans-serif;
+            border-bottom: 1px solid rgba(var(--light-purple-rgb), 0.3);
+            padding-bottom: 10px;
+        }
+        .account-card h3 i {
+            margin-right: 10px;
+            color: var(--light-purple);
+            font-size: 1.2em;
         }
 
-        .account-card .account-type {
-            font-size: 1.1em;
+        .account-card p {
+            margin: 8px 0;
+            color: #555;
+            font-size: 1.05em;
+        }
+        .account-card .detail-label {
             font-weight: bold;
             color: var(--dark-purple);
-            margin-bottom: 5px;
-            font-family: 'Orbitron', sans-serif;
+            margin-right: 5px;
         }
-
-        .account-card .account-number {
-            font-size: 0.95em;
-            color: #666;
+        .account-card .detail-value {
             font-family: 'Roboto Mono', monospace;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
 
-        .account-card .account-balance {
-            text-align: right;
-            margin-top: 15px;
+        .account-card .balance {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(var(--light-purple-rgb), 0.2);
         }
-
+        .account-card .balance-label {
+            font-size: 1em;
+            color: #777;
+            margin-bottom: 5px;
+        }
         .account-card .balance-amount {
-            font-size: 1.8em; /* Slightly smaller than full page balance */
+            font-size: 2.5em;
             font-weight: bold;
             color: var(--success-green);
-            margin: 0;
             font-family: 'Orbitron', sans-serif;
-            text-shadow: 0 0 8px rgba(40, 167, 69, 0.3); /* Subtle glow */
+            text-shadow: 0 0 10px rgba(40, 167, 69, 0.4);
         }
 
-        .account-card .balance-status {
-            font-size: 0.85em;
-            color: #888;
-            margin-top: 5px;
-        }
 
         .loading-message {
             text-align: center;
@@ -471,7 +451,6 @@ if (!function_exists('get_currency_symbol')) {
             color: #777;
             font-size: 0.9em;
         }
-
 
         /* --- RESPONSIVENESS --- */
         @media (max-width: 768px) {
@@ -575,7 +554,8 @@ if (!function_exists('get_currency_symbol')) {
                 text-align: center; /* Center balance */
             }
 
-            /* New accounts-section styles for mobile */
+            /* New accounts-section styles for mobile (if you were to use this on dashboard) */
+            /* These styles are present in your dashboard.php, but copied here for reference if you plan to merge */
             .accounts-section {
                 padding: 20px;
             }
@@ -657,12 +637,20 @@ if (!function_exists('get_currency_symbol')) {
         </aside>
 
         <main class="accounts-content">
+            <?php
+            // Display messages (e.g., from failed account fetch)
+            if (isset($_SESSION['message'])) {
+                $message_type = $_SESSION['message_type'] ?? 'info';
+                echo '<div class="alert ' . htmlspecialchars($message_type) . '">' . htmlspecialchars($_SESSION['message']) . '</div>';
+                unset($_SESSION['message']); // Clear the message after displaying
+                unset($_SESSION['message_type']);
+            }
+            ?>
             <div class="card">
                 <h2>Your Bank Accounts</h2>
 
                 <?php if (!empty($user_accounts)): ?>
-                    <div class="account-card-container">
-                        <?php foreach ($user_accounts as $account): ?>
+                    <div class="account-card-container"> <?php foreach ($user_accounts as $account): ?>
                             <div class="account-card">
                                 <h3>
                                     <?php
@@ -698,7 +686,10 @@ if (!function_exists('get_currency_symbol')) {
                                     <p><span class="detail-label">SWIFT/BIC:</span> <span class="detail-value"><?php echo htmlspecialchars($account['swift_bic']); ?></span></p>
                                 <?php endif; ?>
 
-                                <p class="balance">Balance: <?php echo formatCurrency($account['balance'] ?? 0, $account['currency'] ?? 'USD'); ?></p>
+                                <p class="balance">
+                                    <span class="balance-label">Current Balance:</span><br>
+                                    <span class="balance-amount"><?php echo formatCurrency($account['balance'] ?? 0, $account['currency'] ?? 'USD'); ?></span>
+                                </p>
                             </div>
                         <?php endforeach; ?>
                     </div>
