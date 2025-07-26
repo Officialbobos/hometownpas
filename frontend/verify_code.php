@@ -6,66 +6,54 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 // Ensure session is started at the very beginning
-// Assuming session_start() is either in Config.php or index.php,
-// but for verify_code.php, it's safer to ensure it's here if not globally guaranteed.
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
 error_log("--- verify_code.php Start ---");
 error_log("Session ID: " . session_id());
-error_log("Session Contents (verify_code.php start): " . print_r($_SESSION, true));
-error_log("Request Method: " . $_SERVER['REQUEST_METHOD']);
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    error_log("POST data: " . print_r($_POST, true));
-}
-
-
-require_once __DIR__ . '/../vendor/autoload.php'; // Correct path to autoload.php
+error_log("Session Contents (verify_code.php initial load): " . print_r($_SESSION, true)); // Critical check
 
 // --- Start Dotenv loading (conditional for deployment) ---
-// This block attempts to load .env files only if they exist.
-// On Render, environment variables should be set directly in the dashboard,
-// so a physical .env file won't be present.
 $dotenvPath = dirname(__DIR__);
 if (file_exists($dotenvPath . '/.env')) {
     $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
     try {
-        $dotenv->load(); // This will only run if .env file exists
+        $dotenv->load();
     } catch (Dotenv\Exception\InvalidPathException $e) {
-        // This catch is mostly for local dev if .env is missing.
-        // On Render, this block won't be hit because file_exists is false.
         error_log("Dotenv load error locally on path " . $dotenvPath . ": " . $e->getMessage());
     }
 }
-// If .env doesn't exist (like on Render), the variables are assumed to be pre-loaded
-// into the environment by the hosting platform (e.g., Render's Config Vars).
 // --- End Dotenv loading ---
 
-require_once __DIR__ . '/../Config.php';          // Path from frontend/ to project root
-require_once __DIR__ . '/../functions.php';        // Path from frontend/ to project root
+require_once __DIR__ . '/../Config.php';
+require_once __DIR__ . '/../functions.php';
 
 use MongoDB\Client;
-use MongoDB\BSON\ObjectId; // Ensure ObjectId is used
-use MongoDB\BSON\UTCDateTime; // Ensure UTCDateTime is used for date handling
-use MongoDB\Driver\Exception\Exception as MongoDBDriverException; // For general MongoDB driver exceptions
-use OTPHP\TOTP; // For TOTP (Time-based One-Time Password) functionality
-use BaconQrCode\Writer; // For QR code generation
-use BaconQrCode\Renderer\Image\Png; // For rendering QR code as PNG
+use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\UTCDateTime;
+use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
+use OTPHP\TOTP;
+use BaconQrCode\Writer;
+use BaconQrCode\Renderer\Image\Png;
 
 $message = '';
 $message_type = '';
 
+error_log("verify_code.php: Checking session state for 2FA flow.");
+error_log("verify_code.php: _SESSION['auth_step'] = " . ($_SESSION['auth_step'] ?? 'NOT SET'));
+error_log("verify_code.php: _SESSION['temp_user_id'] = " . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
+
 // Check if 2FA process is pending and temporary user ID exists
-// Ensure consistent session state: 'auth_step' should be set in login.php
-// If these conditions are NOT met, means the user is not in the correct 2FA flow.
 if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' || !isset($_SESSION['temp_user_id'])) {
-    error_log("Redirecting to login: Session 'auth_step' is not 'awaiting_2fa' or 'temp_user_id' is missing.");
+    error_log("Redirecting to login: Session 'auth_step' is not 'awaiting_2fa' OR 'temp_user_id' is missing.");
     error_log("Current auth_step: " . ($_SESSION['auth_step'] ?? 'NOT SET'));
     error_log("Current temp_user_id: " . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
+    
+    // Clear potentially corrupted session
     session_unset();
     session_destroy();
-    // Redirect to the /login route handled by index.php
+    error_log("Session cleared and destroyed due to invalid 2FA state. Redirecting to " . BASE_URL . "/login");
     header('Location: ' . BASE_URL . '/login');
     exit;
 }
@@ -78,19 +66,20 @@ $masked_user_email = '';
 
 try {
     $user_id_obj = new ObjectId($temp_user_id_str); // Convert to ObjectId for MongoDB queries
+    error_log("Successfully created ObjectId from temp_user_id: " . $temp_user_id_str);
 } catch (MongoDB\BSON\Exception\InvalidTypeException $e) {
-    error_log("Invalid temp_user_id in session: " . $e->getMessage());
+    error_log("Invalid temp_user_id in session, cannot convert to ObjectId: " . $e->getMessage());
     error_log("Redirecting to login: Invalid ObjectId from temp_user_id.");
     $message = "Session error: Your login session is invalid. Please try logging in again.";
     $message_type = 'error';
     session_unset();
     session_destroy();
-    header('Location: ' . BASE_URL . '/login'); // Redirect to /login
+    header('Location: ' . BASE_URL . '/login');
     exit;
 }
 
 // Establish MongoDB connection and get collection
-$usersCollection = getCollection('users'); // This function should be defined in functions.php
+$usersCollection = getCollection('users');
 
 // Fetch user's email, name, and 2FA settings for display and functionality
 $user_data = null;
@@ -102,62 +91,57 @@ try {
         $first_name = $user_data['first_name'] ?? '';
         $last_name = $user_data['last_name'] ?? '';
         $user_full_name = htmlspecialchars(trim($first_name . ' ' . $last_name));
-        $masked_user_email = hideEmailPartially($user_email); // Use the helper function
-        // Assign role to session before handling requests to use in routing decision
-        // Use null coalescing operator to safely access 'is_admin'
+        $masked_user_email = hideEmailPartially($user_email);
         $_SESSION['role'] = ($user_data['is_admin'] ?? false) ? 'admin' : 'user';
-
+        error_log("User data fetched successfully for user ID: " . $temp_user_id_str . ". Email: " . $user_email);
     } else {
-        // User not found in DB for the session temp_user_id
-        error_log("User data not found for temp_user_id: " . $temp_user_id_str . ". Possible session mismatch or DB issue.");
+        error_log("User data not found in DB for temp_user_id: " . $temp_user_id_str . ". Possible session mismatch or DB issue.");
         error_log("Redirecting to login: User data not found in DB.");
         $message = "Your account details could not be retrieved. Please try logging in again.";
         $message_type = 'error';
         session_unset();
         session_destroy();
-        header('Location: ' . BASE_URL . '/login'); // Redirect to /login if user data isn't found
+        header('Location: ' . BASE_URL . '/login');
         exit;
     }
 } catch (MongoDBDriverException $e) {
     error_log("MongoDB error fetching user data for 2FA verification: " . $e->getMessage());
     $message = "A database error occurred. Please try again later.";
     $message_type = 'error';
-    // For critical failures like this, it's safer to redirect to login after a brief message.
-    // However, for this example, we'll let the error message display.
+    // No redirect here, display message to user
 } catch (Exception $e) {
     error_log("General error fetching user data for 2FA verification: " . $e->getMessage());
     $message = "An unexpected error occurred. Please try again.";
     $message_type = 'error';
+    // No redirect here, display message to user
 }
 
 // --- Determine 2FA Type and Setup/Verification State ---
 $two_factor_enabled = $user_data['two_factor_enabled'] ?? false;
 $two_factor_secret = $user_data['two_factor_secret'] ?? null;
-$two_factor_method = $user_data['two_factor_method'] ?? 'email'; // Default to 'email' if not set
+$two_factor_method = $user_data['two_factor_method'] ?? 'email';
 
 $show_authenticator_setup = false;
-$qr_code_data_url = ''; // Changed from $qr_code_url to $qr_code_data_url to store data URI
+$qr_code_data_url = '';
 $manual_secret = '';
 
+error_log("User 2FA Status: Enabled=" . ($two_factor_enabled ? 'true' : 'false') . ", Method=" . $two_factor_method . ", Secret=" . ($two_factor_secret ? 'SET' : 'NOT SET'));
+
 if ($two_factor_enabled && $two_factor_method === 'authenticator' && !$two_factor_secret) {
-    error_log("Authenticator setup flow initiated for user ID: " . $temp_user_id_str);
-    // User has 2FA enabled, method is authenticator, but no secret is set (first-time setup)
+    error_log("Authenticator setup flow initiated for user ID: " . $temp_user_id_str . " (no secret found).");
     $show_authenticator_setup = true;
     
-    // Generate a new secret using OTPHP\TOTP
-    $totp = TOTP::generate(); // Creates a new TOTP object with a new secret
-    $manual_secret = $totp->getSecret(); // Get the generated secret string
+    $totp = TOTP::generate();
+    $manual_secret = $totp->getSecret();
     error_log("Generated new TOTP secret: " . $manual_secret);
 
-    // Generate the QR code URL (otpauth URI)
-    $issuer = SMTP_FROM_NAME; // Use directly, urlencode done internally by library
-    $account_name = $user_email; // Use directly
-    $totp->setLabel($account_name); // Set the account name
-    $totp->setIssuer($issuer); // Set the issuer (your bank name)
-    $otp_auth_uri = $totp->getProvisioningUri(); // Get the URI
+    $issuer = SMTP_FROM_NAME;
+    $account_name = $user_email;
+    $totp->setLabel($account_name);
+    $totp->setIssuer($issuer);
+    $otp_auth_uri = $totp->getProvisioningUri();
     error_log("Generated OTP Auth URI: " . $otp_auth_uri);
 
-    // Generate the QR code image as a Data URI (Base64 encoded PNG)
     try {
         $writer = new Writer(new Png());
         $qr_code_data_url = 'data:image/png;base64,' . base64_encode($writer->writeString($otp_auth_uri));
@@ -166,10 +150,9 @@ if ($two_factor_enabled && $two_factor_method === 'authenticator' && !$two_facto
         error_log("Error generating QR code: " . $e->getMessage());
         $message = "Error generating QR code. Please try again or contact support.";
         $message_type = 'error';
-        $show_authenticator_setup = false; // Prevent display if QR code fails
+        $show_authenticator_setup = false;
     }
 
-    // Save the generated secret to the user's document for future verification IF it's not already there.
     if (($user_data['two_factor_secret'] ?? null) === null) {
         try {
             $usersCollection->updateOne(
@@ -183,13 +166,13 @@ if ($two_factor_enabled && $two_factor_method === 'authenticator' && !$two_facto
             error_log("MongoDB error saving new 2FA secret for user ID: " . $temp_user_id_str . " Error: " . $e->getMessage());
             $message = "A database error occurred during 2FA setup. Please try again later.";
             $message_type = 'error';
-            $show_authenticator_setup = false; // Prevent display if error
+            $show_authenticator_setup = false;
         }
     } else {
         error_log("2FA secret already exists for user ID: " . $temp_user_id_str . ". Not overwriting.");
         $message = "Please enter the code generated by your authenticator app.";
         $message_type = 'info';
-        $show_authenticator_setup = false; // Secret exists, so no need to show setup again unless forced.
+        $show_authenticator_setup = false;
     }
 }
 
@@ -200,27 +183,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
     if (!$user_id_obj || empty($user_email)) {
         $message = "Unable to resend code: Missing user information. Please try logging in again.";
         $message_type = 'error';
-        error_log("Resend failed: Missing user ID or email.");
+        error_log("Resend failed: Missing user ID or email. User ID Obj: " . ($user_id_obj ? 'SET' : 'NOT SET') . ", Email: " . ($user_email ? 'SET' : 'NOT SET'));
     } elseif ($two_factor_method === 'authenticator') {
         $message = "Resending codes is not applicable for Authenticator app 2FA. Please generate a new code using your app.";
         $message_type = 'info';
-        error_log("Resend not applicable for authenticator method.");
-    } else { // Handle email-based code resend
-        // Implement rate limiting here if desired to prevent abuse
+        error_log("Resend not applicable for authenticator method. User ID: " . $temp_user_id_str);
+    } else {
         $last_resend_time = $_SESSION['last_resend_time'] ?? 0;
-        if (time() - $last_resend_time < 60) { // 60 seconds cooldown
+        if (time() - $last_resend_time < 60) {
             $remaining_time = 60 - (time() - $last_resend_time);
             $message = "Please wait before requesting another code. You can request again in " . $remaining_time . " seconds.";
             $message_type = 'error';
             error_log("Resend rate limited for user " . $temp_user_id_str . ". Remaining: " . $remaining_time . "s");
         } else {
-            // Generate a new verification code using constants
             $new_verification_code = str_pad(random_int(0, (10**TWO_FACTOR_CODE_LENGTH) - 1), TWO_FACTOR_CODE_LENGTH, '0', STR_PAD_LEFT);
             $new_expiry_time = new UTCDateTime(strtotime('+' . TWO_FACTOR_CODE_EXPIRY_MINUTES . ' minutes') * 1000);
             error_log("Generated new email 2FA code: " . $new_verification_code . " (expires: " . $new_expiry_time->toDateTime()->format('Y-m-d H:i:s T') . ")");
 
             try {
-                // Update the database with the new code and expiry
                 $updateResult = $usersCollection->updateOne(
                     ['_id' => $user_id_obj],
                     ['$set' => [
@@ -231,7 +211,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
 
                 if ($updateResult->getModifiedCount() > 0) {
                     error_log("DB updated with new 2FA code for user ID: " . $temp_user_id_str);
-                    // Send the new verification email
                     $email_subject = "HomeTown Bank Login Verification Code";
                     $email_body_html = "
                     <!DOCTYPE html>
@@ -272,8 +251,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
                     </body>
                     </html>";
 
-                    $email_sent = sendEmail($user_email, $email_subject, $email_body_html, "Your new verification code for HomeTown Bank is: " . $new_verification_code); // Also provide plain text
-                    $_SESSION['last_resend_time'] = time(); // Update last resend time
+                    $email_sent = sendEmail($user_email, $email_subject, $email_body_html, "Your new verification code for HomeTown Bank is: " . $new_verification_code);
+                    $_SESSION['last_resend_time'] = time();
 
                     if ($email_sent) {
                         $message = "A new verification code has been sent to your registered email address.";
@@ -282,17 +261,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
                     } else {
                         $message = "Failed to resend verification email. Please try again or contact support.";
                         $message_type = 'error';
-                        error_log("Resend 2FA email failed for user ID: " . $temp_user_id_str . " (Email: " . $user_email . ")");
+                        error_log("Resend 2FA email failed for user ID: " . $temp_user_id_str . " (Email: " . $user_email . "). Check mailer config/logs.");
                     }
                 } else {
                     $message = "Failed to update new verification code in the database. Please try again.";
                     $message_type = 'error';
-                    error_log("Failed to update new 2FA code for user ID: " . $temp_user_id_str . ". No document modified.");
+                    error_log("Failed to update new 2FA code for user ID: " . $temp_user_id_str . ". No document modified in DB.");
                 }
             } catch (MongoDBDriverException $e) {
                 $message = "A database error occurred during code resend. Please try again.";
                 $message_type = 'error';
-                error_log("MongoDB error updating 2FA code for user ID: " . $temp_user_id_str . " Error: " . $e->getMessage());
+                error_log("MongoDB error during code resend for user ID: " . $temp_user_id_str . " Error: " . $e->getMessage());
             } catch (Exception $e) {
                 $message = "An unexpected error occurred during resend. Please try again.";
                 $message_type = 'error';
@@ -305,109 +284,109 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
 
 // --- Handle Code Verification ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
-    error_log("Verify code request received for user ID: " . $temp_user_id_str);
-    $entered_code = sanitize_input($_POST['verification_code'] ?? ''); // Sanitize input
-    error_log("Entered code: " . $entered_code);
+    error_log("Verify code request received (POST) for user ID: " . $temp_user_id_str);
+    error_log("Session state at verification attempt: " . print_r($_SESSION, true)); // Critical check
+    $entered_code = sanitize_input($_POST['verification_code'] ?? '');
+    error_log("Entered code: '" . $entered_code . "'");
 
     if (empty($entered_code)) {
         $message = 'Please enter the verification code.';
         $message_type = 'error';
-        error_log("Verification failed: Empty code entered.");
+        error_log("Verification failed: Empty code entered by user.");
     } else {
         if (!$user_id_obj || !$user_data) {
             $message = "Missing user information for verification. Please try logging in again.";
             $message_type = 'error';
-            error_log("Verification failed: Missing user_id_obj or user_data.");
-            // Potentially redirect if critical data is missing
-            // header('Location: ' . BASE_URL . '/login'); exit; // Added for clarity
+            error_log("Verification failed: Missing user_id_obj or user_data after POST. User ID Obj: " . ($user_id_obj ? 'SET' : 'NOT SET') . ", User Data: " . ($user_data ? 'SET' : 'NOT SET'));
+            // This is a critical state, user should not proceed
+            session_unset(); session_destroy();
+            header('Location: ' . BASE_URL . '/login');
+            exit;
         } else {
             try {
                 // Re-fetch user data to ensure we have the absolute latest 2FA state (especially for secret/temp_code)
-                // This protects against race conditions if other processes modify the user document.
                 $user_data_for_verification = $usersCollection->findOne(['_id' => $user_id_obj]);
-                error_log("Refetched user data for verification: " . print_r($user_data_for_verification, true));
-
+                error_log("Re-fetched user data for verification: " . print_r($user_data_for_verification, true));
 
                 if (!$user_data_for_verification) {
                     error_log("User account not found for verification during re-fetch. User ID: " . $temp_user_id_str);
                     $message = "User account not found for verification. Please try logging in again.";
                     $message_type = 'error';
-                    session_unset(); session_destroy(); 
-                    header('Location: ' . BASE_URL . '/login'); 
-                    exit; // Redirect to /login
+                    session_unset(); session_destroy();
+                    header('Location: ' . BASE_URL . '/login');
+                    exit;
                 }
 
-                $two_factor_method_current = $user_data_for_verification['two_factor_method'] ?? 'email'; // Get current method from DB
+                $two_factor_method_current = $user_data_for_verification['two_factor_method'] ?? 'email';
                 $is_code_valid = false;
-                $clear_temp_code_from_db = false; // Flag to decide if two_factor_temp_code should be unset
+                $clear_temp_code_from_db = false;
 
                 error_log("Current 2FA method for verification: " . $two_factor_method_current);
 
                 if ($two_factor_method_current === 'authenticator') {
                     $secret_to_verify = $user_data_for_verification['two_factor_secret'] ?? null;
-                    error_log("Authenticator method: Secret from DB: " . ($secret_to_verify ? 'SET' : 'NOT SET'));
+                    error_log("Authenticator method: Secret from DB: " . ($secret_to_verify ? 'SET' : 'NOT SET') . ", Length: " . strlen($secret_to_verify ?? ''));
                     if ($secret_to_verify) {
-                        // Recreate TOTP object using the stored secret for verification
                         $totp_verifier = TOTP::create($secret_to_verify);
-                        // Check the code. The verify method has a second parameter for clock drift (e.g., 1 for +/- 30s)
                         $is_code_valid = $totp_verifier->verify($entered_code);
-                        error_log("Authenticator verification result: " . ($is_code_valid ? 'SUCCESS' : 'FAILURE'));
+                        error_log("Authenticator verification result: " . ($is_code_valid ? 'SUCCESS' : 'FAILURE') . ". Entered: " . $entered_code);
                     } else {
                         $message = 'Authenticator app not fully set up or secret is missing. Please contact support.';
                         $message_type = 'error';
                         error_log("2FA Authenticator: No secret found for user " . $temp_user_id_str . " during verification.");
                     }
-                } else { // Default to email verification (or if method is explicitly 'email')
+                } else { // Email verification
                     $stored_code = $user_data_for_verification['two_factor_temp_code'] ?? null;
                     $stored_expiry_utc = $user_data_for_verification['two_factor_code_expiry'] ?? null;
 
                     $current_timestamp = time();
-                    $expiry_timestamp = $stored_expiry_utc instanceof UTCDateTime ? $stored_expiry_utc->toDateTime()->getTimestamp() : 0;
+                    $expiry_timestamp = 0;
+                    if ($stored_expiry_utc instanceof UTCDateTime) {
+                        $expiry_timestamp = $stored_expiry_utc->toDateTime()->getTimestamp();
+                    } else {
+                        error_log("2FA: Stored expiry is not a UTCDateTime object for user " . $temp_user_id_str);
+                    }
                     
-                    error_log("Email method: Stored code: " . ($stored_code ?? 'NOT SET') . ", Entered code: " . $entered_code);
-                    error_log("Current timestamp: " . $current_timestamp . ", Expiry timestamp: " . $expiry_timestamp);
+                    error_log("Email method: Stored code: '" . ($stored_code ?? 'NULL') . "', Entered code: '" . $entered_code . "'");
+                    error_log("Current timestamp: " . $current_timestamp . " (" . date('Y-m-d H:i:s T', $current_timestamp) . ")");
+                    error_log("Expiry timestamp: " . $expiry_timestamp . " (" . date('Y-m-d H:i:s T', $expiry_timestamp) . ")");
 
                     if ($stored_code && $stored_expiry_utc && $entered_code === $stored_code && $current_timestamp < $expiry_timestamp) {
                         $is_code_valid = true;
-                        $clear_temp_code_from_db = true; // Mark for clearing temp fields
-                        error_log("Email code is valid and not expired.");
+                        $clear_temp_code_from_db = true;
+                        error_log("Email code is VALID and not expired for user " . $temp_user_id_str);
                     } else if ($stored_expiry_utc && $current_timestamp >= $expiry_timestamp) {
                         $message = 'The verification code has expired. Please request a new one.';
                         $message_type = 'error';
-                        error_log("2FA: Code expired for user " . $temp_user_id_str . ". Entered: " . $entered_code . ", Stored: " . $stored_code);
+                        error_log("2FA: Code EXPIRED for user " . $temp_user_id_str . ". Entered: '" . $entered_code . "', Stored: '" . ($stored_code ?? 'NULL') . "'");
                     } else {
-                        error_log("Email code check failed: Stored code missing/expired or mismatch. Stored: " . ($stored_code ?? 'NULL') . ", Entered: " . $entered_code . ", Expired: " . ($current_timestamp >= $expiry_timestamp ? 'YES' : 'NO'));
+                        $message = 'The verification code is incorrect. Please try again.'; // Provide a generic error for security reasons
+                        $message_type = 'error';
+                        error_log("Email code MISMATCH or missing code/expiry for user " . $temp_user_id_str . ". Stored: '" . ($stored_code ?? 'NULL') . "', Entered: '" . $entered_code . "'");
                     }
                 }
 
                 if ($is_code_valid) {
                     error_log("2FA code IS VALID for user ID: " . $temp_user_id_str . ". Finalizing login.");
-                    // Code is valid, user is fully authenticated
-                    $_SESSION['user_logged_in'] = true; // Set flag used by login.php to redirect
-                    $_SESSION['user_id'] = $temp_user_id_str; // Store actual user ID in session
+                    $_SESSION['user_logged_in'] = true;
+                    $_SESSION['user_id'] = $temp_user_id_str;
                     $_SESSION['first_name'] = $user_data_for_verification['first_name'] ?? '';
                     $_SESSION['last_name'] = $user_data_for_verification['last_name'] ?? '';
                     $_SESSION['full_name'] = $user_data_for_verification['full_name'] ?? trim(($user_data_for_verification['first_name'] ?? '') . ' ' . ($user_data_for_verification['last_name'] ?? ''));
-                    // Use null coalescing operator to safely access 'is_admin'
                     $_SESSION['is_admin'] = $user_data_for_verification['is_admin'] ?? false;
-                    $_SESSION['two_factor_enabled'] = $two_factor_enabled; // Keep 2FA status in session
-                    $_SESSION['two_factor_method'] = $two_factor_method_current; // Keep 2FA method in session
-                    // Ensure role is set for general routing, using safe access
-                    $_SESSION['role'] = ($user_data_for_verification['is_admin'] ?? false) ? 'admin' : 'user'; 
+                    $_SESSION['two_factor_enabled'] = $two_factor_enabled;
+                    $_SESSION['two_factor_method'] = $two_factor_method_current;
+                    $_SESSION['role'] = ($user_data_for_verification['is_admin'] ?? false) ? 'admin' : 'user';
 
-                    // CRITICAL: Set 2FA as verified in session
-                    $_SESSION['2fa_verified'] = true;
-                    error_log("Session after successful 2FA: " . print_r($_SESSION, true));
+                    $_SESSION['2fa_verified'] = true; // CRITICAL: Mark 2FA as verified
+                    error_log("Session state AFTER successful 2FA verification: " . print_r($_SESSION, true));
 
-
-                    // Clear 2FA specific temporary session variables
+                    // Clear temporary 2FA specific session variables
                     unset($_SESSION['auth_step']);
                     unset($_SESSION['temp_user_id']);
-                    unset($_SESSION['last_resend_time']); // Clear resend cooldown
-                    // If you had a session temp_2fa_secret for *setup verification*, clear it here
+                    unset($_SESSION['last_resend_time']);
                     unset($_SESSION['temp_2fa_secret']);
-                    error_log("Cleared temporary 2FA session variables.");
-
+                    error_log("Cleared temporary 2FA session variables from SESSION.");
 
                     // Clear temporary code/expiry from DB if it was an email verification
                     if ($clear_temp_code_from_db) {
@@ -419,20 +398,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
                             error_log("MongoDB: Cleared two_factor_temp_code and two_factor_code_expiry for user ID: " . $temp_user_id_str);
                         } catch (MongoDBDriverException $e) {
                             error_log("MongoDB error clearing 2FA temp code for user ID: " . $temp_user_id_str . " Error: " . $e->getMessage());
-                            // This is not critical to login, but important to log.
                         }
                     }
 
-                    // Redirect to dashboard based on role using BASE_URL
                     $redirect_path = (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) ? '/admin' : '/dashboard';
                     error_log("Redirecting to " . BASE_URL . $redirect_path . " after successful 2FA verification.");
-                    header('Location: ' . BASE_URL . $redirect_path); // Admin dashboard route
+                    header('Location: ' . BASE_URL . $redirect_path);
                     exit;
 
                 } else if ($message_type === '') { // Only set generic error if not already set by expiry check
+                    // This block will catch mismatches for both email and authenticator if not expired.
                     $message = 'The verification code is incorrect. Please try again.';
                     $message_type = 'error';
-                    error_log("2FA: Invalid code for user " . $temp_user_id_str . ". Entered: " . $entered_code . ". Method: " . $two_factor_method_current);
+                    error_log("2FA: Invalid code. User ID: " . $temp_user_id_str . ". Entered: '" . $entered_code . "'. Method: " . $two_factor_method_current);
                 }
 
             } catch (MongoDBDriverException $e) {
