@@ -11,8 +11,8 @@ use MongoDB\Exception\Exception as MongoDBException; // Catch general MongoDB ex
 use MongoDB\Driver\Exception\BulkWriteException; // Specific exception for write errors (e.g., duplicate key)
 
 // AWS SDK for PHP
-use Aws\S3\S3Client;
-use Aws\S3\Exception\S3Exception;
+use Aws\S3\S3Client; // You use the S3Client class from the AWS SDK
+use Aws\S3\Exception\S3Exception; // And the S3Exception for error handling
 
 // Check if admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
