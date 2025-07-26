@@ -27,9 +27,9 @@ if (isset($_SESSION['message'])) {
 }
 
 // --- Session State Validation ---
-error_log("Verify_code.php: Checking session state. auth_step: " . ($_SESSION['auth_step'] ?? 'N/A') . ", temp_user_id: " . ($_SESSION['temp_user_id'] ?? 'N/A')); // Added detailed log
+error_log("Verify_code.php: Checking session state. auth_step: " . ($_SESSION['auth_step'] ?? 'N/A') . ", temp_user_id: " . ($_SESSION['temp_user_id'] ?? 'N/A') . ", email: " . ($_SESSION['email'] ?? 'N/A')); // Added detailed log
 if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' || !isset($_SESSION['temp_user_id'])) {
-    error_log("Verify_code.php: Invalid session state for 2FA. Redirecting to login.");
+    error_log("Verify_code.php: Invalid session state for 2FA. Redirecting to login. Reason: auth_step=" . ($_SESSION['auth_step'] ?? 'NOT SET') . ", temp_user_id=" . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
     $_SESSION['message'] = "Your session has expired or is invalid. Please log in again.";
     $_SESSION['message_type'] = "error";
     header('Location: ' . BASE_URL . '/login');
@@ -66,6 +66,13 @@ try {
         error_log("Verify_code.php: User " . $user_id . " 2FA status changed or is none. Logging in directly.");
         $_SESSION['user_logged_in'] = true;
         $_SESSION['2fa_verified'] = true; // No 2FA, so consider it verified immediately
+        // Also set the actual user_id in the session for the now-logged-in state
+        $_SESSION['user_id'] = (string)$user['_id'];
+        // Ensure other relevant user details are in session for full login
+        $_SESSION['first_name'] = $user['first_name'] ?? '';
+        $_SESSION['email'] = $user['email'] ?? '';
+        $_SESSION['is_admin'] = $user['is_admin'] ?? false; // Only if applicable
+
         unset($_SESSION['auth_step']);
         unset($_SESSION['temp_user_id']);
 
@@ -94,6 +101,9 @@ try {
                 // If no code is pending in DB, force user to re-initiate login
                 unset($_SESSION['auth_step']);
                 unset($_SESSION['temp_user_id']);
+                // It's crucial to add the message to session BEFORE redirecting if you want it displayed on login.php
+                $_SESSION['message'] = $message;
+                $_SESSION['message_type'] = $message_type;
                 header('Location: ' . BASE_URL . '/login');
                 exit;
             }
@@ -109,6 +119,11 @@ try {
                 // Code is correct and not expired - SUCCESS!
                 $_SESSION['user_logged_in'] = true;
                 $_SESSION['2fa_verified'] = true;
+                $_SESSION['user_id'] = (string)$user['_id']; // Store actual user ID in session for full access
+                $_SESSION['first_name'] = $user['first_name'] ?? ''; // Example of storing more user data
+                $_SESSION['email'] = $user['email'] ?? ''; // Keep actual email if needed for session
+                $_SESSION['is_admin'] = $user['is_admin'] ?? false; // Only if applicable
+
                 unset($_SESSION['auth_step']); // Clear the 2FA state
                 unset($_SESSION['temp_user_id']); // Clear temp user ID
 
@@ -132,6 +147,13 @@ try {
                         ['_id' => $user['_id']],
                         ['$unset' => ['two_factor_temp_code' => '', 'two_factor_code_expiry' => '']]
                     );
+                    // If code expired, force re-initiate login
+                    unset($_SESSION['auth_step']);
+                    unset($_SESSION['temp_user_id']);
+                    $_SESSION['message'] = $message;
+                    $_SESSION['message_type'] = "error";
+                    header('Location: ' . BASE_URL . '/login');
+                    exit;
                 } else {
                     $message = "Invalid verification code. Please try again.";
                     error_log("Verify_code.php: Invalid code submitted for user " . $user_id . ".");
@@ -148,6 +170,8 @@ try {
     unset($_SESSION['auth_step']);
     unset($_SESSION['temp_user_id']);
     session_destroy();
+    $_SESSION['message'] = $message; // Store message for login.php
+    $_SESSION['message_type'] = $message_type;
     header('Location: ' . BASE_URL . '/login');
     exit;
 } catch (Exception $e) {
@@ -158,6 +182,8 @@ try {
     unset($_SESSION['auth_step']);
     unset($_SESSION['temp_user_id']);
     session_destroy();
+    $_SESSION['message'] = $message; // Store message for login.php
+    $_SESSION['message_type'] = $message_type;
     header('Location: ' . BASE_URL . '/login');
     exit;
 }

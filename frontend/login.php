@@ -37,8 +37,8 @@ if (file_exists($dotenvPath . '/.env')) {
 // into the environment by the hosting platform (e.g., Render's Config Vars).
 // --- End Dotenv loading ---
 
-require_once __DIR__ . '/../Config.php';       // Path from frontend/ to project root
-require_once __DIR__ . '/../functions.php';     // Path from frontend/ to project root
+require_once __DIR__ . '/../Config.php';        // Path from frontend/ to project root
+require_once __DIR__ . '/../functions.php';      // Path from frontend/ to project root
 
 // Initialize message and message type variables
 $message = '';
@@ -54,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     if (empty($lastName) || empty($membershipNumber)) {
         $message = "Please enter both last name and membership number.";
         $message_type = "error";
+        error_log("Login.php: Missing last name or membership number.");
     } else {
         try {
             // Establish MongoDB connection and get the 'users' collection
@@ -85,9 +86,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                 // will be treated as a standard user for this frontend.
                 // If you *must* block admin accounts from logging in here, you'd add:
                 // if (($user['role'] ?? 'user') === 'admin' || ($user['is_admin'] ?? false)) {
-                //     $message = "Administrators must log in via the admin portal.";
-                //     $message_type = "error";
-                //     // Maybe log this attempt
+                //      $message = "Administrators must log in via the admin portal.";
+                //      $message_type = "error";
+                //      // Maybe log this attempt
                 // } else { ... proceed with user login }
 
 
@@ -97,6 +98,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                     // temp_user_id is already set as user_id above, but explicitly setting for clarity in 2FA flow.
                     // This is for verify_code.php to pick up the user.
                     $_SESSION['temp_user_id'] = (string) $user['_id'];
+                    $_SESSION['email'] = $user['email'] ?? ''; // Store user's email for display in verify_code.php
+
+                    error_log("Login.php: 2FA enabled for user: " . $user['email'] . ". Setting session vars for 2FA.");
+                    error_log("Login.php: Session dump before 2FA code generation: " . print_r($_SESSION, true));
+
 
                     // If 2FA method is email, generate and send code
                     if ($twoFactorMethod === 'email') {
@@ -111,6 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                                 'two_factor_code_expiry' => $expiryTime
                             ]]
                         );
+                        error_log("Login.php: Generated code and updated DB for user " . $user['_id'] . ". Code: " . $verificationCode);
 
                         // Send the email (assuming sendEmail function exists in functions.php)
                         $emailSubject = "HomeTown Bank Login Verification Code";
@@ -146,24 +153,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                             </body>
                             </html>";
                         sendEmail($user['email'], $emailSubject, $emailBodyHtml, "Your verification code for HomeTown Bank is: " . $verificationCode);
+                        error_log("Login.php: Verification email sent to " . $user['email']);
                     }
+
                     ob_end_clean(); // Discard any buffered output
-                    header('Location: ' . BASE_URL . 'verify_code');
+                    error_log("Login.php: Redirecting to verify_code. Current session state: " . print_r($_SESSION, true)); // CRITICAL LOG
+                    header('Location: ' . BASE_URL . '/verify_code'); // Ensure / before verify_code
                     exit;
 
                 } else {
                     // No 2FA enabled for this user or method is 'none', log them in directly
                     $_SESSION['user_logged_in'] = true; // Mark as fully logged in
                     $_SESSION['2fa_verified'] = true; // No 2FA, so consider it verified immediately
+                    // Assuming you have a user ID or similar to store for the actual logged-in session
+                    $_SESSION['user_id'] = (string)$user['_id']; 
+                    // Set other necessary session vars for a logged-in user (e.g., first_name, role)
+                    $_SESSION['first_name'] = $user['first_name'] ?? '';
+                    $_SESSION['is_admin'] = $user['is_admin'] ?? false; // Make sure this is only set for actual admins if needed
+                    $_SESSION['email'] = $user['email'] ?? '';
+
+
+                    error_log("Login.php: 2FA NOT enabled for user " . $user['email'] . ". Logging in directly.");
+                    error_log("Login.php: Session dump before direct login redirect: " . print_r($_SESSION, true));
 
                     ob_end_clean(); // Discard any buffered output
-                    header('Location: ' . BASE_URL . '/dashboard');
+                    $redirect_path = ($_SESSION['is_admin'] ?? false) ? '/admin' : '/dashboard';
+                    header('Location: ' . BASE_URL . $redirect_path);
                     exit;
                 }
             } else {
                 // User not found or credentials do not match
                 $message = "Invalid last name or membership number.";
                 $message_type = "error";
+                error_log("Login.php: Invalid credentials for last name: " . $lastName);
             }
         } catch (MongoDB\Driver\Exception\Exception $e) {
             // Log the MongoDB error for debugging
