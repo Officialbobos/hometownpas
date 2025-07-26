@@ -1,5 +1,26 @@
 <?php
 // index.php
+
+// --- START TEMPORARY DEBUG CODE ---
+// Force display errors for debugging on Render (remove for production)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// Check if MongoDB extension is loaded
+if (!extension_loaded('mongodb')) {
+    die('<h1>FATAL ERROR: MongoDB PHP extension is not loaded!</h1><p>Please check your Dockerfile, build logs, and PHP configuration.</p>');
+}
+
+// Check if MongoDB Client class exists (Composer autoloading)
+// This confirms if Composer's autoloader is working for MongoDB classes.
+if (!class_exists('MongoDB\Client')) {
+    die('<h1>FATAL ERROR: MongoDB\Client class not found!</h1><p>This usually means Composer\'s autoloader failed or the MongoDB driver was not correctly installed/enabled.</p><p>Ensure `composer install` ran successfully and `docker-php-ext-enable mongodb` completed in your Dockerfile.</p>');
+}
+
+// --- END TEMPORARY DEBUG CODE ---
+
+
 session_start();
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/functions.php'; // Contains getMongoDBClient()
@@ -12,10 +33,12 @@ $mongoDb = null;
 try {
     $mongoClient = getMongoDBClient();
     $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME);
+    // If we reach here, the connection was successful. Temporarily confirm this.
+    // die('<h1>SUCCESS: MongoDB connection established!</h1><p>The issue is likely further down in your application logic, or you can remove debug code now.</p>');
 } catch (Exception $e) {
     error_log("Failed to connect to MongoDB: " . $e->getMessage());
-    // In a real application, you might redirect to an error page or show a friendly message
-    die("<h1>Service Unavailable: Database connection failed.</h1>");
+    // This die() should now catch connection-specific errors.
+    die("<h1>Service Unavailable: Database connection failed.</h1><p>Error: " . htmlspecialchars($e->getMessage()) . "</p>");
 }
 
 $request_uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -32,7 +55,7 @@ $authenticated_routes = [
     'bank_cards', // Add this
     'api/get_user_cards',
     'api/get_user_accounts', // Add this
-    'api/order_card',       // Add this
+    'api/order_card',        // Add this
     // Add other routes that require authentication
 ];
 
