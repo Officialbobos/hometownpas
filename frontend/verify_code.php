@@ -1,427 +1,212 @@
 <?php
-// C:\xampp\htdocs\heritagebank\frontend\verify_code.php
+// C:\xampp\htdocs\heritagebank\frontend\login.php
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Ensure session is started at the very beginning
+// >>>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT: Add session_start() at the very top <<<<<<<<<<<<<<<<<<<<<<<<
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-error_log("--- verify_code.php Start ---");
+error_log("--- login.php Start (New Version) ---");
 error_log("Session ID: " . session_id());
-error_log("Session Contents (verify_code.php initial load): " . print_r($_SESSION, true)); // Critical check
+error_log("Session Contents (login.php initial load): " . print_r($_SESSION, true)); // CRITICAL check
+
+require_once __DIR__ . '/../vendor/autoload.php'; // Correct path to autoload.php
 
 // --- Start Dotenv loading (conditional for deployment) ---
+// This block attempts to load .env files only if they exist.
+// On Render, environment variables should be set directly in the dashboard,
+// so a physical .env file won't be present.
 $dotenvPath = dirname(__DIR__);
 if (file_exists($dotenvPath . '/.env')) {
     $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
     try {
-        $dotenv->load();
+        $dotenv->load(); // This will only run if .env file exists
+        error_log("Dotenv: .env file loaded successfully.");
     } catch (Dotenv\Exception\InvalidPathException $e) {
+        // This catch is mostly for local dev if .env is missing.
         error_log("Dotenv load error locally on path " . $dotenvPath . ": " . $e->getMessage());
     }
+} else {
+    error_log("Dotenv: .env file not found. Assuming environment variables are pre-loaded by the system (e.g., Render).");
 }
+// If .env doesn't exist (like on Render), the variables are assumed to be pre-loaded
+// into the environment by the hosting platform (e.g., Render's Config Vars).
 // --- End Dotenv loading ---
 
-require_once __DIR__ . '/../Config.php';
-require_once __DIR__ . '/../functions.php';
+require_once __DIR__ . '/../Config.php';      // Path from frontend/ to project root
+require_once __DIR__ . '/../functions.php';    // Path from frontend/ to project root
 
-use MongoDB\Client;
-use MongoDB\BSON\ObjectId;
-use MongoDB\BSON\UTCDateTime;
-use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
-use OTPHP\TOTP;
-use BaconQrCode\Writer;
-use BaconQrCode\Renderer\Image\Png;
-
+// Initialize message and message type variables
 $message = '';
 $message_type = '';
 
-error_log("verify_code.php: Checking session state for 2FA flow.");
-error_log("verify_code.php: _SESSION['auth_step'] = " . ($_SESSION['auth_step'] ?? 'NOT SET'));
-error_log("verify_code.php: _SESSION['temp_user_id'] = " . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
-
-// Check if 2FA process is pending and temporary user ID exists
-if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' || !isset($_SESSION['temp_user_id'])) {
-    error_log("Redirecting to login: Session 'auth_step' is not 'awaiting_2fa' OR 'temp_user_id' is missing.");
-    error_log("Current auth_step: " . ($_SESSION['auth_step'] ?? 'NOT SET'));
-    error_log("Current temp_user_id: " . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
-    
-    // Clear potentially corrupted session
-    session_unset();
-    session_destroy();
-    error_log("Session cleared and destroyed due to invalid 2FA state. Redirecting to " . BASE_URL . "/login");
-    header('Location: ' . BASE_URL . '/login');
-    exit;
+// Check for messages from other pages (e.g., from verify_code.php if it redirects back due to session issues)
+if (isset($_SESSION['message'])) {
+    $message = $_SESSION['message'];
+    $message_type = $_SESSION['message_type'] ?? 'info';
+    error_log("Login.php: Displaying message from session: '" . $message . "' of type '" . $message_type . "'");
+    unset($_SESSION['message']); // Clear message after displaying
+    unset($_SESSION['message_type']);
 }
 
-$temp_user_id_str = $_SESSION['temp_user_id'];
-$user_id_obj = null;
-$user_email = '';
-$user_full_name = '';
-$masked_user_email = '';
+// Check if the login form was submitted via POST request
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
+    error_log("Login.php: POST request received for login.");
+    error_log("Session Contents (login.php during POST handling): " . print_r($_SESSION, true)); // CRITICAL check here
 
-try {
-    $user_id_obj = new ObjectId($temp_user_id_str); // Convert to ObjectId for MongoDB queries
-    error_log("Successfully created ObjectId from temp_user_id: " . $temp_user_id_str);
-} catch (MongoDB\BSON\Exception\InvalidTypeException $e) {
-    error_log("Invalid temp_user_id in session, cannot convert to ObjectId: " . $e->getMessage());
-    error_log("Redirecting to login: Invalid ObjectId from temp_user_id.");
-    $message = "Session error: Your login session is invalid. Please try logging in again.";
-    $message_type = 'error';
-    session_unset();
-    session_destroy();
-    header('Location: ' . BASE_URL . '/login');
-    exit;
-}
+    // Sanitize and retrieve input data
+    $lastName = sanitize_input(trim($_POST['last_name'] ?? '')); // Using sanitize_input from functions.php
+    $membershipNumber = sanitize_input(trim($_POST['membership_number'] ?? ''));
 
-// Establish MongoDB connection and get collection
-$usersCollection = getCollection('users');
+    error_log("Login.php: Attempting login with Last Name: '" . $lastName . "', Membership Number: '" . $membershipNumber . "'");
 
-// Fetch user's email, name, and 2FA settings for display and functionality
-$user_data = null;
-try {
-    $user_data = $usersCollection->findOne(['_id' => $user_id_obj]);
-
-    if ($user_data) {
-        $user_email = $user_data['email'] ?? '';
-        $first_name = $user_data['first_name'] ?? '';
-        $last_name = $user_data['last_name'] ?? '';
-        $user_full_name = htmlspecialchars(trim($first_name . ' ' . $last_name));
-        $masked_user_email = hideEmailPartially($user_email);
-        $_SESSION['role'] = ($user_data['is_admin'] ?? false) ? 'admin' : 'user';
-        error_log("User data fetched successfully for user ID: " . $temp_user_id_str . ". Email: " . $user_email);
+    // Basic validation (can be expanded)
+    if (empty($lastName) || empty($membershipNumber)) {
+        $message = "Please enter both last name and membership number.";
+        $message_type = "error";
+        error_log("Login.php: Validation failed - Empty last name or membership number.");
     } else {
-        error_log("User data not found in DB for temp_user_id: " . $temp_user_id_str . ". Possible session mismatch or DB issue.");
-        error_log("Redirecting to login: User data not found in DB.");
-        $message = "Your account details could not be retrieved. Please try logging in again.";
-        $message_type = 'error';
-        session_unset();
-        session_destroy();
-        header('Location: ' . BASE_URL . '/login');
-        exit;
-    }
-} catch (MongoDBDriverException $e) {
-    error_log("MongoDB error fetching user data for 2FA verification: " . $e->getMessage());
-    $message = "A database error occurred. Please try again later.";
-    $message_type = 'error';
-    // No redirect here, display message to user
-} catch (Exception $e) {
-    error_log("General error fetching user data for 2FA verification: " . $e->getMessage());
-    $message = "An unexpected error occurred. Please try again.";
-    $message_type = 'error';
-    // No redirect here, display message to user
-}
-
-// --- Determine 2FA Type and Setup/Verification State ---
-$two_factor_enabled = $user_data['two_factor_enabled'] ?? false;
-$two_factor_secret = $user_data['two_factor_secret'] ?? null;
-$two_factor_method = $user_data['two_factor_method'] ?? 'email';
-
-$show_authenticator_setup = false;
-$qr_code_data_url = '';
-$manual_secret = '';
-
-error_log("User 2FA Status: Enabled=" . ($two_factor_enabled ? 'true' : 'false') . ", Method=" . $two_factor_method . ", Secret=" . ($two_factor_secret ? 'SET' : 'NOT SET'));
-
-if ($two_factor_enabled && $two_factor_method === 'authenticator' && !$two_factor_secret) {
-    error_log("Authenticator setup flow initiated for user ID: " . $temp_user_id_str . " (no secret found).");
-    $show_authenticator_setup = true;
-    
-    $totp = TOTP::generate();
-    $manual_secret = $totp->getSecret();
-    error_log("Generated new TOTP secret: " . $manual_secret);
-
-    $issuer = SMTP_FROM_NAME;
-    $account_name = $user_email;
-    $totp->setLabel($account_name);
-    $totp->setIssuer($issuer);
-    $otp_auth_uri = $totp->getProvisioningUri();
-    error_log("Generated OTP Auth URI: " . $otp_auth_uri);
-
-    try {
-        $writer = new Writer(new Png());
-        $qr_code_data_url = 'data:image/png;base64,' . base64_encode($writer->writeString($otp_auth_uri));
-        error_log("QR Code Data URL generated successfully.");
-    } catch (Exception $e) {
-        error_log("Error generating QR code: " . $e->getMessage());
-        $message = "Error generating QR code. Please try again or contact support.";
-        $message_type = 'error';
-        $show_authenticator_setup = false;
-    }
-
-    if (($user_data['two_factor_secret'] ?? null) === null) {
         try {
-            $usersCollection->updateOne(
-                ['_id' => $user_id_obj],
-                ['$set' => ['two_factor_secret' => $manual_secret]]
-            );
-            error_log("Saved new 2FA secret to DB for user ID: " . $temp_user_id_str);
-            $message = "Please scan the QR code with your authenticator app and enter the code below to complete setup.";
-            $message_type = 'info';
-        } catch (MongoDBDriverException $e) {
-            error_log("MongoDB error saving new 2FA secret for user ID: " . $temp_user_id_str . " Error: " . $e->getMessage());
-            $message = "A database error occurred during 2FA setup. Please try again later.";
-            $message_type = 'error';
-            $show_authenticator_setup = false;
-        }
-    } else {
-        error_log("2FA secret already exists for user ID: " . $temp_user_id_str . ". Not overwriting.");
-        $message = "Please enter the code generated by your authenticator app.";
-        $message_type = 'info';
-        $show_authenticator_setup = false;
-    }
-}
+            // Establish MongoDB connection and get the 'users' collection
+            // Assuming getCollection() is defined in functions.php and handles DB connection
+            $usersCollection = getCollection('users');
 
+            // Find the user by last_name and membership_number
+            // IMPORTANT: For production, membership_number should be hashed in the DB
+            // and you would compare the hash here. For this example, direct comparison.
+            $user = $usersCollection->findOne([
+                'last_name' => $lastName,
+                'membership_number' => $membershipNumber // Direct comparison - HASH THIS IN PRODUCTION!
+            ]);
 
-// --- Handle Code Resend ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_code'])) {
-    error_log("Resend code request received for user ID: " . $temp_user_id_str);
-    if (!$user_id_obj || empty($user_email)) {
-        $message = "Unable to resend code: Missing user information. Please try logging in again.";
-        $message_type = 'error';
-        error_log("Resend failed: Missing user ID or email. User ID Obj: " . ($user_id_obj ? 'SET' : 'NOT SET') . ", Email: " . ($user_email ? 'SET' : 'NOT SET'));
-    } elseif ($two_factor_method === 'authenticator') {
-        $message = "Resending codes is not applicable for Authenticator app 2FA. Please generate a new code using your app.";
-        $message_type = 'info';
-        error_log("Resend not applicable for authenticator method. User ID: " . $temp_user_id_str);
-    } else {
-        $last_resend_time = $_SESSION['last_resend_time'] ?? 0;
-        if (time() - $last_resend_time < 60) {
-            $remaining_time = 60 - (time() - $last_resend_time);
-            $message = "Please wait before requesting another code. You can request again in " . $remaining_time . " seconds.";
-            $message_type = 'error';
-            error_log("Resend rate limited for user " . $temp_user_id_str . ". Remaining: " . $remaining_time . "s");
-        } else {
-            $new_verification_code = str_pad(random_int(0, (10**TWO_FACTOR_CODE_LENGTH) - 1), TWO_FACTOR_CODE_LENGTH, '0', STR_PAD_LEFT);
-            $new_expiry_time = new UTCDateTime(strtotime('+' . TWO_FACTOR_CODE_EXPIRY_MINUTES . ' minutes') * 1000);
-            error_log("Generated new email 2FA code: " . $new_verification_code . " (expires: " . $new_expiry_time->toDateTime()->format('Y-m-d H:i:s T') . ")");
+            if ($user) {
+                error_log("Login.php: User found in DB. User ID: " . (string)$user['_id'] . ", Email: " . ($user['email'] ?? 'N/A'));
+                // User found and credentials match
+                $twoFactorEnabled = $user['two_factor_enabled'] ?? false;
+                $twoFactorMethod = $user['two_factor_method'] ?? 'email'; // Default to 'email' if not set
 
-            try {
-                $updateResult = $usersCollection->updateOne(
-                    ['_id' => $user_id_obj],
-                    ['$set' => [
-                        'two_factor_temp_code' => $new_verification_code,
-                        'two_factor_code_expiry' => $new_expiry_time
-                    ]]
-                );
+                error_log("Login.php: User 2FA Status - Enabled: " . ($twoFactorEnabled ? 'true' : 'false') . ", Method: " . $twoFactorMethod);
 
-                if ($updateResult->getModifiedCount() > 0) {
-                    error_log("DB updated with new 2FA code for user ID: " . $temp_user_id_str);
-                    $email_subject = "HomeTown Bank Login Verification Code";
-                    $email_body_html = "
-                    <!DOCTYPE html>
-                    <html lang='en'>
-                    <head>
-                        <meta charset='UTF-8'>
-                        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-                        <title>HomeTown Bank - Verification Code</title>
-                        <style>
-                            body { font-family: 'Roboto', sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }
-                            .email-container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.05); overflow: hidden; }
-                            .header { background-color: #0056b3; padding: 20px; text-align: center; color: #ffffff; font-size: 24px; font-weight: bold; }
-                            .content { padding: 30px; color: #333333; line-height: 1.6; text-align: center; }
-                            .content p { margin-bottom: 15px; }
-                            .verification-code { display: inline-block; background-color: #e6f0fa; color: #0056b3; font-size: 32px; font-weight: bold; padding: 15px 30px; border-radius: 5px; margin: 20px 0; letter-spacing: 3px; text-align: center; }
-                            .expiry-info { font-size: 0.9em; color: #777777; margin-top: 20px; }
-                            .footer { background-color: #f0f0f0; padding: 20px; text-align: center; font-size: 0.85em; color: #666666; border-top: 1px solid #eeeeee; }
-                        </style>
-                    </head>
-                    <body>
-                        <div class='email-container'>
-                            <div class='header'>
-                                HomeTown Bank 
-                            </div>
-                            <div class='content'>
-                                <p>Dear " . $user_full_name . ",</p>
-                                <p>You requested a new verification code for your HomeTown Bank Online Banking account. Here is your new code:</p>
-                                <div class='verification-code'>" . htmlspecialchars($new_verification_code) . "</div>
-                                <p class='expiry-info'>This code is valid for <strong>" . TWO_FACTOR_CODE_EXPIRY_MINUTES . " minutes</strong> and should be entered on the verification page.</p>
-                                <p>If you did not request this, please ignore this email or contact us immediately if you suspect unauthorized activity on your account.</p>
-                                <p>For security reasons, do not share this code with anyone.</p>
-                            </div>
-                            <div class='footer'>
-                                <p>&copy; " . date('Y') . " HomeTown Bank. All rights reserved.</p>
-                                <p>This is an automated email, please do not reply.</p>
-                            </div>
-                        </div>
-                    </body>
-                    </html>";
+                // Set user-related session variables that are safe to set even before 2FA
+                $_SESSION['user_id'] = (string) $user['_id']; // Store ObjectId as string
+                $_SESSION['role'] = $user['role'] ?? 'user';
+                $_SESSION['first_name'] = $user['first_name'] ?? '';
+                $_SESSION['last_name'] = $user['last_name'] ?? '';
+                $_SESSION['full_name'] = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
+                $_SESSION['email'] = $user['email'] ?? '';
+                $_SESSION['is_admin'] = $user['is_admin'] ?? false; // Assuming 'is_admin' field exists
 
-                    $email_sent = sendEmail($user_email, $email_subject, $email_body_html, "Your new verification code for HomeTown Bank is: " . $new_verification_code);
-                    $_SESSION['last_resend_time'] = time();
+                error_log("Login.php: Basic session variables set. Current Session: " . print_r($_SESSION, true));
 
-                    if ($email_sent) {
-                        $message = "A new verification code has been sent to your registered email address.";
-                        $message_type = 'success';
-                        error_log("New 2FA email sent successfully to " . $user_email . " for user ID: " . $temp_user_id_str);
-                    } else {
-                        $message = "Failed to resend verification email. Please try again or contact support.";
-                        $message_type = 'error';
-                        error_log("Resend 2FA email failed for user ID: " . $temp_user_id_str . " (Email: " . $user_email . "). Check mailer config/logs.");
-                    }
-                } else {
-                    $message = "Failed to update new verification code in the database. Please try again.";
-                    $message_type = 'error';
-                    error_log("Failed to update new 2FA code for user ID: " . $temp_user_id_str . ". No document modified in DB.");
-                }
-            } catch (MongoDBDriverException $e) {
-                $message = "A database error occurred during code resend. Please try again.";
-                $message_type = 'error';
-                error_log("MongoDB error during code resend for user ID: " . $temp_user_id_str . " Error: " . $e->getMessage());
-            } catch (Exception $e) {
-                $message = "An unexpected error occurred during resend. Please try again.";
-                $message_type = 'error';
-                error_log("General error during 2FA code resend for user ID: " . $temp_user_id_str . " Error: " . $e->getMessage());
-            }
-        }
-    }
-}
+                if ($twoFactorEnabled && $twoFactorMethod !== 'none') {
+                    error_log("Login.php: 2FA is enabled for this user. Preparing for verification.");
+                    // 2FA is enabled for this user. Redirect to verification page.
+                    $_SESSION['auth_step'] = 'awaiting_2fa';
+                    // temp_user_id is already set as user_id above, but explicitly setting for clarity in 2FA flow.
+                    // This is for verify_code.php to pick up the user.
+                    $_SESSION['temp_user_id'] = (string) $user['_id'];
 
+                    error_log("Login.php: Set SESSION: auth_step='" . $_SESSION['auth_step'] . "', temp_user_id='" . $_SESSION['temp_user_id'] . "'");
+                    error_log("Login.php: Session Contents BEFORE 2FA redirect: " . print_r($_SESSION, true)); // CRITICAL final check before redirect
 
-// --- Handle Code Verification ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
-    error_log("Verify code request received (POST) for user ID: " . $temp_user_id_str);
-    error_log("Session state at verification attempt: " . print_r($_SESSION, true)); // Critical check
-    $entered_code = sanitize_input($_POST['verification_code'] ?? '');
-    error_log("Entered code: '" . $entered_code . "'");
+                    // If 2FA method is email, generate and send code
+                    if ($twoFactorMethod === 'email') {
+                        $verificationCode = str_pad(random_int(0, (10**TWO_FACTOR_CODE_LENGTH) - 1), TWO_FACTOR_CODE_LENGTH, '0', STR_PAD_LEFT);
+                        $expiryTime = new MongoDB\BSON\UTCDateTime(strtotime('+' . TWO_FACTOR_CODE_EXPIRY_MINUTES . ' minutes') * 1000);
 
-    if (empty($entered_code)) {
-        $message = 'Please enter the verification code.';
-        $message_type = 'error';
-        error_log("Verification failed: Empty code entered by user.");
-    } else {
-        if (!$user_id_obj || !$user_data) {
-            $message = "Missing user information for verification. Please try logging in again.";
-            $message_type = 'error';
-            error_log("Verification failed: Missing user_id_obj or user_data after POST. User ID Obj: " . ($user_id_obj ? 'SET' : 'NOT SET') . ", User Data: " . ($user_data ? 'SET' : 'NOT SET'));
-            // This is a critical state, user should not proceed
-            session_unset(); session_destroy();
-            header('Location: ' . BASE_URL . '/login');
-            exit;
-        } else {
-            try {
-                // Re-fetch user data to ensure we have the absolute latest 2FA state (especially for secret/temp_code)
-                $user_data_for_verification = $usersCollection->findOne(['_id' => $user_id_obj]);
-                error_log("Re-fetched user data for verification: " . print_r($user_data_for_verification, true));
+                        // Update user document with the temporary code and expiry
+                        $usersCollection->updateOne(
+                            ['_id' => $user['_id']],
+                            ['$set' => [
+                                'two_factor_temp_code' => $verificationCode,
+                                'two_factor_code_expiry' => $expiryTime
+                            ]]
+                        );
+                        error_log("Login.php: Generated and saved email 2FA code: " . $verificationCode . " for user " . $_SESSION['email']);
 
-                if (!$user_data_for_verification) {
-                    error_log("User account not found for verification during re-fetch. User ID: " . $temp_user_id_str);
-                    $message = "User account not found for verification. Please try logging in again.";
-                    $message_type = 'error';
-                    session_unset(); session_destroy();
-                    header('Location: ' . BASE_URL . '/login');
-                    exit;
-                }
-
-                $two_factor_method_current = $user_data_for_verification['two_factor_method'] ?? 'email';
-                $is_code_valid = false;
-                $clear_temp_code_from_db = false;
-
-                error_log("Current 2FA method for verification: " . $two_factor_method_current);
-
-                if ($two_factor_method_current === 'authenticator') {
-                    $secret_to_verify = $user_data_for_verification['two_factor_secret'] ?? null;
-                    error_log("Authenticator method: Secret from DB: " . ($secret_to_verify ? 'SET' : 'NOT SET') . ", Length: " . strlen($secret_to_verify ?? ''));
-                    if ($secret_to_verify) {
-                        $totp_verifier = TOTP::create($secret_to_verify);
-                        $is_code_valid = $totp_verifier->verify($entered_code);
-                        error_log("Authenticator verification result: " . ($is_code_valid ? 'SUCCESS' : 'FAILURE') . ". Entered: " . $entered_code);
-                    } else {
-                        $message = 'Authenticator app not fully set up or secret is missing. Please contact support.';
-                        $message_type = 'error';
-                        error_log("2FA Authenticator: No secret found for user " . $temp_user_id_str . " during verification.");
-                    }
-                } else { // Email verification
-                    $stored_code = $user_data_for_verification['two_factor_temp_code'] ?? null;
-                    $stored_expiry_utc = $user_data_for_verification['two_factor_code_expiry'] ?? null;
-
-                    $current_timestamp = time();
-                    $expiry_timestamp = 0;
-                    if ($stored_expiry_utc instanceof UTCDateTime) {
-                        $expiry_timestamp = $stored_expiry_utc->toDateTime()->getTimestamp();
-                    } else {
-                        error_log("2FA: Stored expiry is not a UTCDateTime object for user " . $temp_user_id_str);
-                    }
-                    
-                    error_log("Email method: Stored code: '" . ($stored_code ?? 'NULL') . "', Entered code: '" . $entered_code . "'");
-                    error_log("Current timestamp: " . $current_timestamp . " (" . date('Y-m-d H:i:s T', $current_timestamp) . ")");
-                    error_log("Expiry timestamp: " . $expiry_timestamp . " (" . date('Y-m-d H:i:s T', $expiry_timestamp) . ")");
-
-                    if ($stored_code && $stored_expiry_utc && $entered_code === $stored_code && $current_timestamp < $expiry_timestamp) {
-                        $is_code_valid = true;
-                        $clear_temp_code_from_db = true;
-                        error_log("Email code is VALID and not expired for user " . $temp_user_id_str);
-                    } else if ($stored_expiry_utc && $current_timestamp >= $expiry_timestamp) {
-                        $message = 'The verification code has expired. Please request a new one.';
-                        $message_type = 'error';
-                        error_log("2FA: Code EXPIRED for user " . $temp_user_id_str . ". Entered: '" . $entered_code . "', Stored: '" . ($stored_code ?? 'NULL') . "'");
-                    } else {
-                        $message = 'The verification code is incorrect. Please try again.'; // Provide a generic error for security reasons
-                        $message_type = 'error';
-                        error_log("Email code MISMATCH or missing code/expiry for user " . $temp_user_id_str . ". Stored: '" . ($stored_code ?? 'NULL') . "', Entered: '" . $entered_code . "'");
-                    }
-                }
-
-                if ($is_code_valid) {
-                    error_log("2FA code IS VALID for user ID: " . $temp_user_id_str . ". Finalizing login.");
-                    $_SESSION['user_logged_in'] = true;
-                    $_SESSION['user_id'] = $temp_user_id_str;
-                    $_SESSION['first_name'] = $user_data_for_verification['first_name'] ?? '';
-                    $_SESSION['last_name'] = $user_data_for_verification['last_name'] ?? '';
-                    $_SESSION['full_name'] = $user_data_for_verification['full_name'] ?? trim(($user_data_for_verification['first_name'] ?? '') . ' ' . ($user_data_for_verification['last_name'] ?? ''));
-                    $_SESSION['is_admin'] = $user_data_for_verification['is_admin'] ?? false;
-                    $_SESSION['two_factor_enabled'] = $two_factor_enabled;
-                    $_SESSION['two_factor_method'] = $two_factor_method_current;
-                    $_SESSION['role'] = ($user_data_for_verification['is_admin'] ?? false) ? 'admin' : 'user';
-
-                    $_SESSION['2fa_verified'] = true; // CRITICAL: Mark 2FA as verified
-                    error_log("Session state AFTER successful 2FA verification: " . print_r($_SESSION, true));
-
-                    // Clear temporary 2FA specific session variables
-                    unset($_SESSION['auth_step']);
-                    unset($_SESSION['temp_user_id']);
-                    unset($_SESSION['last_resend_time']);
-                    unset($_SESSION['temp_2fa_secret']);
-                    error_log("Cleared temporary 2FA session variables from SESSION.");
-
-                    // Clear temporary code/expiry from DB if it was an email verification
-                    if ($clear_temp_code_from_db) {
-                        try {
-                            $usersCollection->updateOne(
-                                ['_id' => $user_id_obj],
-                                ['$unset' => ['two_factor_temp_code' => '', 'two_factor_code_expiry' => '']]
-                            );
-                            error_log("MongoDB: Cleared two_factor_temp_code and two_factor_code_expiry for user ID: " . $temp_user_id_str);
-                        } catch (MongoDBDriverException $e) {
-                            error_log("MongoDB error clearing 2FA temp code for user ID: " . $temp_user_id_str . " Error: " . $e->getMessage());
+                        // Send the email (assuming sendEmail function exists in functions.php)
+                        $emailSubject = "HomeTown Bank Login Verification Code";
+                        $emailBodyHtml = "
+                            <!DOCTYPE html>
+                            <html lang='en'>
+                            <head>
+                                <meta charset='UTF-8'>
+                                <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                                <title>HomeTown Bank - Verification Code</title>
+                                <style>
+                                    body { font-family: sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }
+                                    .email-container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.05); overflow: hidden; }
+                                    .header { background-color: #0056b3; padding: 20px; text-align: center; color: #ffffff; font-size: 24px; font-weight: bold; }
+                                    .content { padding: 30px; color: #333333; line-height: 1.6; text-align: center; }
+                                    .verification-code { display: inline-block; background-color: #e6f0fa; color: #0056b3; font-size: 32px; font-weight: bold; padding: 15px 30px; border-radius: 5px; margin: 20px 0; letter-spacing: 3px; text-align: center; }
+                                    .expiry-info { font-size: 0.9em; color: #777777; margin-top: 20px; }
+                                    .footer { background-color: #f0f0f0; padding: 20px; text-align: center; font-size: 0.85em; color: #666666; border-top: 1px solid #eeeeee; }
+                                </style>
+                            </head>
+                            <body>
+                                <div class='email-container'>
+                                    <div class='header'>HomeTown Bank</div>
+                                    <div class='content'>
+                                        <p>Dear " . htmlspecialchars($user['first_name'] ?? '') . ",</p>
+                                        <p>Your verification code for HomeTown Bank Online Banking is:</p>
+                                        <div class='verification-code'>" . htmlspecialchars($verificationCode) . "</div>
+                                        <p class='expiry-info'>This code is valid for <strong>" . TWO_FACTOR_CODE_EXPIRY_MINUTES . " minutes</strong>.</p>
+                                        <p>If you did not request this, please ignore this email.</p>
+                                    </div>
+                                    <div class='footer'>&copy; " . date('Y') . " HomeTown Bank.</div>
+                                </div>
+                            </body>
+                            </html>";
+                        $email_sent = sendEmail($user['email'], $emailSubject, $emailBodyHtml, "Your verification code for HomeTown Bank is: " . $verificationCode);
+                        if (!$email_sent) {
+                            error_log("Login.php: Failed to send 2FA email to " . $_SESSION['email'] . ". Check mailer configuration.");
+                            $message = "Failed to send verification email. Please try again or contact support.";
+                            $message_type = 'error';
+                            // Clear temp session state if we block the user here
+                            unset($_SESSION['auth_step']);
+                            unset($_SESSION['temp_user_id']);
+                            // Don't redirect, let the page re-render with the error message
                         }
                     }
+                    if (empty($message)) { // Only redirect if no email sending error occurred
+                        error_log("Login.php: Redirecting to verify_code after successful 2FA initiation for user: " . $_SESSION['email']);
+                        header('Location: ' . BASE_URL . '/verify_code');
+                        exit;
+                    }
 
-                    $redirect_path = (isset($_SESSION['is_admin']) && $_SESSION['is_admin']) ? '/admin' : '/dashboard';
-                    error_log("Redirecting to " . BASE_URL . $redirect_path . " after successful 2FA verification.");
+                } else {
+                    error_log("Login.php: 2FA not enabled for user " . $_SESSION['email'] . ". Logging in directly.");
+                    // No 2FA enabled for this user or method is 'none', log them in directly
+                    $_SESSION['user_logged_in'] = true; // Mark as fully logged in
+                    $_SESSION['2fa_verified'] = true; // No 2FA, so consider it verified immediately
+
+                    error_log("Login.php: Final Session Contents AFTER direct login: " . print_r($_SESSION, true)); // CRITICAL check here
+
+                    $redirect_path = ($_SESSION['is_admin']) ? '/admin' : '/dashboard';
+                    error_log("Login.php: Redirecting to " . BASE_URL . $redirect_path . " after direct login.");
                     header('Location: ' . BASE_URL . $redirect_path);
                     exit;
-
-                } else if ($message_type === '') { // Only set generic error if not already set by expiry check
-                    // This block will catch mismatches for both email and authenticator if not expired.
-                    $message = 'The verification code is incorrect. Please try again.';
-                    $message_type = 'error';
-                    error_log("2FA: Invalid code. User ID: " . $temp_user_id_str . ". Entered: '" . $entered_code . "'. Method: " . $two_factor_method_current);
                 }
-
-            } catch (MongoDBDriverException $e) {
-                $message = "A database error occurred during verification. Please try again.";
-                $message_type = 'error';
-                error_log("MongoDB error during 2FA verification for user ID: " . $temp_user_id_str . " Error: " . $e->getMessage());
-            } catch (Exception $e) {
-                $message = "An unexpected error occurred during verification. Please try again.";
-                $message_type = 'error';
-                error_log("General error during 2FA code verification for user ID: " . $temp_user_id_str . " Error: " . $e->getMessage());
+            } else {
+                // User not found or credentials do not match
+                $message = "Invalid last name or membership number.";
+                $message_type = "error";
+                error_log("Login.php: Login attempt failed - Invalid last name or membership number provided.");
             }
+        } catch (MongoDB\Driver\Exception\Exception $e) {
+            // Log the MongoDB error for debugging
+            error_log("Login.php: MongoDB Error during login: " . $e->getMessage());
+            $message = "A database error occurred. Please try again later.";
+            $message_type = "error";
+        } catch (Exception $e) {
+            // Catch any other unexpected errors
+            error_log("Login.php: General Error during login: " . $e->getMessage());
+            $message = "An unexpected error occurred. Please try again.";
+            $message_type = "error";
         }
     }
 }
@@ -431,218 +216,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HomeTown Bank - Verify Code</title>
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/frontend/style.css"> 
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
-    <style>
-        /* Specific styles for the verify code page, extending from style.css */
-        body.verify-page {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center; /* Center vertically */
-            min-height: 100vh;
-            background-color: #f4f7f6; /* Match main body background */
-            font-family: 'Roboto', sans-serif;
-        }
-
-        .verify-container {
-            background-color: #fff;
-            padding: 30px 40px;
-            border-radius: 8px;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 450px; /* Slightly smaller than login container */
-            box-sizing: border-box;
-            text-align: center;
-        }
-
-        .verify-container h1 {
-            font-size: 1.8em;
-            color: #333;
-            margin-bottom: 20px;
-        }
-
-        .verify-container p {
-            color: #555;
-            margin-bottom: 25px;
-            line-height: 1.5;
-        }
-
-        .verify-container .form-group {
-            margin-bottom: 25px;
-            text-align: left;
-        }
-
-        .verify-container label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 0.9em;
-            color: #333;
-            font-weight: bold;
-        }
-
-        .verify-container input[type="text"] {
-            width: calc(100% - 22px);
-            padding: 12px 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 1.1em;
-            text-align: center; /* Center the code input */
-            letter-spacing: 2px; /* Space out characters for code readability */
-            box-sizing: border-box;
-        }
-
-        .verify-container input[type="text"]:focus {
-            border-color: #0056b3;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(0, 86, 179, 0.2);
-        }
-
-        .button-primary {
-            background-color: #007bff;
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 4px;
-            font-size: 1em;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-            transition: background-color 0.3s ease;
-            margin-bottom: 15px; /* Space before resend */
-        }
-
-        .button-primary:hover {
-            background-color: #0056b3;
-        }
-
-        .resend-link {
-            font-size: 0.9em;
-            color: #555;
-            margin-top: 15px; /* Added margin for separation */
-        }
-
-        .resend-link button {
-            background: none;
-            border: none;
-            color: #0056b3;
-            text-decoration: underline;
-            cursor: pointer;
-            font-size: 1em;
-            font-family: 'Roboto', sans-serif;
-            padding: 0;
-            margin-left: 5px; /* Added space between text and button */
-        }
-
-        .resend-link button:hover {
-            color: #007bff;
-        }
-
-        /* Message styling from main style.css (or define here if not global) */
-        .message {
-            padding: 10px 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            font-size: 0.95em;
-            text-align: center;
-        }
-
-        .message.success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .message.error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        /* Additional styles for QR code display */
-        .qr-code-section {
-            text-align: center;
-            margin-top: 20px;
-            margin-bottom: 25px;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border: 1px dashed #ddd;
-            border-radius: 5px;
-        }
-        .qr-code-section img {
-            max-width: 200px;
-            height: auto;
-            border: 1px solid #eee;
-            margin-bottom: 15px;
-        }
-        .qr-code-section p {
-            font-size: 0.9em;
-            color: #666;
-            margin-bottom: 10px;
-        }
-        .qr-code-section strong {
-            color: #333;
-        }
-
-
-        @media (max-width: 600px) {
-            .verify-container {
-                padding: 20px 25px;
-                margin: 20px; /* Add margin on smaller screens */
-            }
-            .verify-container h1 {
-                font-size: 1.5em;
-            }
-            .verify-container input[type="text"] {
-                padding: 10px;
-                font-size: 1em;
-            }
-        }
-    </style>
+    <title>HomeTown Bank - User Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
-<body class="verify-page">
-    <div class="verify-container">
-        <h1>2-Factor Authentication</h1>
-
-        <?php if (!empty($message)): ?>
-            <div class="message <?php echo $message_type; ?>"><?php echo htmlspecialchars($message); ?></div>
-        <?php endif; ?>
-
-        <?php if ($show_authenticator_setup): ?>
-            <div class="qr-code-section">
-                <p>Scan this QR code with your Authenticator app (e.g., Google Authenticator, Authy).</p>
-                <img src="<?php echo htmlspecialchars($qr_code_data_url); ?>" alt="QR Code">
-                <p>Alternatively, enter this secret key manually:</p>
-                <strong><?php echo htmlspecialchars($manual_secret); ?></strong>
-            </div>
-            <p>Then, enter the 6-digit code generated by your app below to complete the setup.</p>
-        <?php elseif ($two_factor_method === 'authenticator'): ?>
-            <p>Enter the 6-digit code from your authenticator app.</p>
-        <?php else: // Email method ?>
-            <p>A 6-digit verification code has been sent to **<?php echo htmlspecialchars($masked_user_email); ?>**.</p>
-            <p>Please enter the code below to complete your login.</p>
-        <?php endif; ?>
-
-        <form action="<?php echo BASE_URL; ?>/verify_code" method="POST">
-            <div class="form-group">
-                <label for="verification_code">Verification Code</label>
-                <input type="text" id="verification_code" name="verification_code" required maxlength="6" pattern="\d{6}" title="Please enter the 6-digit code.">
-            </div>
-            <button type="submit" name="verify_code" class="button-primary">Verify Code</button>
-        </form>
-
-        <?php if ($two_factor_method === 'email' && !$show_authenticator_setup): ?>
-            <div class="resend-link">
-                Didn't receive the code?
-                <form action="<?php echo BASE_URL; ?>/verify_code" method="POST" style="display:inline;">
-                    <button type="submit" name="resend_code">Resend Code</button>
-                </form>
-            </div>
-        <?php endif; ?>
-
-        <div class="resend-link" style="margin-top: 25px;">
-            <a href="<?php echo BASE_URL; ?>/login">Return to Login</a> </div>
+<body>
+    <div class="background-container">
     </div>
+
+    <div class="login-card-container">
+        <div class="login-card">
+            <div class="bank-logo">
+                <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo">
+            </div>
+
+            <?php if (!empty($message)): ?>
+                <div id="login-message" class="message-box <?php echo htmlspecialchars($message_type); ?>" style="display: block;">
+                    <?php echo htmlspecialchars($message); ?>
+                </div>
+            <?php else: ?>
+                <div id="login-message" class="message-box" style="display: none;"></div>
+            <?php endif; ?>
+
+            <form class="login-form" id="loginForm" action="<?php echo BASE_URL; ?>/login" method="POST">
+                <div class="form-group username-group">
+                    <label for="last_name" class="sr-only">Last Name</label>
+                    <p class="input-label">Last Name</p>
+                    <div class="input-wrapper">
+                        <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($_POST['last_name'] ?? ''); ?>" required>
+                    </div>
+                </div>
+
+                <div class="form-group password-group">
+                    <label for="membership_number" class="sr-only">Membership Number</label>
+                    <p class="input-label">Membership Number</p>
+                    <div class="input-wrapper">
+                        <input type="text" id="membership_number" name="membership_number" placeholder="" required pattern="\d{12}" title="Membership number must be 12 digits" value="<?php echo htmlspecialchars($_POST['membership_number'] ?? ''); ?>">
+                    </div>
+                    <a href="#" class="forgot-password-link">Forgot?</a>
+                </div>
+
+                <div class="buttons-group">
+                    <button type="submit" name="login" class="btn btn-primary">Sign in</button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 HomeTown Bank Pa. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="heritagebank_admin/index.php">Privacy Policy</a>
+            <a href="#">Terms of Service</a>
+            <a href="#">Contact Us</a>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
 </body>
 </html>
