@@ -648,7 +648,7 @@ try {
         </nav>
         <h1>Manage My Cards</h1>
         <div class="logo">
-            <img src="<?= BASE_URL ?>/frontend/assets/images/logo.png" alt="Hometown Bank PA Logo">
+                <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo">
         </div>
     </header>
 
