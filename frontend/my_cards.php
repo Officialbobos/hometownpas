@@ -1,59 +1,57 @@
 <?php
+// frontend/my_cards.php
 session_start();
-require_once '/../Config.php'; // Adjust path based on your directory structure
-require_once '/../functions.php'; // For MongoDB setup and other helpers (like sendEmail if used)
+// Adjust path based on your directory structure relative to this file
+require_once __DIR__ . '/../Config.php';
+require_once __DIR__ . '/../functions.php'; // For getMongoDBClient() and other helpers
 
 use MongoDB\Client;
-use MongoDB\BSON\ObjectId; // For working with MongoDB's unique IDs
-use MongoDB\Driver\Exception\Exception as MongoDBDriverException; // Specific MongoDB exceptions
+use MongoDB\BSON\ObjectId;
+use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // Check if the user is NOT logged in, redirect to login page
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ' . BASE_URL . '/index.php'); // Use BASE_URL for consistency
+    header('Location: ' . BASE_URL . '/login'); // Redirect to login route
     exit;
 }
 
-$message = '';
+$message = ''; // For PHP-generated messages (e.g., initial DB error)
 $message_type = '';
-$user_bank_cards = [];
 $userId = $_SESSION['user_id']; // Get user ID from session
 
+// PHP won't fetch cards here directly, cards.js will do that via API
+// However, we still need to establish the MongoDB connection for other potential uses
+// and to ensure $mongoDb is available for included API files if any are added later directly.
+
 $mongoClient = null;
+$mongoDb = null; // Declare $mongoDb here to be available globally if needed by included files
 try {
-    $client = getMongoDBClient(); // Use your helper function to get MongoDB client
-    $database = $client->selectDatabase(MONGODB_DB_NAME); // Use MONGO_DB_NAME from Config.php
-    $bankCardsCollection = $database->selectCollection('bank_cards');
-    $usersCollection = $database->selectCollection('users'); // To get user name for cards
-
-    // Convert user_id from session (string) to ObjectId
-    $userObjectId = new ObjectId($userId);
-
-    // Fetch user's name for card holder display
-    $userData = $usersCollection->findOne(['_id' => $userObjectId], ['projection' => ['first_name' => 1, 'last_name' => 1]]);
-    $cardHolderName = '';
-    if ($userData) {
-        $cardHolderName = strtoupper(trim(($userData['first_name'] ?? '') . ' ' . ($userData['last_name'] ?? '')));
-    } else {
-        error_log("User with ID " . $userId . " not found in database for my_cards.php.");
-        $cardHolderName = 'CARD HOLDER'; // Fallback
-    }
-
-    // Fetch all active cards for the current user
-    $cursor = $bankCardsCollection->find(['user_id' => $userObjectId, 'is_active' => true]);
-    foreach ($cursor as $cardDoc) {
-        $card = (array) $cardDoc;
-        $card['id'] = (string) $card['_id']; // Convert ObjectId to string for HTML forms
-        $user_bank_cards[] = $card;
-    }
-
-} catch (MongoDBDriverException $e) { // Catch specific MongoDB driver exceptions
-    error_log("MongoDB error in my_cards.php: " . $e->getMessage());
+    $mongoClient = getMongoDBClient(); // Use your helper function to get MongoDB client
+    $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME); // Make it available for API calls
+} catch (MongoDBDriverException $e) {
+    error_log("MongoDB connection error in my_cards.php: " . $e->getMessage());
     $message = "Database connection error. Please try again later.";
     $message_type = 'error';
-} catch (Exception $e) { // Catch general exceptions (e.g., ObjectId creation)
+} catch (Exception $e) {
     error_log("General error in my_cards.php: " . $e->getMessage());
     $message = "An unexpected error occurred. Please try again later.";
     $message_type = 'error';
+}
+
+// User's name for card holder display (still useful for UI elements, or if you pre-fill forms)
+$cardHolderName = 'CARD HOLDER'; // Default
+if ($mongoDb && isset($_SESSION['user_id'])) {
+    try {
+        $usersCollection = $mongoDb->selectCollection('users');
+        $userData = $usersCollection->findOne(['_id' => new ObjectId($_SESSION['user_id'])], ['projection' => ['first_name' => 1, 'last_name' => 1]]);
+        if ($userData) {
+            $cardHolderName = strtoupper(trim(($userData['first_name'] ?? '') . ' ' . ($userData['last_name'] ?? '')));
+        }
+    } catch (MongoDBDriverException $e) {
+        error_log("MongoDB error fetching user name in my_cards.php: " . $e->getMessage());
+    } catch (Exception $e) {
+        error_log("General error fetching user name in my_cards.php: " . $e->getMessage());
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -62,7 +60,8 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Bank Cards - HomeTown Bank</title>
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/frontend/style.css"> <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/frontend/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
@@ -134,7 +133,7 @@ try {
             justify-content: center; /* Center cards */
             margin-top: 30px;
         }
-        .card-display {
+        .card-item { /* Changed from .card-display to .card-item for JS rendering consistency */
             color: white;
             padding: 25px;
             border-radius: 15px;
@@ -150,29 +149,47 @@ try {
             min-height: 200px; /* Ensure consistent height */
         }
         /* Specific card network gradients (adjust these if your card_network values are different) */
-        .card-display.visa { background: linear-gradient(45deg, #2a4b8d, #3f60a9); }
-        .card-display.mastercard { background: linear-gradient(45deg, #eb001b, #ff5f00); }
-        .card-display.amex { background: linear-gradient(45deg, #0081c7, #26a5d4); } /* Added Amex */
-        .card-display.verve { background: linear-gradient(45deg, #006633, #009933); }
+        .card-item.visa { background: linear-gradient(45deg, #2a4b8d, #3f60a9); }
+        .card-item.mastercard { background: linear-gradient(45deg, #eb001b, #ff5f00); }
+        .card-item.amex { background: linear-gradient(45deg, #0081c7, #26a5d4); } /* Added Amex */
+        .card-item.verve { background: linear-gradient(45deg, #006633, #009933); }
 
-        .card-display h4 { margin-top: 0; font-size: 1.1em; color: rgba(255,255,255,0.8); }
-        .card-display .chip {
+        .card-item h4 { margin-top: 0; font-size: 1.1em; color: rgba(255,255,255,0.8); }
+        .card-item .chip {
             width: 50px; height: 35px; background-color: #d4af37; border-radius: 5px; margin-bottom: 20px;
         }
-        .card-display .card-number {
+        .card-item .card-number {
             font-size: 1.6em; letter-spacing: 2px; margin-bottom: 20px; word-wrap: break-word; /* Ensure long numbers wrap */
         }
-        .card-display .card-footer {
+        .card-item .card-footer {
             display: flex; justify-content: space-between; align-items: flex-end; font-size: 0.9em;
         }
-        .card-display .card-footer .label {
+        .card-item .card-footer .label {
             font-size: 0.7em; opacity: 0.7; margin-bottom: 3px;
         }
-        .card-display .card-footer .value { font-weight: bold; }
-        .card-logo {
+        .card-item .card-footer .value { font-weight: bold; }
+        .card-logo-img { /* Changed from .card-logo to .card-logo-img for JS consistency */
             position: absolute; bottom: 25px; right: 25px; height: 40px; /* Adjust size as needed */
             max-width: 80px; /* Prevent logos from overflowing */
         }
+        .card-status {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .card-status.active {
+            background-color: #28a745; /* Green */
+            color: white;
+        }
+        .card-status.inactive {
+            background-color: #dc3545; /* Red */
+            color: white;
+        }
+
         .pin-action {
             text-align: center;
             margin-top: 20px;
@@ -203,10 +220,128 @@ try {
                 align-items: center;
                 gap: 20px; /* Reduce gap */
             }
-            .card-display {
+            .card-item {
                 width: 90%; /* Make cards take more width on small screens */
                 max-width: 350px; /* But don't exceed max width */
             }
+        }
+
+        /* Order Card Form Styles */
+        .order-card-section {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #eee;
+        }
+        .order-card-section h3 {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .order-card-form label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        .order-card-form select,
+        .order-card-form input[type="text"],
+        .order-card-form input[type="email"],
+        .order-card-form input[type="submit"],
+        .order-card-form button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1em;
+            box-sizing: border-box; /* Include padding in element's total width and height */
+        }
+        .order-card-form select:focus,
+        .order-card-form input[type="text"]:focus,
+        .order-card-form input[type="email"]:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 5px rgba(0, 123, 255, 0.25);
+        }
+        .order-card-form button[type="submit"] {
+            background-color: #28a745; /* Green submit button */
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .order-card-form button[type="submit"]:hover {
+            background-color: #218838;
+        }
+        .order-card-form button[type="submit"]:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        /* Message Box Overlay Styles */
+        .message-box-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .message-box-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .message-box-content {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            position: relative;
+        }
+
+        .message-box-base {
+            padding: 20px; /* Base padding */
+            border-radius: 8px; /* Base border radius */
+            margin-bottom: 20px;
+        }
+
+        .message-box-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message-box-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message-box-overlay button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background-color 0.3s ease;
+        }
+
+        .message-box-overlay button:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
@@ -215,73 +350,78 @@ try {
         <div class="user-header">
             <img src="<?php echo BASE_URL; ?>/images/hometown_bank_logo.png" alt="HomeTown Bank Logo" class="logo">
             <h2>My Bank Cards</h2>
-            <a href="<?php echo BASE_URL; ?>/logout.php" class="logout-button">Logout</a>
+            <a href="<?php echo BASE_URL; ?>/logout" class="logout-button">Logout</a>
         </div>
 
         <div class="dashboard-content">
             <h2 class="section-header">Your Active Bank Cards</h2>
-            <?php if (!empty($message)): ?>
+            <?php if (!empty($message)): // Display PHP-generated messages ?>
                 <p class="message <?php echo $message_type; ?>"><?php echo htmlspecialchars($message); ?></p>
             <?php endif; ?>
 
-            <?php if (empty($user_bank_cards)): ?>
-                <p>You don't have any active bank cards yet. Please contact support if you believe this is an error, or order a new one from your <a href="<?php echo BASE_URL; ?>/user_dashboard.php">Dashboard</a>.</p>
-            <?php else: ?>
-                <div class="card-container">
-                    <?php foreach ($user_bank_cards as $card):
-                        $masked_card_number = substr($card['card_number'] ?? '0000000000000000', 0, 4) . ' **** **** ' . substr($card['card_number'] ?? '0000000000000000', -4);
-                        $expiry_month_short = str_pad($card['expiry_month'] ?? '', 2, '0', STR_PAD_LEFT);
-                        $expiry_year_short = substr($card['expiry_year'] ?? '', 2, 2); // Get last two digits of year
+            <p id="cardsLoadingMessage" style="text-align: center; display: none;">Loading your cards...</p>
+            <p id="noCardsMessage" style="text-align: center; display: none;">You don't have any active bank cards yet.</p>
 
-                        // Determine the card network for CSS class and logo
-                        $card_network_for_display = strtolower($card['card_network'] ?? 'default'); // Use 'card_network' field
-                        
-                        // Default logo path, useful for unknown networks or as a fallback
-                        $card_logo_path = BASE_URL . '/images/card_logos/default.png'; 
-
-                        // Assign specific logo paths based on card_network
-                        if ($card_network_for_display === 'visa') {
-                            $card_logo_path = BASE_URL . '/images/card_logos/visa.png';
-                        } elseif ($card_network_for_display === 'mastercard') {
-                            $card_logo_path = BASE_URL . '/images/card_logos/mastercard.png';
-                        } elseif ($card_network_for_display === 'verve') {
-                            $card_logo_path = BASE_URL . '/images/card_logos/verve.png';
-                        } elseif ($card_network_for_display === 'amex') { // Assuming you might have Amex cards
-                            $card_logo_path = BASE_URL . '/images/card_logos/amex.png';
-                        }
-                        
-                        // Add a class for the card network for styling the background gradient
-                        $card_network_css_class = $card_network_for_display;
-                    ?>
-                        <div class="card-display <?php echo htmlspecialchars($card_network_css_class); ?>">
-                            <h4>HOMETOWN BANK</h4>
-                            <div class="chip"></div>
-                            <div class="card-number"><?php echo htmlspecialchars($masked_card_number); ?></div>
-                            <div class="card-footer">
-                                <div>
-                                    <div class="label">CARD HOLDER</div>
-                                    <div class="value"><?php echo htmlspecialchars($cardHolderName); ?></div>
-                                </div>
-                                <div>
-                                    <div class="label">EXPIRES</div>
-                                    <div class="value"><?php echo htmlspecialchars($expiry_month_short . '/' . $expiry_year_short); ?></div>
-                                </div>
-                            </div>
-                            <img src="<?php echo htmlspecialchars($card_logo_path); ?>" alt="<?php echo htmlspecialchars($card['card_network'] ?? 'Card'); ?> Logo" class="card-logo">
-                            
-                            <div class="pin-action">
-                                <?php if (empty($card['pin']) || !isset($card['pin'])): // Check if PIN is null or not set ?>
-                                    <a href="<?php echo BASE_URL; ?>/set_card_pin.php?card_id=<?php echo htmlspecialchars($card['id']); ?>">Set Card PIN</a>
-                                <?php else: ?>
-                                    <button disabled>PIN Set</button>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+            <div id="userCardList" class="card-container">
                 </div>
-            <?php endif; ?>
-            <p style="text-align: center; margin-top: 30px;"><a href="<?php echo BASE_URL; ?>/user_dashboard.php" class="back-link">&larr; Back to Dashboard</a></p>
+            
+            <p style="text-align: center; margin-top: 30px;">
+                <a href="<?php echo BASE_URL; ?>/dashboard" class="back-link">&larr; Back to Dashboard</a>
+            </p>
+
+            <div class="order-card-section">
+                <h3 class="section-header">Order a New Bank Card</h3>
+                <form id="orderCardForm" class="order-card-form">
+                    <div class="form-group">
+                        <label for="accountId">Link to Account:</label>
+                        <select id="accountId" name="account_id" required>
+                            <option value="">-- Loading Accounts --</option>
+                            </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cardNetwork">Card Network:</label>
+                        <select id="cardNetwork" name="card_network" required>
+                            <option value="">Select Card Type</option>
+                            <option value="Visa">Visa</option>
+                            <option value="Mastercard">Mastercard</option>
+                            <option value="Verve">Verve</option>
+                            <option value="Amex">Amex</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cardType">Card Type:</label>
+                        <select id="cardType" name="card_type" required>
+                            <option value="">Select Card Type</option>
+                            <option value="Debit">Debit Card</option>
+                            <option value="Credit">Credit Card</option>
+                            </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="deliveryAddress">Delivery Address:</label>
+                        <input type="text" id="deliveryAddress" name="delivery_address" placeholder="e.g., 123 Main St, City, State, Zip" required>
+                    </div>
+
+                    <button type="submit">Order Card</button>
+                </form>
+            </div>
         </div>
     </div>
+
+    <div id="messageBoxOverlay" class="message-box-overlay">
+        <div class="message-box-content">
+            <p id="messageBoxContent"></p>
+            <button id="messageBoxButton">OK</button>
+        </div>
+    </div>
+
+    <script>
+        const PHP_BASE_URL = '<?php echo rtrim(BASE_URL, '/'); ?>/';
+        const FRONTEND_BASE_URL = '<?php echo rtrim(BASE_URL, '/'); ?>/frontend/'; // If you need a separate frontend base
+    </script>
+    
+    <script src="<?php echo BASE_URL; ?>/frontend/cards.js"></script>
 </body>
 </html>
