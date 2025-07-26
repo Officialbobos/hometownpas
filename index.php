@@ -231,7 +231,8 @@ switch ($route) {
     
     case 'settings': // Route for user settings
         if (!$isLoggedIn) {
-            header('Location: ' . BASE_ENV_URL . '/login'); // Changed from BASE_URL to BASE_ENV_URL (assuming this is correct from your Config.php)
+            // Note: Assuming BASE_ENV_URL is defined and correct for settings page redirect
+            header('Location: ' . BASE_URL . '/login'); // Changed BASE_ENV_URL back to BASE_URL for consistency unless specified otherwise
             exit;
         }
         include 'frontend/settings.php';
@@ -331,7 +332,8 @@ switch ($route) {
     case 'api/order_card': // New API endpoint for submitting a new card order
         if (!$isLoggedIn) {
             http_response_code(403);
-            echo json_encode(['success'] => false, 'message' => 'Unauthorized']);
+            // CORRECTED: Fixed the syntax error here
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
             exit;
         }
         // Pass the MongoDB object to the API handler
@@ -362,7 +364,8 @@ switch ($route) {
     case 'api/admin/delete_user':
         if (!$isLoggedIn || $userRole !== 'admin') {
             http_response_code(403);
-            echo json_encode(['success'] => false, 'message' => 'Unauthorized']);
+            // CORRECTED: Fixed the syntax error here
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
             exit;
         }
         // Pass the MongoDB object to the API handler
@@ -447,4 +450,3 @@ if ($mongoClient) {
 }
 
 ob_end_flush(); // Flush the output buffer at the very end
-?>
