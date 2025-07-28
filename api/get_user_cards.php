@@ -19,6 +19,7 @@ try {
         throw new Exception("MongoDB database not selected.");
     }
 
+    // --- CRITICAL FIX: Use 'bank_cards' as the collection name ---
     $cardsCollection = $mongoDb->selectCollection('bank_cards');
     // $accountsCollection is implicitly used within the aggregation pipeline's $lookup
 
@@ -59,7 +60,6 @@ try {
         [
             // Stage 3: Deconstruct the 'accountInfo' array field into a stream of documents.
             // This assumes each card is linked to exactly one account.
-            // If a card might exist without an account link, use { preserveNullAndEmptyArrays: true }
             '$unwind' => '$accountInfo'
         ],
         [
@@ -69,16 +69,24 @@ try {
                 'id' => [ '$toString' => '$_id' ], // Convert card's _id to string and rename to 'id'
                 'card_holder_name' => '$card_holder_name',
                 'display_card_number' => [
-                    // Example: Mask all but the last 4 digits of 'card_number_encrypted'
-                    // Assumes 'card_number_encrypted' stores the full card number (even if encrypted)
+                    // --- FIX: Use 'card_number' instead of 'card_number_encrypted' ---
+                    // Mask all but the last 4 digits of 'card_number'
                     '$concat' => [
                         'XXXX XXXX XXXX ',
-                        [ '$substrCP' => [ '$card_number_encrypted', [ '$subtract' => [ [ '$strLenCP' => '$card_number_encrypted' ], 4 ] ], 4 ] ]
+                        [ '$substrCP' => [ '$card_number', [ '$subtract' => [ [ '$strLenCP' => '$card_number' ], 4 ] ], 4 ] ]
                     ]
                 ],
-                'display_expiry' => '$expiry_date', // Assuming 'expiry_date' is stored in 'MM/YY' or 'MM/YYYY' format
+                'display_expiry' => [
+                    // --- FIX: Combine 'expiry_month' and 'expiry_year' ---
+                    '$concat' => [
+                        ['$cond' => [['$lt' => ['$expiry_month', 10]], '0', '']], // Add leading zero if month < 10
+                        ['$toString' => '$expiry_month'],
+                        '/',
+                        ['$toString' => ['$mod' => ['$expiry_year', 100]]] // Get last two digits of year
+                    ]
+                ],
                 'display_cvv' => 'XXX', // CVV should never be exposed; use a placeholder
-                'card_network' => '$card_network',
+                'card_network' => '$card_type', // --- POTENTIAL FIX: Assuming card_type is the network, based on sample
                 'is_active' => '$is_active',
                 'account_type' => '$accountInfo.account_type',
                 'display_account_number' => '$accountInfo.account_number', // Assumes 'accounts' documents have an 'account_number' field
@@ -88,10 +96,10 @@ try {
                 'card_logo_src' => [
                     '$switch' => [
                         'branches' => [
-                            ['case' => ['$eq' => ['$card_network', 'Visa']], 'then' => BASE_URL . '/assets/images/visa-logo.png'],
-                            ['case' => ['$eq' => ['$card_network', 'Mastercard']], 'then' => BASE_URL . '/assets/images/mastercard-logo.png'],
-                            ['case' => ['$eq' => ['$card_network', 'Amex']], 'then' => BASE_URL . '/assets/images/amex-logo.png'],
-                            ['case' => ['$eq' => ['$card_network', 'Verve']], 'then' => BASE_URL . '/assets/images/verve-logo.png'],
+                            ['case' => ['$eq' => ['$card_type', 'Visa']], 'then' => BASE_URL . '/assets/images/visa-logo.png'],
+                            ['case' => ['$eq' => ['$card_type', 'MasterCard']], 'then' => BASE_URL . '/assets/images/mastercard-logo.png'],
+                            ['case' => ['$eq' => ['$card_type', 'Amex']], 'then' => BASE_URL . '/assets/images/amex-logo.png'],
+                            ['case' => ['$eq' => ['$card_type', 'Verve']], 'then' => BASE_URL . '/assets/images/verve-logo.png'],
                         ],
                         'default' => BASE_URL . '/assets/images/default-card-logo.png' // Fallback for unknown networks
                     ]
