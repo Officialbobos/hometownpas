@@ -126,9 +126,8 @@ try {
 <body>
     <header class="header">
         <nav class="header-nav">
-            <a href="<?php echo BASE_URL; ?>/dashboard" class="back-to-dashboard">
-                <i class="fas fa-arrow-circle-left"></i> Back to Dashboard
-            </a>
+            <a href="<?php echo BASE_URL; ?>/dashboard" class="contact-button homepage">
+                <i class="fas fa-home"></i> Back to Dashboard </a>
         </nav>
         <h1>Manage My Cards</h1>
         <div class="logo">
