@@ -27,24 +27,45 @@ function getMongoDBClient(): Client
 {
     static $mongoClient = null; // Use a static variable to store the client
 
+    // --- START DEBUG LOGS ---
+    error_log("--- Inside getMongoDBClient START (singleton check) ---");
+    // --- END DEBUG LOGS ---
+
     if ($mongoClient === null) {
         // Ensure the MONGODB_CONNECTION_URI constant is defined
         if (!defined('MONGODB_CONNECTION_URI') || !MONGODB_CONNECTION_URI) {
-            // Log this as a critical configuration error
             error_log("FATAL ERROR: MONGODB_CONNECTION_URI not found. Ensure it's defined in Config.php and .env is loaded correctly.");
             throw new Exception("Database configuration error. Please contact support.");
         }
+
+        // --- START DEBUG LOGS ---
+        error_log("--- MONGODB_CONNECTION_URI is defined. Value: " . (defined('MONGODB_CONNECTION_URI') ? MONGODB_CONNECTION_URI : 'NOT DEFINED') . " ---");
+        error_log("--- Attempting to instantiate new MongoDB\\Client... ---");
+        // --- END DEBUG LOGS ---
 
         try {
             $mongoClient = new Client(MONGODB_CONNECTION_URI);
             // Optional: Ping to verify connection. Remove in production if not needed for performance.
             // Note: ping requires replica set or sharded cluster, may not work on standalone default XAMPP setup.
             // $mongoClient->admin->command(['ping' => 1]);
-            // error_log("MongoDB connected successfully via getMongoDBClient().");
+            // --- START DEBUG LOGS ---
+            error_log("--- MongoDB Client instantiated successfully ---");
+            // --- END DEBUG LOGS ---
         } catch (MongoDBDriverException $e) {
-            error_log("FATAL ERROR in getMongoDBClient(): Failed to connect to MongoDB. " . $e->getMessage());
+            // --- START DEBUG LOGS ---
+            error_log("FATAL ERROR in getMongoDBClient(): Failed to connect to MongoDB. Driver Exception: " . $e->getMessage());
+            // --- END DEBUG LOGS ---
             throw new Exception("Database connection error. Please try again later. If the issue persists, contact support.");
+        } catch (Exception $e) { // Catch any other general exceptions not caught by MongoDBDriverException
+            // --- START DEBUG LOGS ---
+            error_log("General Exception in getMongoDBClient: " . $e->getMessage());
+            // --- END DEBUG LOGS ---
+            throw new Exception("An unexpected error occurred during MongoDB client creation: " . $e->getMessage(), 0, $e);
         }
+    } else {
+        // --- START DEBUG LOGS ---
+        error_log("--- Reusing existing MongoDB Client instance. ---");
+        // --- END DEBUG LOGS ---
     }
     return $mongoClient;
 }
@@ -264,7 +285,7 @@ function get_user_details($user_id): ?array {
         $filterId = (is_string($user_id) && strlen($user_id) === 24 && ctype_xdigit($user_id)) ? new ObjectId($user_id) : $user_id;
 
         $user = $usersCollection->findOne(['_id' => $filterId], ['projection' => ['email' => 1, 'full_name' => 1, 'last_name' => 1, 'first_name' => 1]]); // Added first_name and last_name
-        
+
         if ($user) {
             $userArray = $user->toArray();
             // Ensure 'full_name' exists, create if not
@@ -305,11 +326,15 @@ function complete_pending_transfer($transaction_id): array {
         return ['success' => false, 'message' => "Invalid transaction ID format.", 'transaction_details' => null];
     }
 
-    // Start a session for the transaction (requires a replica set or sharded cluster)
-    // For local development on a standalone server, transactions might not be supported.
-    // Ensure your MongoDB instance is a replica set for this to work.
-    //$session = $client->startSession(); // Use the client from getMongoDBClient()
-    //$session->startTransaction();
+    // --- IMPORTANT: MongoDB Transactions require a replica set or sharded cluster ---
+    // If you are running a standalone MongoDB instance, comment out all lines
+    // related to $session (e.g., $session = $client->startSession(); and $session->startTransaction();
+    // and the ['session' => $session] options in findOne/updateOne calls)
+    $session = $client->startSession();
+    error_log("Starting MongoDB session for complete_pending_transfer.");
+    $session->startTransaction();
+    error_log("Starting MongoDB transaction for complete_pending_transfer.");
+
 
     try {
         // 1. Fetch the pending transaction details
@@ -319,6 +344,7 @@ function complete_pending_transfer($transaction_id): array {
         );
 
         if (!$transaction) {
+            error_log("Pending transaction ID {$transactionObjectId} not found or not PENDING.");
             $session->abortTransaction();
             return ['success' => false, 'message' => "Pending transaction not found or already processed.", 'transaction_details' => null];
         }
@@ -344,12 +370,14 @@ function complete_pending_transfer($transaction_id): array {
             );
 
             if (!$recipient_account) {
+                error_log("Recipient internal account not found or is inactive for transaction {$transactionObjectId}.");
                 $session->abortTransaction();
                 throw new Exception("Recipient internal account not found or is inactive for transaction {$transactionObjectId}.");
             }
 
             // CRITICAL CHECK: Ensure recipient's account currency matches the transaction's credit currency
             if (strtoupper($recipient_account['currency']) !== strtoupper($credit_currency)) {
+                error_log("Currency mismatch for internal transfer credit. Expected " . $credit_currency . ", got " . $recipient_account['currency'] . " for transaction {$transactionObjectId}.");
                 $session->abortTransaction();
                 throw new Exception("Currency mismatch for internal transfer credit. Expected " . $credit_currency . ", got " . $recipient_account['currency'] . " for transaction {$transactionObjectId}.");
             }
@@ -368,6 +396,7 @@ function complete_pending_transfer($transaction_id): array {
             );
 
             if ($updateResult->getModifiedCount() === 0) {
+                error_log("Failed to credit recipient account for transaction {$transactionObjectId}. Possible concurrency issue or invalid account ID.");
                 $session->abortTransaction();
                 throw new Exception("Failed to credit recipient account for transaction {$transactionObjectId}. Possible concurrency issue or invalid account ID.");
             }
@@ -376,36 +405,37 @@ function complete_pending_transfer($transaction_id): array {
             $recipient_tx_type = (strpos($transaction_details['transaction_type'], 'SELF') !== false) ? 'INTERNAL_SELF_TRANSFER_IN' : 'INTERNAL_TRANSFER_IN';
 
             $recipientTransactionData = [
-                'user_id'                         => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
-                'account_id'                      => $recipient_account_id, // This should be ObjectId
-                'amount'                          => new Decimal128($credit_amount_str), // Store as Decimal128
-                'currency'                        => $credit_currency,
-                'transaction_type'                => $recipient_tx_type,
-                'description'                     => $transaction_details['description'],
-                'status'                          => 'COMPLETED',
-                'initiated_at'                    => $transaction_details['initiated_at'], // Use original initiated_at
-                'transaction_reference'           => $transaction_details['transaction_reference'] . '_IN', // Unique ref for incoming
-                'recipient_name'                  => $transaction_details['recipient_name'],
-                'recipient_account_number'        => $transaction_details['recipient_account_number'],
-                'recipient_iban'                  => $transaction_details['recipient_iban'] ?? null,
-                'recipient_swift_bic'             => $transaction_details['recipient_swift_bic'] ?? null,
-                'recipient_sort_code'             => $transaction_details['recipient_sort_code'] ?? null,
+                'user_id'                           => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
+                'account_id'                        => $recipient_account_id, // This should be ObjectId
+                'amount'                            => new Decimal128($credit_amount_str), // Store as Decimal128
+                'currency'                          => $credit_currency,
+                'transaction_type'                  => $recipient_tx_type,
+                'description'                       => $transaction_details['description'],
+                'status'                            => 'COMPLETED',
+                'initiated_at'                      => $transaction_details['initiated_at'], // Use original initiated_at
+                'transaction_reference'             => $transaction_details['transaction_reference'] . '_IN', // Unique ref for incoming
+                'recipient_name'                    => $transaction_details['recipient_name'],
+                'recipient_account_number'          => $transaction_details['recipient_account_number'],
+                'recipient_iban'                    => $transaction_details['recipient_iban'] ?? null,
+                'recipient_swift_bic'               => $transaction_details['recipient_swift_bic'] ?? null,
+                'recipient_sort_code'               => $transaction_details['recipient_sort_code'] ?? null,
                 'recipient_external_account_number' => $transaction_details['recipient_external_account_number'] ?? null,
-                'recipient_user_id'               => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
-                'recipient_bank_name'             => $transaction_details['recipient_bank_name'] ?? null,
-                'sender_name'                     => $transaction_details['sender_name'],
-                'sender_account_number'           => $transaction_details['sender_account_number'],
-                'sender_user_id'                  => (is_string($transaction_details['sender_user_id']) && strlen($transaction_details['sender_user_id']) === 24 && ctype_xdigit($transaction_details['sender_user_id'])) ? new ObjectId($transaction_details['sender_user_id']) : $transaction_details['sender_user_id'],
-                'converted_amount'                => new Decimal128($credit_amount_str), // Store as Decimal128
-                'converted_currency'              => $credit_currency,
-                'exchange_rate'                   => new Decimal128((string)($transaction_details['exchange_rate'] ?? 1.0)), // Store as Decimal128
-                'external_bank_details'           => $transaction_details['external_bank_details'] ?? null,
-                'transaction_date'                => new UTCDateTime(strtotime('today') * 1000), // Date without time
-                'completed_at'                    => new UTCDateTime(), // Current UTC timestamp
+                'recipient_user_id'                 => (is_string($transaction_details['recipient_user_id']) && strlen($transaction_details['recipient_user_id']) === 24 && ctype_xdigit($transaction_details['recipient_user_id'])) ? new ObjectId($transaction_details['recipient_user_id']) : $transaction_details['recipient_user_id'],
+                'recipient_bank_name'               => $transaction_details['recipient_bank_name'] ?? null,
+                'sender_name'                       => $transaction_details['sender_name'],
+                'sender_account_number'             => $transaction_details['sender_account_number'],
+                'sender_user_id'                    => (is_string($transaction_details['sender_user_id']) && strlen($transaction_details['sender_user_id']) === 24 && ctype_xdigit($transaction_details['sender_user_id'])) ? new ObjectId($transaction_details['sender_user_id']) : $transaction_details['sender_user_id'],
+                'converted_amount'                  => new Decimal128($credit_amount_str), // Store as Decimal128
+                'converted_currency'                => $credit_currency,
+                'exchange_rate'                     => new Decimal128((string)($transaction_details['exchange_rate'] ?? 1.0)), // Store as Decimal128
+                'external_bank_details'             => $transaction_details['external_bank_details'] ?? null,
+                'transaction_date'                  => new UTCDateTime(strtotime('today') * 1000), // Date without time
+                'completed_at'                      => new UTCDateTime(), // Current UTC timestamp
             ];
 
             $insertResult = $transactionsCollection->insertOne($recipientTransactionData, ['session' => $session]);
             if ($insertResult->getInsertedCount() === 0) {
+                error_log("Failed to insert recipient transaction record for transaction {$transactionObjectId}.");
                 $session->abortTransaction();
                 throw new Exception("Failed to insert recipient transaction record for transaction {$transactionObjectId}.");
             }
@@ -426,12 +456,14 @@ function complete_pending_transfer($transaction_id): array {
         );
 
         if ($updateOriginalTxResult->getModifiedCount() === 0) {
+            error_log("Transaction status update failed for transaction {$transactionObjectId}. Transaction might no longer be PENDING or ID is incorrect.");
             $session->abortTransaction();
             throw new Exception("Transaction status update failed for transaction {$transactionObjectId}. Transaction might no longer be PENDING or ID is incorrect.");
         }
 
         // If all operations succeed, commit the transaction
         $session->commitTransaction();
+        error_log("MongoDB transaction committed successfully for complete_pending_transfer ID {$transactionObjectId}.");
 
         // --- Email Notification for Sender ---
         // Pass original transaction ID (from MySQL) if needed for email history lookup.
@@ -552,12 +584,14 @@ function complete_pending_transfer($transaction_id): array {
     } catch (Exception $e) {
         // Rollback the transaction on any error
         if ($session->isInTransaction()) {
+            error_log("Aborting MongoDB transaction for complete_pending_transfer due to error.");
             $session->abortTransaction();
         }
         // Log the error for debugging
         error_log("Failed to complete transaction ID {$transactionObjectId}: " . $e->getMessage());
         return ['success' => false, 'message' => "Transaction completion failed: " . $e->getMessage(), 'transaction_details' => null];
     } finally {
+        error_log("Ending MongoDB session for complete_pending_transfer.");
         $session->endSession(); // Always end the session
     }
 }
@@ -585,8 +619,15 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
         return ['success' => false, 'message' => "Invalid transaction ID format.", 'transaction_details' => null];
     }
 
-    //$session = $client->startSession();
-    //$session->startTransaction();
+    // --- IMPORTANT: MongoDB Transactions require a replica set or sharded cluster ---
+    // If you are running a standalone MongoDB instance, comment out all lines
+    // related to $session (e.g., $session = $client->startSession(); and $session->startTransaction();
+    // and the ['session' => $session] options in findOne/updateOne calls)
+    $session = $client->startSession();
+    error_log("Starting MongoDB session for reject_pending_transfer.");
+    $session->startTransaction();
+    error_log("Starting MongoDB transaction for reject_pending_transfer.");
+
 
     try {
         // 1. Fetch the pending transaction details
@@ -596,6 +637,7 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
         );
 
         if (!$transaction) {
+            error_log("Pending transaction ID {$transactionObjectId} not found or not PENDING for rejection.");
             $session->abortTransaction();
             return ['success' => false, 'message' => "Pending transaction not found or already processed.", 'transaction_details' => null];
         }
@@ -613,6 +655,7 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
         );
 
         if (!$sender_account) {
+            error_log("Sender account not found or does not belong to the sender for transaction {$transactionObjectId} rejection.");
             $session->abortTransaction();
             throw new Exception("Sender account not found or does not belong to the sender for transaction {$transactionObjectId}.");
         }
@@ -624,10 +667,11 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
 
         // CRITICAL CHECK: Ensure sender's account currency matches the transaction's original currency for refund
         if (strtoupper($sender_account['currency']) !== strtoupper($refund_currency)) {
+            error_log("Currency mismatch for refund. Expected " . $refund_currency . ", got " . $sender_account['currency'] . " for transaction {$transactionObjectId}.");
             $session->abortTransaction();
             throw new Exception("Currency mismatch for refund. Expected " . $refund_currency . ", got " . $sender_account['currency'] . " for transaction {$transactionObjectId}.");
         }
-        
+
         // Get current balance as string for bcmath, then convert result back to Decimal128
         $current_sender_balance_str = (string)$sender_account['balance'];
         $new_sender_balance_str = bcadd_precision($current_sender_balance_str, $refund_amount_str, 2);
@@ -640,6 +684,7 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
         );
 
         if ($updateResult->getModifiedCount() === 0) {
+            error_log("Failed to credit sender account during rejection for transaction {$transactionObjectId}. Possible concurrency issue or invalid account ID.");
             $session->abortTransaction();
             throw new Exception("Failed to credit sender account during rejection for transaction {$transactionObjectId}. Possible concurrency issue or invalid account ID.");
         }
@@ -652,12 +697,14 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
         );
 
         if ($updateOriginalTxResult->getModifiedCount() === 0) {
+            error_log("Transaction status update to REJECTED failed for transaction {$transactionObjectId}. Transaction might no longer be PENDING or ID is incorrect.");
             $session->abortTransaction();
             throw new Exception("Transaction status update to REJECTED failed for transaction {$transactionObjectId}. Transaction might no longer be PENDING or ID is incorrect.");
         }
 
         // If all operations succeed, commit the transaction
         $session->commitTransaction();
+        error_log("MongoDB transaction committed successfully for reject_pending_transfer ID {$transactionObjectId}.");
 
         // --- Email Notification for Sender (Rejection) ---
         $sender_user = get_user_details($transaction_details['user_id']);
@@ -716,12 +763,14 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
     } catch (Exception $e) {
         // Rollback the transaction on any error
         if ($session->isInTransaction()) {
+            error_log("Aborting MongoDB transaction for reject_pending_transfer due to error.");
             $session->abortTransaction();
         }
         // Log the error for debugging
         error_log("Failed to reject transaction ID {$transactionObjectId}: " . $e->getMessage());
         return ['success' => false, 'message' => "Transaction rejection failed: " . $e->getMessage(), 'transaction_details' => null];
     } finally {
+        error_log("Ending MongoDB session for reject_pending_transfer.");
         $session->endSession(); // Always end the session
     }
 }

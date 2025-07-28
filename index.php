@@ -8,8 +8,8 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 
-error_log("--- SCRIPT START ---"); // Add this line
-require __DIR__ . '/vendor/autoload.php'; // <-- ADD THIS LINE!
+error_log("--- SCRIPT START ---");
+require __DIR__ . '/vendor/autoload.php';
 
 
 // Check if MongoDB extension is loaded
@@ -18,7 +18,6 @@ if (!extension_loaded('mongodb')) {
 }
 
 // Check if MongoDB Client class exists (Composer autoloading)
-// This confirms if Composer's autoloader is working for MongoDB classes.
 if (!class_exists('MongoDB\Client')) {
     die('<h1>FATAL ERROR: MongoDB\Client class not found!</h1><p>This usually means Composer\'s autoloader failed or the MongoDB driver was not correctly installed/enabled.</p><p>Ensure `composer install` ran successfully and `docker-php-ext-enable mongodb` completed in your Dockerfile.</p>');
 }
@@ -30,7 +29,7 @@ session_start();
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/functions.php'; // Contains getMongoDBClient()
 
-error_log("--- After requires ---"); // Add this line
+error_log("--- After requires ---");
 
 use MongoDB\Client;
 
@@ -38,15 +37,17 @@ use MongoDB\Client;
 $mongoClient = null;
 $mongoDb = null;
 try {
+    error_log("--- Attempting to get MongoDB Client in index.php ---"); // <-- NEW LOG
     $mongoClient = getMongoDBClient();
+    error_log("--- MongoDB Client obtained. Attempting to select database ---"); // <-- NEW LOG
     $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME);
-    // If we reach here, the connection was successful. Temporarily confirm this.
-    // die('<h1>SUCCESS: MongoDB connection established!</h1><p>The issue is likely further down in your application logic, or you can remove debug code now.</p>');
+    error_log("--- MongoDB database selected successfully ---"); // <-- NEW LOG
 } catch (Exception $e) {
-    error_log("Failed to connect to MongoDB: " . $e->getMessage());
-    // This die() should now catch connection-specific errors.
+    error_log("Failed to connect to MongoDB in index.php: " . $e->getMessage()); // <-- MODIFIED LOG
     die("<h1>Service Unavailable: Database connection failed.</h1><p>Error: " . htmlspecialchars($e->getMessage()) . "</p>");
 }
+
+error_log("--- MongoDB connection established and DB selected. Proceeding to routing. ---"); // <-- NEW LOG
 
 $request_uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $script_name = dirname($_SERVER['SCRIPT_NAME']);
