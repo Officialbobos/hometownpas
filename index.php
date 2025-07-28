@@ -46,9 +46,29 @@ try {
 
 error_log("--- MongoDB connection established and DB selected. Proceeding to routing. ---");
 
-$request_uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$script_name = dirname($_SERVER['SCRIPT_NAME']);
-$path = substr($request_uri, strlen($script_name));
+// Ensure REQUEST_URI is a string, even if not set. Default to '/'
+$request_uri = $_SERVER['REQUEST_URI'] ?? '/';
+
+// Parse the path component of the URL.
+$request_uri_path = parse_url($request_uri, PHP_URL_PATH);
+
+// Ensure parse_url returns a string or default to '/' if malformed/null
+$request_uri_path = ($request_uri_path !== false && $request_uri_path !== null) ? $request_uri_path : '/';
+
+// Get the directory name of the script (e.g., / or /subdir).
+// Ensure $_SERVER['SCRIPT_NAME'] is handled if it's null.
+$script_name = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+
+// Calculate the path relative to the script's directory.
+// Handle cases where script_name might not be at the start of request_uri_path (e.g., root access).
+if ($script_name !== '/' && strpos($request_uri_path, $script_name) === 0) {
+    $path = substr($request_uri_path, strlen($script_name));
+} else {
+    // If script_name is '/', or not found at the beginning of the path, use the full path.
+    $path = $request_uri_path;
+}
+
+// Trim leading/trailing slashes for cleaner routing logic (e.g., 'login' instead of '/login/').
 $path = trim($path, '/');
 
 // Define all routes that require authentication (both frontend and API)
