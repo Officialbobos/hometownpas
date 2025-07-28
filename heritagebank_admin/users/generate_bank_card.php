@@ -200,7 +200,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'card_type' => $card_type,
                             'expiry_month' => (int)$expiry_month, // Store as integer
                             'expiry_year' => (int)$expiry_year_full, // Store full year as integer
-                            'cvv' => $cvv,
                             'card_holder_name' => $card_holder_name,
                             'is_active' => $is_active,
                             'pin' => null, // PIN is NULL initially
@@ -399,7 +398,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: white;
             padding: 25px;
             border-radius: 15px;
-            width: 350px;
+            width: 320px;
             margin: 30px auto;
             box-shadow: 0 10px 20px rgba(0,0,0,0.2);
             position: relative;
@@ -592,8 +591,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <div class="value"><?php echo htmlspecialchars($generated_card_info['expiry_date']); ?></div>
                         </div>
                     </div>
-                    <p style="font-size: 0.8em; text-align: center; margin-top: 10px;">
-                        CVV: <?php echo $generated_card_info['cvv']; ?>
+                   <p style="font-size: 0.8em; text-align: center; margin-top: 10px;">
+                 CVV: XXX
                     </p>
                     <?php
                         $card_logo_path = '';

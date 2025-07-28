@@ -95,13 +95,13 @@ try {
                 // Dynamically determine the card logo source based on the card network
                 'card_logo_src' => [
                     '$switch' => [
-                        'branches' => [
-                            ['case' => ['$eq' => ['$card_type', 'Visa']], 'then' => BASE_URL . '/assets/images/visa-logo.png'],
-                            ['case' => ['$eq' => ['$card_type', 'MasterCard']], 'then' => BASE_URL . '/assets/images/mastercard-logo.png'],
-                            ['case' => ['$eq' => ['$card_type', 'Amex']], 'then' => BASE_URL . '/assets/images/amex-logo.png'],
-                            ['case' => ['$eq' => ['$card_type', 'Verve']], 'then' => BASE_URL . '/assets/images/verve-logo.png'],
-                        ],
-                        'default' => BASE_URL . '/assets/images/default-card-logo.png' // Fallback for unknown networks
+                       'branches' => [
+    ['case' => ['$eq' => ['$card_type', 'Visa']], 'then' => 'https://i.imgur.com/Zua60IH.png'],
+    ['case' => ['$eq' => ['$card_type', 'MasterCard']], 'then' => 'https://i.imgur.com/ze6oDQT.png'],
+    ['case' => ['$eq' => ['$card_type', 'Amex']], 'then' => BASE_URL . '/assets/images/amex-logo.png'], // This one might be a local asset
+    ['case' => ['$eq' => ['$card_type', 'Verve']], 'then' => 'https://i.imgur.com/Dqk4qfW.png'],
+],
+'default' => BASE_URL . '/assets/images/default-card-logo.png' // Fallback for local asset
                     ]
                 ]
             ]

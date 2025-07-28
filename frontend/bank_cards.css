@@ -158,12 +158,23 @@ h2 {
     flex-direction: column;
     justify-content: space-between;
     min-height: 200px;
+    width: 320px; /* <--- ADD THIS LINE to control the width */
+    /* You might also want a max-width for responsiveness on smaller screens */
+    max-width: calc(100% - 30px); /* Example: 100% minus padding/margin */
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .card-item:hover {
     transform: translateY(-5px);
+    
     box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+}
+.userCardList {
+    display: flex;
+    flex-wrap: wrap; /* Allows cards to wrap to the next line */
+    justify-content: center; /* Centers cards horizontally */
+    gap: 25px; /* Spacing between cards */
+    padding: 20px;
 }
 
 /* Specific card network styles for background and text (from second block) */
