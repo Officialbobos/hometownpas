@@ -7,6 +7,8 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+
+error_log("--- SCRIPT START ---"); // Add this line
 require __DIR__ . '/vendor/autoload.php'; // <-- ADD THIS LINE!
 
 
@@ -27,6 +29,8 @@ if (!class_exists('MongoDB\Client')) {
 session_start();
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/functions.php'; // Contains getMongoDBClient()
+
+error_log("--- After requires ---"); // Add this line
 
 use MongoDB\Client;
 
