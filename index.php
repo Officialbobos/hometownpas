@@ -7,10 +7,8 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-
 error_log("--- SCRIPT START ---");
 require __DIR__ . '/vendor/autoload.php';
-
 
 // Check if MongoDB extension is loaded
 if (!extension_loaded('mongodb')) {
@@ -24,7 +22,6 @@ if (!class_exists('MongoDB\Client')) {
 
 // --- END TEMPORARY DEBUG CODE ---
 
-
 session_start();
 require_once __DIR__ . '/Config.php';
 require_once __DIR__ . '/functions.php'; // Contains getMongoDBClient()
@@ -37,55 +34,76 @@ use MongoDB\Client;
 $mongoClient = null;
 $mongoDb = null;
 try {
-    error_log("--- Attempting to get MongoDB Client in index.php ---"); // <-- NEW LOG
+    error_log("--- Attempting to get MongoDB Client in index.php ---");
     $mongoClient = getMongoDBClient();
-    error_log("--- MongoDB Client obtained. Attempting to select database ---"); // <-- NEW LOG
+    error_log("--- MongoDB Client obtained. Attempting to select database ---");
     $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME);
-    error_log("--- MongoDB database selected successfully ---"); // <-- NEW LOG
+    error_log("--- MongoDB database selected successfully ---");
 } catch (Exception $e) {
-    error_log("Failed to connect to MongoDB in index.php: " . $e->getMessage()); // <-- MODIFIED LOG
+    error_log("Failed to connect to MongoDB in index.php: " . $e->getMessage());
     die("<h1>Service Unavailable: Database connection failed.</h1><p>Error: " . htmlspecialchars($e->getMessage()) . "</p>");
 }
 
-error_log("--- MongoDB connection established and DB selected. Proceeding to routing. ---"); // <-- NEW LOG
+error_log("--- MongoDB connection established and DB selected. Proceeding to routing. ---");
 
 $request_uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $script_name = dirname($_SERVER['SCRIPT_NAME']);
 $path = substr($request_uri, strlen($script_name));
 $path = trim($path, '/');
 
-// Authenticated routes
+// Define all routes that require authentication (both frontend and API)
 $authenticated_routes = [
     'dashboard',
     'profile',
     'transfer',
     'transactions',
-    'bank_cards', // Add this
+    'bank_cards',
+    'accounts',
+    'customer-service',
+    'make_transfer',
+    'manage_card',
+    'my_cards',
+    'set_card_pin',
+    'statements',
+    'verify_code',
     'api/get_user_cards',
-    'api/get_user_accounts', // Add this
-    'api/order_card',        // Add this
-    // Add other routes that require authentication
+    'api/get_user_accounts',
+    'api/order_card',
+    // ... potentially other API/frontend routes that require authentication
 ];
 
 // Check authentication for authenticated routes
-if (in_array($path, $authenticated_routes)) {
+if (in_array($path, $authenticated_routes) && !str_starts_with($path, 'admin/')) { // Exclude admin paths from regular user auth check if admin has separate auth
     if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
         header('Location: ' . BASE_URL . '/login');
         exit;
     }
 }
 
-// Router logic
+// Admin authentication check (if different from user authentication)
+// If admin authentication is distinct, you'd add similar logic here:
+// if (str_starts_with($path, 'admin/') || str_starts_with($path, 'api/admin/')) {
+//     if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+//         header('Location: ' . BASE_URL . '/admin/login'); // Redirect to admin login page
+//         exit;
+//     }
+// }
+
+
+// --- ALL ROUTER LOGIC IN ONE SWITCH STATEMENT ---
 switch ($path) {
-    case '':
+    // --- Frontend Routes ---
+    case '': // Default route for the root URL
     case 'login':
-        require __DIR__ . '/auth/login.php';
+        require __DIR__ . '/frontend/login.php';
         break;
-    case 'register':
-        require __DIR__ . '/auth/register.php';
-        break;
+    // case 'register': // Removed as per your instruction (if no frontend register.php)
+    // If you add a frontend/register.php later, uncomment and adjust path:
+    // case 'register':
+    //     require __DIR__ . '/frontend/register.php';
+    //     break;
     case 'logout':
-        require __DIR__ . '/auth/logout.php';
+        require __DIR__ . '/frontend/logout.php';
         break;
     case 'dashboard':
         require __DIR__ . '/frontend/dashboard.php';
@@ -99,18 +117,42 @@ switch ($path) {
     case 'transactions':
         require __DIR__ . '/frontend/transactions.php';
         break;
-    case 'bank_cards': // Route for the bank cards page
+    case 'bank_cards':
         require __DIR__ . '/frontend/bank_cards.php';
         break;
+    case 'accounts':
+        require __DIR__ . '/frontend/accounts.php';
+        break;
+    case 'customer-service':
+        require __DIR__ . '/frontend/customer-service.php';
+        break;
+    case 'make_transfer':
+        require __DIR__ . '/frontend/make_transfer.php';
+        break;
+    case 'manage_card':
+        require __DIR__ . '/frontend/manage_card.php';
+        break;
+    case 'my_cards':
+        require __DIR__ . '/frontend/my_cards.php';
+        break;
+    case 'set_card_pin':
+        require __DIR__ . '/frontend/set_card_pin.php';
+        break;
+    case 'statements':
+        require __DIR__ . '/frontend/statements.php';
+        break;
+    case 'verify_code':
+        require __DIR__ . '/frontend/verify_code.php';
+        break;
 
-    // API Routes
+    // --- API Routes ---
     case 'api/get_user_cards':
         require __DIR__ . '/api/get_user_cards.php';
         break;
-    case 'api/get_user_accounts': // New API route for fetching user accounts
+    case 'api/get_user_accounts':
         require __DIR__ . '/api/get_user_accounts.php';
         break;
-    case 'api/order_card': // New API route for ordering a card
+    case 'api/order_card':
         require __DIR__ . '/api/order_card.php';
         break;
     case 'api/login':
@@ -121,7 +163,7 @@ switch ($path) {
         break;
     // ... potentially other API routes
 
-    // Admin Panel Routes
+    // --- Admin Panel Routes ---
     case 'admin':
         require __DIR__ . '/heritagebank_admin/admin_dashboard.php';
         break;
@@ -137,7 +179,8 @@ switch ($path) {
     case 'admin/transactions':
         require __DIR__ . '/heritagebank_admin/manage_transactions.php';
         break;
-    // API for admin
+
+    // --- Admin API Routes ---
     case 'api/admin/get_users':
         require __DIR__ . '/heritagebank_admin/api/get_users.php';
         break;
@@ -192,6 +235,11 @@ switch ($path) {
 
     default:
         http_response_code(404);
-        require __DIR__ . '/frontend/404.php'; // Or a simple 404 message
+        // IMPORTANT: Your frontend directory listing did not show '404.php'.
+        // If this file does not exist, the next error will be 'Failed to open stream: 404.php'.
+        // For now, if 404.php doesn't exist, this will echo a simple message.
+        echo "404 Not Found";
+        // If you do have a 404.php in frontend/, uncomment the line below:
+        // require __DIR__ . '/frontend/404.php';
         break;
 }
