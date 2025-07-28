@@ -16,6 +16,7 @@ $message_type = ''; // 'success', 'error', 'warning'
 
 // If admin is already logged in (session is active)
 if (isset($_SESSION['admin_user_id'])) {
+    error_log("index.php: Admin already logged in. Redirecting to dashboard.php."); // ADD THIS LINE
     header('Location: dashboard.php'); // Redirect to admin dashboard
     exit();
 }
@@ -25,13 +26,17 @@ if (isset($_POST['admin_login'])) {
     $email = sanitize_input($_POST['email'] ?? '');
     $password = $_POST['password'] ?? ''; // Passwords are not sanitized with htmlspecialchars
 
+    error_log("index.php: Admin login attempt for email: " . $email); // ADD THIS LINE
+
     if (empty($email) || empty($password)) {
         $message = "Please enter both email and password.";
         $message_type = 'error';
+        error_log("index.php: Login failed - Empty email or password."); // ADD THIS LINE
     } else {
         try {
             // Get the 'admin' collection
-            $adminCollection = getCollection('admin'); // CORRECTED LINE
+            $adminCollection = getCollection('admin');
+            error_log("index.php: Attempting to find user '" . $email . "' in admin collection."); // ADD THIS LINE
 
             // Find admin user by email and ensure they are 'active'
             $admin_user = $adminCollection->findOne([
@@ -41,6 +46,7 @@ if (isset($_POST['admin_login'])) {
 
 
             if ($admin_user) {
+                error_log("index.php: User '" . $email . "' found. Verifying password."); // ADD THIS LINE
                 // Verify password
                 if (isset($admin_user['password']) && password_verify($password, $admin_user['password'])) {
                     // Password is correct, admin is authenticated
@@ -50,19 +56,22 @@ if (isset($_POST['admin_login'])) {
                     $_SESSION['admin_full_name'] = trim(($admin_user['first_name'] ?? '') . ' ' . ($admin_user['last_name'] ?? ''));
                     $_SESSION['is_admin'] = true; // Explicitly mark as admin in session
 
+                    error_log("index.php: Login SUCCESS for user '" . $email . "'. Session set. Redirecting to dashboard.php."); // ADD THIS LINE
                     // Redirect to admin dashboard
                     header('Location: dashboard.php');
                     exit();
                 } else {
                     $message = "Invalid email or password.";
                     $message_type = 'error';
+                    error_log("index.php: Login FAILED - Incorrect password for user '" . $email . "'."); // ADD THIS LINE
                 }
             } else {
                 $message = "Invalid email or password."; // Keep message generic for security
                 $message_type = 'error';
+                error_log("index.php: Login FAILED - User '" . $email . "' not found or not active."); // ADD THIS LINE
             }
         } catch (Exception $e) {
-            error_log("Admin login error: " . $e->getMessage());
+            error_log("index.php: Admin login EXCEPTION: " . $e->getMessage()); // ADD THIS LINE
             $message = "An unexpected error occurred during login. Please try again later.";
             $message_type = 'error';
         }
