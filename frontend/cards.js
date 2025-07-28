@@ -1,21 +1,22 @@
 // Function to show a message box
 function showMessageBox(message, isSuccess) {
     const messageBoxOverlay = document.getElementById('messageBoxOverlay');
-    const messageBoxContent = document.getElementById('messageBoxContent');
-    messageBoxContent.textContent = message;
+    // Targeting the wrapper div for styling and the paragraph for text
+    const messageBoxContentWrapper = document.getElementById('messageBoxContentWrapper');
+    const messageBoxContentParagraph = document.getElementById('messageBoxContent'); // This is your <p> tag
 
-    // Remove any existing status classes
-    messageBoxContent.classList.remove('message-box-success', 'message-box-error');
+    // Set the message text in the paragraph
+    messageBoxContentParagraph.textContent = message;
 
-    // Apply status-specific classes
+    // Remove any existing status classes from the wrapper
+    messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error');
+
+    // Apply status-specific classes to the wrapper (where your background/border styles would be)
     if (isSuccess) {
-        messageBoxContent.classList.add('message-box-success');
+        messageBoxContentWrapper.classList.add('message-box-success');
     } else {
-        messageBoxContent.classList.add('message-box-error');
+        messageBoxContentWrapper.classList.add('message-box-error');
     }
-
-    // Add base styling class (assuming these styles are in CSS now)
-    messageBoxContent.classList.add('message-box-base'); // A new class for common padding, border, etc.
 
     // Show the overlay
     messageBoxOverlay.classList.add('show');
@@ -34,8 +35,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const noCardsMessage = document.getElementById('noCardsMessage');
     const orderCardForm = document.getElementById('orderCardForm');
     const accountIdSelect = document.getElementById('accountId');
-    const messageBoxButton = document.getElementById('messageBoxButton');
+
+    // Message Box Elements (re-referenced to match your HTML)
     const messageBoxOverlay = document.getElementById('messageBoxOverlay');
+    const messageBoxButton = document.getElementById('messageBoxButton');
+    const messageBoxContentWrapper = document.getElementById('messageBoxContentWrapper'); // The div containing the <p> and button
+    const messageBoxContentParagraph = document.getElementById('messageBoxContent'); // The <p> tag itself
+
     const orderCardSubmitButton = orderCardForm.querySelector('button[type="submit"]'); // Get the submit button
 
     // Function to fetch and populate user's bank accounts for the order form
@@ -98,8 +104,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const networkClass = card.card_network ? card.card_network.toLowerCase() : 'default';
                     cardItem.className = `card-item ${networkClass}`;
 
+                    // Dynamic bank logo. Assuming card.bank_logo_src is provided by API
+                    // Also using card.bank_name if available, defaulting to 'HOMETOWN BANK'
+                    const bankLogoHtml = card.bank_logo_src ? `<img src="${card.bank_logo_src}" alt="Bank Logo" class="bank-logo-on-card">` : '';
+                    const bankName = card.bank_name || 'HOMETOWN BANK';
+
                     cardItem.innerHTML = `
-                        <h4>HOMETOWN BANK</h4>
+                        ${bankLogoHtml}
+                        <h4>${bankName}</h4>
                         <div class="chip"></div>
                         <div class="card-number">${card.display_card_number}</div>
                         <div class="card-footer">
@@ -112,11 +124,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <div class="value">${card.display_expiry}</div>
                             </div>
                         </div>
-                        <p style="font-size: 0.8em; text-align: center; margin-top: 10px; color: rgba(255,255,255,0.7);">
+                        <p class="card-cvv-mock">
                             CVV: ${card.display_cvv} (Mock)
                         </p>
                         ${card.is_active == 1 ? '<div class="card-status active">Active</div>' : '<div class="card-status inactive">Inactive</div>'}
-                        ${card.card_logo_src ? `<img src="${card.card_logo_src}" alt="${card.card_network} Logo" class="card-logo-img">` : ''}
+                        ${card.card_logo_src ? `<img src="${card.card_logo_src}" alt="${card.card_network} Logo" class="card-network-logo-img">` : ''}
                     `;
                     userCardList.appendChild(cardItem);
                 });
@@ -191,8 +203,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle message box dismissal
     messageBoxButton.addEventListener('click', () => {
-        messageBoxOverlay.classList.remove('show'); // Hide the overlay using classList
-        // Optionally, remove the success/error classes from content when hidden
-        document.getElementById('messageBoxContent').classList.remove('message-box-success', 'message-box-error', 'message-box-base');
+        messageBoxOverlay.classList.remove('show'); // Hide the overlay
+        // Remove success/error classes from the wrapper when hidden
+        messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error');
+        // Clear the message text
+        messageBoxContentParagraph.textContent = '';
     });
 });

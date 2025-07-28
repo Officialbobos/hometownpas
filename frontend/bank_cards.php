@@ -151,7 +151,7 @@ try {
         </section>
 
         <section class="order-card-section">
-            <h2>Order a New Card</h2>
+            <h2>Order a Card</h2>
             <form id="orderCardForm">
                 <div class="form-group">
                     <label for="cardHolderName">Card Holder Name:</label>
