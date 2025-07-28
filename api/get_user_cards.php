@@ -19,7 +19,7 @@ try {
         throw new Exception("MongoDB database not selected.");
     }
 
-    $cardsCollection = $mongoDb->selectCollection('cards');
+    $cardsCollection = $mongoDb->selectCollection('bank_cards');
     // $accountsCollection is implicitly used within the aggregation pipeline's $lookup
 
     $userId = $_SESSION['user_id'];
