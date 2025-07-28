@@ -39,6 +39,10 @@ COPY . /var/www/html/
 # Install PHP dependencies using Composer
 RUN composer install --no-dev --optimize-autoloader
 
+
+# Explicitly dump the Composer autoloader (stronger guarantee)
+RUN composer dump-autoload --optimize --no-dev
+
 # Enable Apache's rewrite module
 RUN a2enmod rewrite
 
