@@ -85,7 +85,7 @@ $authenticated_routes = [
     'my_cards',
     'set_card_pin',
     'statements',
-    'verify_code',
+    //'verify_code',
     'api/get_user_cards',
     'api/get_user_accounts',
     'api/order_card',
@@ -93,8 +93,17 @@ $authenticated_routes = [
 ];
 
 // Check authentication for authenticated routes
-if (in_array($path, $authenticated_routes) && !str_starts_with($path, 'admin/')) { // Exclude admin paths from regular user auth check if admin has separate auth
+if (in_array($path, $authenticated_routes) && !str_starts_with($path, 'admin/')) {
+    // This block handles routes that require a user to be fully logged in (after 2FA)
     if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
+        header('Location: ' . BASE_URL . '/login');
+        exit;
+    }
+} elseif ($path === 'verify_code') {
+    // This block specifically handles the 2FA verification page
+    // It checks if the user is in the 'awaiting_2fa' state, meaning they passed initial login
+    if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' || !isset($_SESSION['temp_user_id'])) {
+        // If not in the correct 2FA pending state, redirect them back to login
         header('Location: ' . BASE_URL . '/login');
         exit;
     }
