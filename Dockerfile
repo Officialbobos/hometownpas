@@ -45,4 +45,8 @@ RUN a2enmod rewrite
 # Expose port 80
 EXPOSE 80
 
+<<<<<<< HEAD
 # CMD is implicitly handled by the base image.
+=======
+# CMD is implicitly handled by the base image.
+>>>>>>> 44a6caae50bfea3650ac871d95b83ee7b334c93f
