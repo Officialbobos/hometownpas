@@ -207,7 +207,7 @@ h2 {
 
 .card-item h4 {
     margin-top: 0;
-    font-size: 1.1em;
+    font-size: 0.8em;
     color: #333; /* Default text color for card issuer name */
     position: absolute; /* Allows precise positioning */
     top: 25px; /* Adjust as needed */
@@ -218,11 +218,11 @@ h2 {
 /* This is the actual network logo image from the backend (Visa, Mastercard, etc.) */
 .card-logo-img {
     position: absolute;
-    bottom: 20px;
-    right: 20px; /* Keeps the network logo on the right */
-    height: 45px; /* Base height */
+    bottom: 5px;
+    right: 5px; /* Keeps the network logo on the right */
+    height: 10px; /* Base height */
     width: auto;
-    max-width: 80px;
+    max-width: 40px;
     z-index: 2;
 }
 
@@ -240,11 +240,11 @@ h2 {
 
 /* Chip */
 .card-item .chip {
-    width: 50px;
-    height: 35px;
+    width: 40px;
+    height: 30px;
     background-color: #d4af37;
     border-radius: 5px;
-    position: absolute;
+    position: absolute; 
     top: 90px; /* Adjust vertical position */
     left: 25px;
     z-index: 2;
@@ -253,14 +253,14 @@ h2 {
 /* Card Number */
 .card-number {
     font-family: var(--font-family-card-number);
-    font-size: 1.6em; /* Base font size */
+    font-size: 1.2em; /* Base font size */
     letter-spacing: 2px;
     margin-bottom: 20px; /* Not relevant with absolute positioning */
     color: #444;
     text-align: center;
     word-break: break-all;
     position: absolute;
-    top: 140px; /* Adjust vertical position, after chip */
+    top: 120px; /* Adjust vertical position, after chip */
     left: 50%;
     transform: translateX(-50%); /* Center horizontally */
     width: calc(100% - 50px); /* Leave space for padding */
@@ -297,10 +297,10 @@ h2 {
 p.card-cvv-mock {
     font-size: 0.8em;
     text-align: center;
-    /* margin-top: 10px; Replaced by positioning */
+    margin-top: 10px; /*Replaced by positioning */
     color: #888;
     position: absolute;
-    bottom: 60px; /* Position above footer */
+    bottom: 20px; /* Position above footer */
     left: 50%;
     transform: translateX(-50%);
     width: calc(100% - 50px); /* Adjust width to fit within card bounds */
@@ -765,30 +765,30 @@ p.card-cvv-mock {
         margin: 0 auto; /* Keep cards centered */
     }
     .bank-logo-on-card {
-        height: 30px; /* Maintain original "bank size" image height for visibility */
-        top: 15px; /* Adjust position relative to new padding */
-        left: 15px;
+        height: 20px; /* Maintain original "bank size" image height for visibility */
+        top: 10px; /* Adjust position relative to new padding */
+        left: 10px;
     }
     .card-logo-img {
-        height: 38px; /* Slightly smaller network logo */
-        bottom: 12px;
-        right: 12px;
+        height: 10x; /* Slightly smaller network logo */
+        bottom: 5px;
+        right: 7px;
     }
     .card-item .chip {
-        width: 45px;
-        height: 30px;
-        top: 75px; /* Adjust vertical position to fit content better */
+        width: 25px;
+        height: 15px;
+        top: 55px; /* Adjust vertical position to fit content better */
         left: 15px;
     }
     .card-item h4 {
-        font-size: 0.95em; /* Reduced bank name font size */
+        font-size: 0.7em; /* Reduced bank name font size */
         top: 15px;
         left: 15px;
     }
     .card-number {
-        font-size: 1.3rem; /* Reduced card number font size */
-        letter-spacing: 1.2px;
-        top: 115px; /* Adjusted vertical position */
+        font-size: 1rem; /* Reduced card number font size */
+        letter-spacing: 1px;
+        top: 100px; /* Adjusted vertical position */
         width: calc(100% - 30px); /* Adjust width based on new padding */
     }
     .card-footer {
@@ -799,7 +799,7 @@ p.card-cvv-mock {
     }
     p.card-cvv-mock {
         font-size: 0.7em; /* Reduced CVV mock text size */
-        bottom: 45px; /* Adjusted position */
+        bottom: 10px; /* Adjusted position */
         width: calc(100% - 30px);
     }
     .card-status {
@@ -952,143 +952,3 @@ p.card-cvv-mock {
     .bank-card-display .card-cvv-row { font-size: 0.65em; }
     .message { padding: 8px; font-size: 0.85em; }
 }
-
-/* Original dashboard layout elements (uncomment if you need them for a full dashboard page) */
-/*
-.dashboard-container {
-    display: flex;
-    min-height: 100vh;
-    flex-direction: column;
-}
-.top-navbar {
-    background-color: var(--text-color-light);
-    padding: 10px 20px;
-    box-shadow: var(--box-shadow-light);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    height: var(--navbar-height);
-    box-sizing: border-box;
-    position: fixed;
-    width: 100%;
-    top: 0;
-    left: 0;
-    z-index: 1000;
-}
-.top-navbar .logo img { height: 40px; }
-.top-navbar h2 {
-    margin: 0;
-    font-size: 1.4em;
-    color: var(--dark-blue);
-}
-.top-navbar .user-info {
-    display: flex; align-items: center; gap: 10px; font-size: 0.9em;
-}
-.top-navbar .user-info .profile-icon { font-size: 1.2em; color: var(--primary-blue); }
-.top-navbar .user-info a { color: var(--primary-blue); text-decoration: none; font-weight: 500; }
-.top-navbar .user-info a:hover { text-decoration: underline; }
-.menu-toggle {
-    display: none; font-size: 1.8em; color: var(--primary-blue); cursor: pointer; z-index: 1001;
-}
-.sidebar {
-    width: var(--sidebar-width); background-color: var(--primary-blue); color: var(--text-color-light);
-    padding-top: var(--navbar-height); position: fixed; height: 100vh; overflow-y: auto;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 999; transform: translateX(0);
-    transition: transform 0.3s ease-in-out;
-}
-.sidebar ul { list-style: none; padding: 0; margin: 0; }
-.sidebar ul li a {
-    display: flex; align-items: center; padding: 15px 20px; color: var(--text-color-light);
-    text-decoration: none; font-size: 1.1em; transition: background-color 0.3s ease;
-}
-.sidebar ul li a i { margin-right: 10px; font-size: 1.2em; }
-.sidebar ul li a:hover, .sidebar ul li.active a { background-color: var(--dark-blue); }
-
-.main-content-wrapper {
-    flex-grow: 1; padding: 20px; margin-top: var(--navbar-height);
-    margin-left: var(--sidebar-width); box-sizing: border-box;
-    background-color: var(--light-grey); min-height: calc(100vh - var(--navbar-height));
-}
-.main-content-wrapper h3 {
-    color: var(--text-color-dark); margin-bottom: 25px; font-size: 1.8em; text-align: center;
-}
-
-.bank-card-display {
-    width: 320px; height: 200px; aspect-ratio: 1.6 / 1;
-    background: linear-gradient(135deg, #007bff, #0056b3);
-    color: var(--text-color-light); border-radius: 15px;
-    box-shadow: var(--box-shadow-medium); margin: 30px auto;
-    padding: 20px; display: flex; flex-direction: column;
-    justify-content: space-between; box-sizing: border-box;
-    position: relative; overflow: hidden;
-}
-.bank-card-display::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="10" height="10"><rect width="10" height="10" fill="rgba(255,255,255,0.05)"/><rect x="0" y="0" width="5" height="5" fill="rgba(255,255,255,0.05)"/></svg>');
-    background-size: 10px 10px; opacity: 0.8; pointer-events: none;
-}
-.bank-card-display .card-header-logo {
-    text-align: left; font-size: 1.1em; font-weight: 700; opacity: 0.9;
-}
-.bank-card-display .card-number {
-    font-size: 1.8em; text-align: center; letter-spacing: 2px; margin-bottom: 10px; font-weight: 400;
-}
-.bank-card-display .card-details-row {
-    display: flex; justify-content: space-between; align-items: flex-end; font-size: 0.9em; margin-top: auto;
-}
-.bank-card-display .card-cvv-row {
-    display: flex; justify-content: flex-end; font-size: 0.9em; margin-top: 5px;
-}
-.bank-card-display .card-details-group {
-    display: flex; flex-direction: column; text-align: left;
-}
-.bank-card-display .card-details-group.right { text-align: right; }
-.bank-card-display .card-details-label {
-    font-weight: 300; opacity: 0.8; margin-bottom: 3px; font-size: 0.8em;
-}
-.bank-card-display .card-details-value { font-weight: 500; }
-.status-badge {
-    padding: 4px 8px; border-radius: 4px; font-weight: bold; color: var(--text-color-light);
-    font-size: 0.8em; display: inline-block;
-}
-.status-approved { background-color: var(--success-color); }
-.status-declined { background-color: var(--error-color); }
-.card-actions-section {
-    background-color: var(--text-color-light); padding: 25px; border-radius: 8px;
-    box-shadow: var(--box-shadow-light); max-width: 500px; margin: 20px auto; text-align: center;
-}
-.card-actions-section h4 {
-    color: var(--dark-blue); margin-bottom: 20px; font-size: 1.5em;
-}
-.form-group.switch-container {
-    display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 20px;
-}
-.form-group.switch-container label {
-    margin-bottom: 0; font-weight: 500; color: var(--text-color-dark);
-}
-.switch { position: relative; display: inline-block; width: 60px; height: 34px; vertical-align: middle; }
-.switch input { opacity: 0; width: 0; height: 0; }
-.slider {
-    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-    background-color: #ccc; transition: .4s; border-radius: 34px;
-}
-.slider:before {
-    position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px;
-    background-color: white; transition: .4s; border-radius: 50%;
-}
-input:checked + .slider { background-color: var(--primary-blue); }
-input:focus + .slider { box-shadow: 0 0 1px var(--primary-blue); }
-input:checked + .slider:before { -webkit-transform: translateX(26px); -ms-transform: translateX(26px); transform: translateX(26px); }
-
-.button-primary {
-    display: block; width: calc(100% - 40px); max-width: 300px; margin: 15px auto;
-    padding: 12px 20px; border-radius: 8px; text-decoration: none;
-    color: var(--text-color-light); background-color: var(--primary-blue);
-    border: none; cursor: pointer; font-size: 1em;
-    transition: background-color 0.3s ease, transform 0.2s ease;
-    text-align: center; font-weight: 500; box-shadow: var(--box-shadow-light);
-}
-.button-primary:hover { background-color: var(--dark-blue); transform: translateY(-2px); }
-.button-danger { background-color: var(--error-color); }
-.button-danger:hover { background-color: #c82333; }
-*/
