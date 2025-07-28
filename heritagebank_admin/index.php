@@ -1,5 +1,6 @@
 <?php
 // C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\index.php
+session_start();
 
 // 1. Load your core configuration first.
 require_once __DIR__ . '/../Config.php';
