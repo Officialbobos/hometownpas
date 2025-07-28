@@ -122,7 +122,6 @@ h2 {
     font-weight: 700;
     letter-spacing: -0.5px;
 }
-
 /* Sections (from second block) */
 .cards-section, .order-card-section {
     margin-bottom: 40px;
@@ -142,7 +141,7 @@ h2 {
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 25px;
     margin-top: 25px;
-    justify-content: center;
+    justify-content: center; /* Ensures the grid itself is centered if it doesn't take full width */
 }
 
 /* Individual Card Item (from second block) */
@@ -156,25 +155,29 @@ h2 {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    /* justify-content: space-between; This might cause issues with absolute positioning of logos */
+    justify-content: flex-start; /* Start content from the top */
     min-height: 200px;
-    width: 320px; /* <--- ADD THIS LINE to control the width */
-    /* You might also want a max-width for responsiveness on smaller screens */
+    width: 320px; /* This defines the standard width of your cards */
     max-width: calc(100% - 30px); /* Example: 100% minus padding/margin */
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .card-item:hover {
     transform: translateY(-5px);
-    
     box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
 }
+
 .userCardList {
     display: flex;
     flex-wrap: wrap; /* Allows cards to wrap to the next line */
     justify-content: center; /* Centers cards horizontally */
     gap: 25px; /* Spacing between cards */
     padding: 20px;
+    /* Add this if userCardList is the main container for the cards and you want it centered */
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 1200px; /* Example max-width for the container */
 }
 
 /* Specific card network styles for background and text (from second block) */
@@ -202,19 +205,43 @@ h2 {
 }
 
 .card-item h4 {
+    /* Existing styles for the "HomeTown Bank" text or similar */
     margin-top: 0;
     font-size: 1.1em;
     color: #333; /* Default text color for card issuer name */
+    /* NEW: Position the bank name/logo (if it's a text h4) */
+    position: absolute; /* Allows precise positioning */
+    top: 25px; /* Adjust as needed */
+    left: 25px; /* Position on the left */
+    z-index: 2; /* Ensure it's above other elements if needed */
 }
 
-.card-logo-img { /* This is the actual logo image from the backend (from second block) */
+/* This is the actual network logo image from the backend (Visa, Mastercard, etc.) */
+.card-logo-img {
     position: absolute;
     bottom: 20px;
-    right: 20px;
+    right: 20px; /* Keeps the network logo on the right */
     height: 45px;
     width: auto;
     max-width: 80px;
+    z-index: 2; /* Ensure it's above other elements if needed */
 }
+
+/* NEW: If you have a separate "Bank Logo" image that should be on the left (e.g., HomeTown Bank's logo) */
+/* You would need to add an <img> tag with a class like 'bank-logo-on-card' to your HTML,
+   similar to how 'card-logo-img' is used for the network logo. */
+/* Example HTML addition in card-item: <img src="[YOUR_BANK_LOGO_URL]" alt="Bank Logo" class="bank-logo-on-card"> */
+.bank-logo-on-card {
+    position: absolute;
+    top: 25px;   /* Distance from the top */
+    left: 25px;  /* Distance from the left */
+    height: 35px; /* Adjust size to fit well */
+    object-fit: contain;
+    z-index: 2;
+    /* If your bank logo is dark and needs to be white on dark card backgrounds: */
+    /* filter: brightness(0) invert(1); */
+}
+
 
 /* Chip (from second block) */
 .card-item .chip {
@@ -222,7 +249,11 @@ h2 {
     height: 35px;
     background-color: #d4af37; /* Adjusted color for a more golden look */
     border-radius: 5px;
-    margin-bottom: 20px;
+    /* margin-bottom: 20px; Removed as we're using absolute positioning now */
+    position: absolute; /* NEW: Absolute position the chip */
+    top: 90px; /* Adjust vertical position */
+    left: 25px; /* Position on the left */
+    z-index: 2;
 }
 
 /* Card Number (from second block) */
@@ -234,6 +265,13 @@ h2 {
     color: #444; /* Default card number color */
     text-align: center;
     word-break: break-all;
+    /* NEW: Adjust position for the card number */
+    position: absolute;
+    top: 140px; /* Adjust vertical position, after chip */
+    left: 50%;
+    transform: translateX(-50%); /* Center horizontally */
+    width: calc(100% - 50px); /* Leave space for padding */
+    z-index: 2;
 }
 /* White for card numbers on colored cards (from second block) */
 .card-item.visa .card-number, .card-item.mastercard .card-number, .card-item.amex .card-number, .card-item.verve .card-number {
@@ -246,7 +284,12 @@ h2 {
     justify-content: space-between;
     align-items: flex-end;
     font-size: 0.9em;
-    width: 100%;
+    width: calc(100% - 50px); /* Adjust width to account for padding */
+    /* NEW: Position the footer at the bottom */
+    position: absolute;
+    bottom: 25px; /* Adjust as needed */
+    left: 25px; /* Align with left padding */
+    z-index: 2;
 }
 
 .card-footer .label {
@@ -265,6 +308,13 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from second block) */
     text-align: center;
     margin-top: 10px;
     color: #888;
+    /* NEW: Position the CVV mock */
+    position: absolute;
+    bottom: 60px; /* Position above footer */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%; /* Take full width */
+    z-index: 2;
 }
 
 /* Card Status (from second block) */
@@ -277,9 +327,14 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from second block) */
     padding: 5px 10px;
     border-radius: 5px;
     display: inline-block;
+    /* NEW: Position the status */
+    position: absolute;
+    top: 25px; /* Align with top elements */
+    right: 25px; /* Position on the right */
+    z-index: 2;
 }
 .card-status.active { background-color: #d4edda; color: #155724; }
-.card-status.inactive { background-color: #f8d7da; color: #721c24; } /* Renamed from error, using default error colors */
+.card-status.inactive { background-color: #f8d7da; color: #721c24; }
 .card-status.frozen { background-color: #fff3cd; color: #ffc107; }
 .card-status.lost, .card-status.stolen { background-color: #f8d7da; color: #721c24; }
 
@@ -303,11 +358,14 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from second block) */
 
 /* Card Actions (from second block) */
 .card-actions {
-    margin-top: 15px;
+    margin-top: 15px; /* Keep margin-top for separation from card elements */
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
     justify-content: center;
+    /* NEW: Position card actions outside the card item, or at the bottom if within */
+    /* If you want actions directly below the card, remove absolute positioning from card elements,
+       or adjust margin-top. The current setup implies they are below. */
 }
 
 .card-actions button {
@@ -335,9 +393,7 @@ p.card-cvv-mock { /* Styling for the CVV mock text (from second block) */
 .card-actions button.unfreeze-btn { background-color: var(--success-color); color: var(--text-color-light); }
 .card-actions button.unfreeze-btn:hover { background-color: #218838; }
 .card-actions button.report-btn { background-color: var(--error-color); color: var(--text-color-light); }
-.card-actions button.report-btn:hover { background-color: #c82333; }
-
-/* Order New Card Section - Form and button styling (from second block) */
+.card-actions button.report-btn:hover { background-color: #c82333; }/* Order New Card Section - Form and button styling (from second block) */
 .order-card-section form {
     display: flex;
     flex-direction: column;
