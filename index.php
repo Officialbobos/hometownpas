@@ -78,9 +78,6 @@ if (in_array($path, $authenticated_routes)) {
 // Router logic
 switch ($path) {
     case '':
-    case 'home':
-        require __DIR__ . '/frontend/home.php';
-        break;
     case 'login':
         require __DIR__ . '/auth/login.php';
         break;
