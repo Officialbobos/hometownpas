@@ -308,8 +308,8 @@ function complete_pending_transfer($transaction_id): array {
     // Start a session for the transaction (requires a replica set or sharded cluster)
     // For local development on a standalone server, transactions might not be supported.
     // Ensure your MongoDB instance is a replica set for this to work.
-    $session = $client->startSession(); // Use the client from getMongoDBClient()
-    $session->startTransaction();
+    //$session = $client->startSession(); // Use the client from getMongoDBClient()
+    //$session->startTransaction();
 
     try {
         // 1. Fetch the pending transaction details
@@ -585,8 +585,8 @@ function reject_pending_transfer($transaction_id, string $reason = 'Rejected by 
         return ['success' => false, 'message' => "Invalid transaction ID format.", 'transaction_details' => null];
     }
 
-    $session = $client->startSession();
-    $session->startTransaction();
+    //$session = $client->startSession();
+    //$session->startTransaction();
 
     try {
         // 1. Fetch the pending transaction details
