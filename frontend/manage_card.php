@@ -1,162 +1,115 @@
 <?php
-session_start();
-require_once '../Config.php'; // Ensure this Config.php contains MongoDB connection details
-require_once '../vendor/autoload.php'; // Make sure Composer's autoloader is included for MongoDB classes
+// Path: C:\xampp\htdocs\hometownbank\frontend\bank_cards.php
+
+// For development:
+ini_set('display_errors', 1); // Enable error display for debugging
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// Ensure session is started and Config/functions are available.
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Define BASE_URL if not already defined (e.g., from Config.php)
+if (!defined('BASE_URL')) {
+    define('BASE_URL', 'http://localhost/hometownbank'); // Adjust as per your actual setup
+}
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
+use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
-// Check if the user is NOT logged in or user_id is not set
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: ../login.php'); // Redirect to login page
+// Check if the user is logged in. If not, redirect to login page.
+if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] != true || !isset($_SESSION['user_id'])) {
+    header('Location: ' . BASE_URL . '/index.php'); // Or wherever your login page is
     exit;
 }
 
-// Convert session user_id to MongoDB ObjectId
-try {
-    $user_id_obj = new ObjectId($_SESSION['user_id']);
-} catch (Exception $e) {
-    // Log the error for debugging purposes (e.g., to a file or a service)
-    error_log("Invalid user ID in session: " . $_SESSION['user_id'] . " - " . $e->getMessage());
-    $_SESSION['message'] = "Your session is invalid. Please log in again.";
-    $_SESSION['message_type'] = "error";
-    header('Location: ../login.php');
-    exit;
+$user_id = $_SESSION['user_id']; // This should be a string representation of ObjectId from login
+$user_full_name = $_SESSION['user_full_name'] ?? '';
+$user_email = $_SESSION['user_email'] ?? '';
+
+$message = '';
+$message_type = '';
+
+global $mongoDb; // Access the global variable set in index.php
+
+if (!$mongoDb) {
+    error_log("CRITICAL ERROR: MongoDB connection not available in bank_cards.php. Check index.php or getMongoDBClient().");
+    die("<h1>Database connection error. Please try again later.</h1>");
 }
 
-$card = null;
-$message = $_GET['message'] ?? ''; // Get message from GET if redirected
-$message_type = $_GET['message_type'] ?? ''; // Get message type from GET
+$usersCollection = $mongoDb->selectCollection('users');
+$accountsCollection = $mongoDb->selectCollection('accounts');
+$bankCardsCollection = $mongoDb->selectCollection('bank_cards');
 
-$mongoClient = null; // Initialize to null for finally block
+$userObjectId = null; // Initialize to null
+
 try {
-    // Establish MongoDB connection using details from Config.php
-    $mongoClient = new Client(MONGODB_CONNECTION_URI);
-    $database = $mongoClient->selectDatabase(MONGODB_DB_NAME);
-    $cardsCollection = $database->bank_cards;
+    // Convert user_id from session string to MongoDB ObjectId
+    $userObjectId = new ObjectId($user_id);
 
-    // Handle form submission for card management
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $card_id_post_str = filter_input(INPUT_POST, 'card_id', FILTER_SANITIZE_STRING); // Get as string
-        $action = filter_input(INPUT_POST, 'action', FILTER_SANITIZE_STRING);
-
-        if ($card_id_post_str && $action) {
-            try {
-                $card_id_obj = new ObjectId($card_id_post_str); // Convert to ObjectId
-            } catch (Exception $e) {
-                // If the card ID from the form is not a valid ObjectId, throw an exception
-                throw new Exception("Invalid card ID format provided.");
-            }
-
-            // Validate that the card belongs to the current user
-            // Use findOne to ensure the card exists and is linked to the user
-            $existingCard = $cardsCollection->findOne([
-                '_id' => $card_id_obj,
-                'user_id' => $user_id_obj
-            ]);
-
-            if ($existingCard) {
-                // Card belongs to the user, proceed with the requested action
-                if ($action === 'toggle_status') {
-                    // Convert checkbox value ('1' or not set) to a boolean for MongoDB
-                    $new_status = (isset($_POST['is_active']) && $_POST['is_active'] === '1');
-                    
-                    $updateResult = $cardsCollection->updateOne(
-                        ['_id' => $card_id_obj],
-                        ['$set' => ['is_active' => $new_status]] // Use $set to update the 'is_active' field
-                    );
-
-                    if ($updateResult->getModifiedCount() > 0) {
-                        $message = "Card status updated successfully!";
-                        $message_type = 'success';
-                    } else {
-                        // This case means no document was modified. It could be because the status was already the same,
-                        // or an unexpected issue.
-                        $message = "Card status is already set to the desired state or no change was needed.";
-                        $message_type = 'info'; // Indicate no change
-                    }
-                } elseif ($action === 'report_lost_stolen') {
-                    $updateResult = $cardsCollection->updateOne(
-                        ['_id' => $card_id_obj],
-                        ['$set' => ['is_active' => false]] // Set 'is_active' to false for lost/stolen
-                    );
-
-                    if ($updateResult->getModifiedCount() > 0) {
-                        $message = "Card reported as lost/stolen and blocked. Please contact support for further assistance.";
-                        $message_type = 'success';
-                    } else {
-                        $message = "Card was already reported as lost/stolen or could not be updated.";
-                        $message_type = 'info';
-                    }
-                } else {
-                    $message = "Invalid action specified.";
-                    $message_type = 'error';
-                }
-            } else {
-                $message = "Unauthorized access or card not found.";
-                $message_type = 'error';
-            }
+    // Fetch user's full name and email from the database if not already in session
+    if (empty($user_full_name) || empty($user_email)) {
+        $user_doc = $usersCollection->findOne(['_id' => $userObjectId]);
+        if ($user_doc) {
+            $user_full_name = trim(($user_doc['first_name'] ?? '') . ' ' . ($user_doc['last_name'] ?? ''));
+            $user_email = $user_doc['email'] ?? '';
+            // Update session with fetched data for future requests
+            $_SESSION['user_full_name'] = $user_full_name;
+            $_SESSION['user_email'] = $user_email;
         } else {
-            $message = "Invalid action or missing card ID.";
-            $message_type = 'error';
-        }
-
-        // Redirect back to self after POST to prevent form re-submission on refresh
-        // Pass messages via GET parameters
-        header('Location: manage_card.php?card_id=' . urlencode($card_id_post_str) . '&message=' . urlencode($message) . '&message_type=' . urlencode($message_type));
-        exit;
-    }
-
-    // Fetch card details for display (after any potential POST updates or on initial GET)
-    $card_id_get_str = filter_input(INPUT_GET, 'card_id', FILTER_SANITIZE_STRING);
-
-    if ($card_id_get_str) {
-        try {
-            $card_id_obj_get = new ObjectId($card_id_get_str); // Convert to ObjectId
-        } catch (Exception $e) {
-            throw new Exception("Invalid card ID format in URL.");
-        }
-
-        // Find the card by its _id and ensure it belongs to the current user
-        $card = $cardsCollection->findOne(['_id' => $card_id_obj_get, 'user_id' => $user_id_obj]);
-
-        if (!$card) {
-            $message = "Card not found or you don't have permission to view it.";
-            $message_type = 'error';
-        } else {
-            // Convert the MongoDB BSON document object to a PHP array for easier access
-            $card = (array) $card;
-            // The '_id' field is a BSON ObjectId; convert it to a string for use in HTML forms/display
-            $card['id'] = (string) $card['_id']; 
-            // The 'is_active' field from MongoDB will be a boolean, which works directly in PHP for truthiness.
-        }
-    } else {
-        // If no card ID is provided in the GET request, and no message is already set (e.g., from a POST redirect)
-        if (empty($message)) { 
-            $message = "No card ID provided. Please select a card from your <a href='bank_cards.php'>Bank Cards</a> page.";
-            $message_type = 'error';
+            error_log("User with ID " . $user_id . " not found in database for bank_cards.php.");
+            $user_full_name = 'Bank Customer'; // Fallback if DB lookup fails
+            $user_email = 'default@example.com';
         }
     }
-
-} catch (Exception $e) {
-    // Catch any exceptions that occur during MongoDB operations
-    $message = "An error occurred: " . $e->getMessage();
+} catch (MongoDBDriverException $e) {
+    error_log("MongoDB operation error in bank_cards.php (user data fetch): " . $e->getMessage());
+    $message = "Database error fetching user details. Please try again later.";
     $message_type = 'error';
-    // Log the full exception for debugging
-    error_log("Card Management MongoDB Error: " . $e->getMessage() . " on line " . $e->getLine() . " in " . $e->getFile());
-} finally {
-    // In MongoDB PHP driver, there's no explicit close() method like MySQLi.
-    // The client handles connections automatically, often using persistent connections or connection pooling.
-    // Unsetting the client variable here just cleans up the reference.
-    $mongoClient = null;
+} catch (Exception $e) { // Catch for ObjectId conversion or other general errors
+    error_log("General error during initial setup in bank_cards.php: " . $e->getMessage());
+    $message = "An unexpected error occurred during page setup. Please try again later.";
+    $message_type = 'error';
+    // If user_id is invalid, it's safer to redirect to login
+    header('Location: ' . BASE_URL . '/index.php?error=invalid_user_session'); // Redirect with an error indicator
+    exit;
 }
 
-// Prepare full name for display in the navbar
-$full_name = 'User';
-if (isset($_SESSION['first_name']) && isset($_SESSION['last_name'])) {
-    $full_name = htmlspecialchars($_SESSION['first_name'] . ' ' . $_SESSION['last_name']);
-} elseif (isset($_SESSION['username'])) {
-    $full_name = htmlspecialchars($_SESSION['username']);
+// Ensure full name and email are set for display, even if database lookup failed
+$user_full_name = $user_full_name ?: 'Bank Customer';
+$user_email = $user_email ?: 'default@example.com';
+
+// --- Non-AJAX request, render the HTML page ---
+// We need to fetch the accounts for the dropdown in the form
+$user_accounts_for_dropdown = [];
+try {
+    // Re-use $userObjectId from the initial connection block
+    if ($userObjectId) {
+        $cursor = $accountsCollection->find(
+            ['user_id' => $userObjectId],
+            ['projection' => ['account_number' => 1, 'account_type' => 1, 'balance' => 1, 'currency' => 1]]
+        );
+        foreach ($cursor as $accountDoc) {
+            $user_accounts_for_dropdown[] = [
+                'id' => (string) $accountDoc['_id'], // Convert ObjectId to string for HTML value
+                'account_type' => $accountDoc['account_type'] ?? 'Account',
+                'display_account_number' => '****' . substr($accountDoc['account_number'] ?? '', -4),
+                'balance' => $accountDoc['balance'] ?? 0.00,
+                'currency' => $accountDoc['currency'] ?? 'USD'
+            ];
+        }
+    }
+} catch (MongoDBDriverException $e) {
+    error_log("Error fetching accounts for dropdown (MongoDB): " . $e->getMessage());
+    $message = "Could not load accounts for linking cards.";
+    $message_type = 'error';
+} catch (Exception $e) {
+    error_log("Error processing user ID for accounts dropdown (General): " . $e->getMessage());
+    $message = "Error loading user data.";
+    $message_type = 'error';
 }
 
 ?>
@@ -165,138 +118,285 @@ if (isset($_SESSION['first_name']) && isset($_SESSION['last_name'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heritage Bank - Manage Card</title>
-    <link rel="stylesheet" href="style.css">
-     <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
-</head>
-<body class="dashboard-page">
-    <div class="dashboard-container">
+    <title>Hometown Bank PA - Manage Cards</title>
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Basic styles for the card container and individual cards */
+        .cards-section {
+            margin-top: 40px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+        .cards-section h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 25px;
+            font-size: 2em;
+        }
+        .card-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); /* Adjust minmax as needed */
+            gap: 30px;
+            justify-content: center;
+            padding: 20px;
+        }
 
-        <div class="sidebar-overlay" onclick="toggleMenu()"></div>
+        .bank-card-display {
+            position: relative;
+            background: linear-gradient(135deg, #004494, #0056b3); /* Example: Hometown Bank Blue */
+            border-radius: 15px;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+            color: #fff;
+            padding: 20px 25px;
+            aspect-ratio: 1.585 / 1; /* Standard credit card aspect ratio */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-family: 'Space Mono', monospace;
+            overflow: hidden;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            cursor: pointer;
+            text-decoration: none; /* For the anchor tag wrapping the card */
+            box-sizing: border-box; /* Include padding in element's total width and height */
+        }
 
-        <nav class="top-navbar">
-            <div class="logo">
-                <img src="https://i.imgur.com/YEFKZlG.png" alt="Heritage Bank Logo">
-            </div>
-            <h2>Manage Card</h2>
-            <div class="user-info">
-                <i class="fas fa-user profile-icon"></i>
-                <span><?php echo htmlspecialchars($full_name); ?></span>
-                <a href="../logout.php">Logout</a>
-            </div>
-            <div id="menu-toggle" class="menu-toggle">
-                <i class="fas fa-bars"></i>
-            </div>
-        </nav>
+        .bank-card-display:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
+        }
 
-        <aside class="sidebar" id="sidebar">
-            <ul>
-                <li><a href="dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
-                <li><a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a></li>
-                <li><a href="statements.php"><i class="fas fa-file-alt"></i> <span>Statements</span></a></li>
-                <li><a href="transfer.php"><i class="fas fa-exchange-alt"></i> <span>Transfers</span></a></li>
-                <li><a href="transactions.php"><i class="fas fa-history"></i> <span>Transaction History</span></a></li>
-                <li class="active"><a href="bank_cards.php"><i class="fas fa-credit-card"></i> <span>Bank Cards</span></a></li>
-                <li><a href="#"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
-                <li><a href="../logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
-            </ul>
-        </aside>
+        /* Subtle overlay for visual depth */
+        .bank-card-display::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 15px;
+            z-index: 1;
+        }
 
-        <main class="main-content-wrapper">
-            <h3 style="margin-top: 0;">Card Management</h3>
+        .bank-card-display > * {
+            z-index: 2; /* Ensure content is above the overlay */
+        }
 
-            <?php if (!empty($message)): ?>
-                <p class="message <?php echo htmlspecialchars($message_type); ?>"><?php echo htmlspecialchars($message); ?></p>
-            <?php endif; ?>
+        .card-header-logo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            text-align: right;
+            margin-bottom: 10px;
+        }
 
-            <?php if ($card): ?>
-                <div class="bank-card-display">
-                    <div class="card-header-logo">Heritage Bank</div>
-                    <div class="card-number"><?php echo htmlspecialchars(wordwrap($card['card_number'], 4, ' ', true)); ?></div>
+        .card-network-logo {
+            position: absolute; /* Position relative to .bank-card-display */
+            top: 20px;
+            left: 25px;
+            width: 70px; /* Adjust size as needed */
+            height: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 0 5px rgba(0,0,0,0.3)); /* Add subtle shadow to logo */
+        }
 
-                    <div class="card-details-row">
-                        <div class="card-details-group">
-                            <div class="card-details-label">Card Holder</div>
-                            <div class="card-details-value"><?php echo htmlspecialchars($card['card_holder_name']); ?></div>
-                        </div>
-                        <div class="card-details-group right">
-                            <div class="card-details-label">Expires</div>
-                            <div class="card-details-value"><?php echo htmlspecialchars(str_pad($card['expiry_month'], 2, '0', STR_PAD_LEFT) . '/' . substr($card['expiry_year'], 2, 2)); ?></div>
-                        </div>
-                    </div>
-                    <div class="card-cvv-row">
-                        <div class="card-details-group right">
-                            <div class="card-details-label">CVV</div>
-                            <div class="card-details-value"><?php echo htmlspecialchars($card['cvv']); ?></div>
-                        </div>
-                    </div>
-                </div>
+        .card-chip {
+            width: 50px;
+            height: 40px;
+            background-color: #d4af37; /* Gold color for chip */
+            border-radius: 6px;
+            position: absolute;
+            top: 90px; /* Adjust vertically */
+            left: 25px;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3);
+        }
 
-                <div class="card-actions-section">
-                    <h4>Card Actions</h4>
+        .card-number {
+            font-size: 1.8em;
+            letter-spacing: 0.15em;
+            text-align: center;
+            margin-top: auto; /* Push it to the bottom-middle */
+            margin-bottom: 15px;
+            word-break: break-all; /* Ensure long numbers wrap if necessary */
+        }
 
-                    <form action="manage_card.php" method="POST">
-                        <input type="hidden" name="card_id" value="<?php echo htmlspecialchars($card['id']); ?>">
-                        <input type="hidden" name="action" value="toggle_status">
-                        <div class="form-group switch-container">
-                            <label for="status_toggle">Card Status:</label>
-                            <label class="switch">
-                                <input type="checkbox" id="status_toggle" name="is_active" value="1" <?php echo $card['is_active'] ? 'checked' : ''; ?> onchange="this.form.submit()">
-                                <span class="slider round"></span>
-                            </label>
-                            <span style="color: var(--text-color-dark); font-weight: bold;"><?php echo $card['is_active'] ? 'Active' : 'Blocked'; ?></span>
-                        </div>
-                        <small style="display: block; text-align: center; margin-top: 5px; color: #777;">Toggle to activate or block your card.</small>
-                    </form>
+        .card-details-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            font-size: 0.85em;
+        }
+        
+        .card-details-group {
+            display: flex;
+            flex-direction: column;
+            text-align: left;
+        }
+        .card-details-group.right {
+            text-align: right;
+        }
+        .card-details-label {
+            font-size: 0.7em;
+            opacity: 0.8;
+            margin-bottom: 2px;
+        }
+        .card-status {
+            position: absolute;
+            bottom: 20px;
+            right: 25px;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 2;
+        }
+        .card-status.active {
+            background-color: rgba(60, 179, 113, 0.8); /* MediumSeaGreen */
+            color: white;
+        }
+        .card-status.inactive {
+            background-color: rgba(255, 99, 71, 0.8); /* Tomato */
+            color: white;
+        }
+        .card-status.lost-stolen {
+            background-color: rgba(220, 20, 60, 0.8); /* Crimson */
+            color: white;
+        }
 
-                    <form action="manage_card.php" method="POST" onsubmit="return confirm('Are you sure you want to report this card as lost/stolen? This action will permanently block the card and cannot be easily reversed online. Please contact support after reporting.');" style="margin-top: 25px;">
-                        <input type="hidden" name="card_id" value="<?php echo htmlspecialchars($card['id']); ?>">
-                        <input type="hidden" name="action" value="report_lost_stolen">
-                        <button type="submit" class="button-primary button-danger">
-                            <i class="fas fa-exclamation-triangle"></i> Report Lost / Stolen
-                        </button>
-                        <small style="display: block; margin-top: 10px; color: var(--error-color); font-weight: bold;">(This action will permanently block the card)</small>
-                    </form>
-                </div>
-            <?php else: ?>
-                <div class="no-data-found">
-                    <p><?php echo htmlspecialchars($message); ?></p>
-                    <?php if ($message_type === 'error' && strpos($message, 'No card ID provided') !== false): ?>
-                        <p><a href="bank_cards.php" class="back-link">Go to My Cards</a></p>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
+        .loading-message, .no-data-message {
+            text-align: center;
+            padding: 20px;
+            font-size: 1.1em;
+            color: #555;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-top: 20px;
+        }
+        .loading-message .fa-spinner {
+            margin-right: 10px;
+        }
 
-            <p class="back-link-container"><a href="bank_cards.php" class="back-link">&larr; Back to My Cards</a></p>
-        </main>
-    </div>
-
-    <script>
-        // JavaScript for mobile menu toggle
-        document.addEventListener('DOMContentLoaded', function() {
-            const menuToggle = document.getElementById('menu-toggle');
-            const sidebar = document.getElementById('sidebar');
-            const sidebarOverlay = document.querySelector('.sidebar-overlay');
-
-            function toggleMenu() {
-                sidebar.classList.toggle('active');
-                sidebarOverlay.classList.toggle('active');
+        @media (max-width: 768px) {
+            .card-list {
+                grid-template-columns: 1fr; /* Stack cards vertically on smaller screens */
             }
+            .bank-card-display {
+                max-width: 350px; /* Limit width for single column display */
+                margin: 0 auto; /* Center individual cards */
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <nav class="header-nav">
+            <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="contact-button homepage">
+                <i class="fas fa-home"></i> Back to Dashboard
+            </a>
+        </nav>
+        <h1>Manage My Cards</h1>
+        <div class="logo">
+            <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo">
+        </div>
+    </header>
 
-            menuToggle.addEventListener('click', toggleMenu);
-            sidebarOverlay.addEventListener('click', toggleMenu);
+    <main class="main-content">
+        <?php if (!empty($message)): ?>
+            <p class="message <?php echo $message_type; ?>"><?php echo htmlspecialchars($message); ?></p>
+        <?php endif; ?>
 
-            // Close sidebar when a link is clicked (optional, for better UX on mobile)
-            document.querySelectorAll('#sidebar ul li a').forEach(item => {
-                item.addEventListener('click', function() {
-                    if (window.innerWidth <= 768) { // Only close on smaller screens
-                        toggleMenu();
-                    }
-                });
-            });
-        });
+        <section class="cards-section">
+            <h2>Your Current Cards</h2>
+            <p id="cardsLoadingMessage" class="loading-message">
+                <i class="fas fa-spinner fa-spin"></i> Loading your cards...
+            </p>
+            <div id="userCardList" class="card-list">
+                <p class="no-data-message" id="noCardsMessage" style="display:none;">No bank cards found. Order a new one below!</p>
+            </div>
+        </section>
+
+        <hr style="margin: 50px 0; border: 0; border-top: 1px solid #eee;">
+
+        <section class="order-card-section">
+            <h2>Order a Card</h2>
+            <form id="orderCardForm">
+                <div class="form-group">
+                    <label for="cardHolderName">Card Holder Name:</label>
+                    <input type="text" id="cardHolderName" name="cardHolderName" value="<?= htmlspecialchars($user_full_name) ?>" required readonly>
+                </div>
+
+                <div class="form-group">
+                    <label for="cardType">Card Type:</label>
+                    <select id="cardType" name="cardType" required>
+                        <option value="">Select Card Type</option>
+                        <option value="Debit">Debit Card</option>
+                        <option value="Credit">Credit Card</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="cardNetwork">Card Network:</label>
+                    <select id="cardNetwork" name="cardNetwork" required>
+                        <option value="">Select Card Network</option>
+                        <option value="Visa">Visa</option>
+                        <option value="Mastercard">Mastercard</option>
+                        <option value="Amex">American Express</option>
+                        <option value="Verve">Verve</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="accountId">Link to Account:</label>
+                    <select id="accountId" name="accountId" required>
+                        <option value="">-- Select an Account --</option>
+                        <?php foreach ($user_accounts_for_dropdown as $account): ?>
+                            <option value="<?php echo htmlspecialchars($account['id']); ?>">
+                                <?php echo htmlspecialchars($account['account_type'] . ' (' . $account['display_account_number'] . ') - ' . $account['currency'] . sprintf('%.2f', $account['balance'])); ?>
+                            </option>
+                        <?php endforeach; ?>
+                        <?php if (empty($user_accounts_for_dropdown)): ?>
+                            <option value="" disabled>No accounts available to link</option>
+                        <?php endif; ?>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="shippingAddress">Shipping Address:</label>
+                    <textarea id="shippingAddress" name="shippingAddress" placeholder="Your full shipping address" rows="3" required></textarea>
+                </div>
+
+                <button type="submit" class="submit-button">
+                    <i class="fas fa-credit-card" style="margin-right: 8px;"></i> Place Card Order
+                </button>
+            </form>
+        </section>
+
+        <section class="manage-pin-section">
+            <h2>Manage Card PIN & Activation</h2>
+            <p>To activate a new card or set/change your existing card's PIN, please visit the <a href="<?php echo rtrim(BASE_URL, '/'); ?>/my_cards">Card Activation & PIN Management page</a>.</p>
+        </section>
+    </main>
+
+    <div class="message-box-overlay" id="messageBoxOverlay">
+        <div class="message-box-content" id="messageBoxContentWrapper">
+            <p id="messageBoxContent"></p>
+            <button id="messageBoxButton">OK</button>
+        </div>
+    </div>
+    <script>
+        // These variables must be defined before cards.js is loaded
+        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/')); ?>;
+        const FRONTEND_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/frontend'); ?>;
+        const currentUserId = <?php echo json_encode($user_id); ?>;
+        const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
+        const currentUserEmail = <?php echo json_encode($user_email); ?>;
     </script>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
 </body>
 </html>
