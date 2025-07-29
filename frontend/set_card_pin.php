@@ -55,7 +55,7 @@ try {
         $card = $bankCardsCollection->findOne([
             '_id' => $cardObjectId,
             'user_id' => $userObjectId, // Crucial for security: ensure card belongs to the user
-            'pin' => null // Only allow setting PIN if it's currently null
+            'pin_hashed' => null // Only allow setting PIN if it's currently null
         ]);
 
         if (!$card) {
@@ -114,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $updateResult = $bankCardsCollection->updateOne(
                     // Double-check ownership and ensure PIN is still null before updating
                     ['_id' => $cardObjectId, 'user_id' => $userObjectId, 'pin' => null],
-                    ['$set' => ['pin' => $hashed_pin, 'updated_at' => new UTCDateTime(time() * 1000)]]
+            ['$set' => ['pin_hashed' => $hashed_pin, 'updated_at' => new UTCDateTime()]] // Consistent name, and cleaner UTCDateTime usage
                 );
 
                 if ($updateResult->getModifiedCount() === 1) {
