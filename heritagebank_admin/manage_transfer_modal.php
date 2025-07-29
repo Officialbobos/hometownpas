@@ -155,7 +155,7 @@ try {
                 </div>
             </form>
 
-            <p><a href="<?php echo BASE_URL; ?>/admin" style="display: inline-block; margin-top: 20px; color: #007bff; text-decoration: none;">&larr; Back to Dashboard</a></p>
+            <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin" style="display: inline-block; margin-top: 20px; color: #007bff; text-decoration: none;">&larr; Back to Dashboard</a></p>
         </div>
     </div>
 </body>

@@ -303,17 +303,17 @@ require_once __DIR__ . '/../functions.php'; // For sanitize_input, getMongoDBCli
             We aim to respond to all inquiries as quickly as possible.
         </p>
 
-        <div class="contact-buttons">
-            <a href="mailto:hometowncustomersercvice@gmail.com" class="contact-button email">
-                <i class="fas fa-envelope"></i> Email Us
-            </a>
-            <a href="tel:+12544007639" class="contact-button phone">
-                <i class="fas fa-phone-alt"></i> Call Us: +1 254-400-7639
-            </a>
-            <a href="<?php echo BASE_URL; ?>/dashboard" class="contact-button homepage">
-                <i class="fas fa-home"></i> Back to Dashboard
-            </a>
-        </div>
+       <div class="contact-buttons">
+    <a href="mailto:hometowncustomersercvice@gmail.com" class="contact-button email">
+        <i class="fas fa-envelope"></i> Email Us
+    </a>
+    <a href="tel:+12544007639" class="contact-button phone">
+        <i class="fas fa-phone-alt"></i> Call Us: +1 254-400-7639
+    </a>
+    <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="contact-button homepage">
+        <i class="fas fa-home"></i> Back to Dashboard
+    </a>
+</div>
 
         <section class="faq-section">
             <h3>Frequently Asked Questions</h3>

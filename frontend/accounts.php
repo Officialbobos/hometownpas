@@ -200,8 +200,8 @@ if (!function_exists('get_currency_symbol')) {
         ?>
         <div class="card">
             <div class="back-to-dashboard">
-                <a href="<?php echo BASE_URL; ?>/app/dashboard.php">
-                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+        <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="contact-button homepage">
+        <i class="fas fa-home"></i> Back to Dashboard
                 </a>
             </div>
 
