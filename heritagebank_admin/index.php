@@ -24,7 +24,7 @@ if (isset($_SESSION['admin_user_id'])) {
 }
 
 // Handle admin login form submission
-if (isset($_POST['admin_user_id'])) {
+if (isset($_POST['admin_login'])) {
     $email = sanitize_input($_POST['email'] ?? '');
     $password = $_POST['password'] ?? ''; // Passwords are not sanitized with htmlspecialchars
 
@@ -60,7 +60,7 @@ if (isset($_POST['admin_user_id'])) {
 
                     error_log("index.php: Login SUCCESS for user '" . $email . "'. Session set. Redirecting to dashboard.php."); // ADD THIS LINE
                     // Redirect to admin dashboard
-                    header('Location: dashboard.php');
+                header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/dashboard.php');
                     exit();
                 } else {
                     $message = "Invalid email or password.";
