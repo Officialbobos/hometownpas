@@ -234,7 +234,5 @@ if (isset($_POST['admin_user_id'])) {
             <a href="#">Contact Us</a>
         </div>
     </footer>
-<script src="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/script.js"></script>
-
 </body>
 </html>
