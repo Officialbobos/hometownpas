@@ -209,7 +209,7 @@ h2 {
     font-weight: bold; /* Bold as in screenshot */
     color: rgba(255,255,255,0.9); /* Slightly off-white for contrast on green */
     position: absolute;
-    top: 60px; /* Aligned with top padding */
+    top: 20px; /* Aligned with top padding */
     left: 20px; /* Aligned with left padding */
     z-index: 2;
     white-space: nowrap; /* Prevent wrapping for bank name */
@@ -221,8 +221,8 @@ h2 {
    If 'HOMETOWN BANK' is always text, ensure this is for an actual logo image. */
 .bank-logo-on-card {
     position: absolute;
-    top: 25px;
-    left: 25px;
+    top: 20px;
+    left: 20px;
     height: 35px; /* Base height */
     width: auto;
     object-fit: contain;
@@ -296,7 +296,7 @@ p.card-cvv-mock {
     text-align: center; /* center horizontally */
     color: rgba(255,255,255,0.8); /* Slightly brighter white for contrast */
     position: absolute;
-    bottom: 15px; /* Position above the footer and below card number */
+    bottom: 10px; /* Position above the footer and below card number */
     left: 50%;
     transform: translateX(-50%); /* Centering trick */
     width: calc(100% - 50px); /* Account for padding */
