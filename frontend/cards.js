@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             // Corrected: Check data.status for consistency, as per your PHP API responses
-                if (data.status === true && data.accounts && data.accounts.length > 0) {
+            if (data.status === true && data.accounts && data.accounts.length > 0) { // THIS LINE IS ALREADY CORRECTED AND REMAINS AS IS
                 accountIdSelect.innerHTML = '<option value="">Select an Account</option>';
                 data.accounts.forEach(account => {
                     const option = document.createElement('option');
@@ -111,13 +111,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to render a single card HTML
     function renderCard(card) {
-        const cardNetworkLogo = card.card_network ?
-            `<img src="${PHP_BASE_URL}/images/${card.card_network.toLowerCase()}_logo.png" alt="${card.card_network} Logo" class="card-network-logo" onerror="this.style.display='none'">` :
-            '';
+        let cardNetworkLogoHtml = '';
+
+        // Prioritize the direct URL if available (new logic)
+        if (card.card_logo_url) {
+            cardNetworkLogoHtml = `<img src="${card.card_logo_url}" alt="${card.card_network || 'Card'} Logo" class="card-network-logo" onerror="this.src='${PHP_BASE_URL}/images/default_logo.png'; this.alt='Default Logo';">`;
+            // The onerror here ensures that if the external URL breaks, it falls back to your local default_logo.png
+        }
+        // Fallback to existing local image logic if no direct URL is provided or if card.card_logo_url is not set
+        else if (card.card_network) {
+            cardNetworkLogoHtml = `<img src="${PHP_BASE_URL}/images/${card.card_network.toLowerCase()}_logo.png" alt="${card.card_network} Logo" class="card-network-logo" onerror="this.src='${PHP_BASE_URL}/images/default_logo.png'; this.alt='Default Logo';">`;
+        }
 
         return `
             <a href="${FRONTEND_BASE_URL}/manage_card.php?card_id=${card.id}" class="bank-card-display">
-                ${cardNetworkLogo}
+                ${cardNetworkLogoHtml}
                 <div class="card-chip"></div>
                 <div class="card-number">${card.card_number_display.replace(/(.{4})/g, '$1 ').trim()}</div>
                 <div class="card-details-bottom">

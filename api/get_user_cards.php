@@ -16,7 +16,6 @@ require_once __DIR__ . '/../functions.php';
 use MongoDB\Client; // Required for getMongoDBClient() if it returns a Client instance
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
-// Removed: use MongoDB\Database; // No longer needed for type hinting $mongoDb directly here
 
 try {
     // 3. Get MongoDB Client instance (assuming getMongoDBClient() returns a Client object)
@@ -78,10 +77,10 @@ try {
         [
             // Stage 2: Join with the 'accounts' collection
             '$lookup' => [
-                'from' => 'accounts',           // The collection to join with
-                'localField' => 'account_id',   // Field from the 'bank_cards' collection
-                'foreignField' => '_id',        // Field from the 'accounts' collection
-                'as' => 'accountInfo'           // The name of the new array field to add to the input documents
+                'from' => 'accounts',             // The collection to join with
+                'localField' => 'account_id',    // Field from the 'bank_cards' collection
+                'foreignField' => '_id',         // Field from the 'accounts' collection
+                'as' => 'accountInfo'            // The name of the new array field to add to the input documents
             ]
         ],
         [
@@ -100,7 +99,6 @@ try {
                 'id' => [ '$toString' => '$_id' ], // Convert card's _id to string and rename to 'id'
                 'card_holder_name' => '$card_holder_name',
                 'card_type_raw' => '$card_type', // Keep raw type for internal use if needed
-                'card_network_raw' => '$card_network', // Keep raw network for internal use if needed
                 'card_number_raw' => '$card_number', // Keep raw number for internal use if needed (e.g. for hashing)
                 // --- MODIFIED: Masking the card number for display ---
                 // Always mask sensitive info before sending to frontend.
@@ -127,18 +125,21 @@ try {
                 'display_cvv' => 'XXX',
                 // Ensure 'status' is always projected, provide a default if it's missing from the document
                 'status' => [ '$ifNull' => [ '$status', 'pending' ] ], // <--- Added $ifNull here
-                // Map card_network for logo display as per frontend's renderCard logic
+                
+                // --- MODIFIED: Map card_type for card_network and add card_logo_url ---
                 'card_network' => [ // This is what frontend uses for logo path
                     '$switch' => [
                         'branches' => [
-                            ['case' => ['$eq' => ['$card_network', 'Visa']], 'then' => 'Visa'],
-                            ['case' => ['$eq' => ['$card_network', 'Mastercard']], 'then' => 'Mastercard'],
-                            ['case' => ['$eq' => ['$card_network', 'Amex']], 'then' => 'Amex'],
-                            ['case' => ['$eq' => ['$card_network', 'Verve']], 'then' => 'Verve'],
+                            ['case' => ['$eq' => ['$card_type', 'Visa']], 'then' => 'Visa'],
+                            ['case' => ['$eq' => ['$card_type', 'MasterCard']], 'then' => 'Mastercard'], // Corrected: use MasterCard from DB
+                            ['case' => ['$eq' => ['$card_type', 'Amex']], 'then' => 'Amex'],
+                            ['case' => ['$eq' => ['$card_type', 'Verve']], 'then' => 'Verve'],
                         ],
                         'default' => 'Default' // Default if network is not recognized
                     ]
                 ],
+                'card_logo_url' => [ '$ifNull' => ['$card_logo_url', null] ], // <--- NEW: Project card_logo_url if exists
+                
                 // Account info (will be null if preserveNullAndEmptyArrays was true and no match)
                 'account_type' => '$accountInfo.account_type',
                 'display_account_number' => '$accountInfo.account_number',
@@ -193,11 +194,11 @@ try {
             'card_number_display' => $card['card_number_display'] ?? 'ERROR: Card number missing',
             'expiry_date_display' => $card['expiry_date_display'] ?? 'MM/YY',
             'display_cvv' => 'XXX', // Always hardcode for security
-            'card_network' => $card['card_network'] ?? 'Default',
+            'card_network' => $card['card_network'] ?? 'Default', // This will now come from the $switch based on card_type
             'is_active' => ($currentCardStatus === 'active'), // Derived from status for convenience
-            'card_logo_src' => $card['card_logo_src'] ?? null, // From MongoDB aggregation if paths are absolute
+            'card_logo_url' => $card['card_logo_url'] ?? null, // <--- IMPORTANT: Ensure this is passed to frontend
             'bank_name' => $card['bank_name'] ?? 'HOMETOWN BANK',
-            'bank_logo_src' => $card['bank_logo_src'] ?? null,
+            'bank_logo_src' => $card['bank_logo_src'] ?? null, // From aggregation, if accounts have it
             'account_type' => $card['account_type'] ?? 'N/A',
             'display_account_number' => $card['display_account_number'] ? ('****' . substr($card['display_account_number'], -4)) : 'N/A', // Mask account number
             'balance' => $card['balance'] ?? 0.00,
@@ -209,7 +210,7 @@ try {
     }
 
     error_log("DEBUG: Preparing to send JSON response with " . count($formattedCards) . " cards.");
-    echo json_encode(['status' => 'success', 'cards' => $formattedCards]); // Changed 'success' to 'status' as per cards.js
+    echo json_encode(['status' => 'success', 'cards' => $formattedCards]);
     exit;
 
 } catch (MongoDBDriverException $e) {
