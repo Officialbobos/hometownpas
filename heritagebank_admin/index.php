@@ -86,7 +86,7 @@ if (isset($_POST['admin_login'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Heritage Bank - Admin Login</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         /* Specific styles for admin login page */
@@ -233,6 +233,7 @@ if (isset($_POST['admin_login'])) {
             <a href="#">Contact Us</a>
         </div>
     </footer>
+<script src="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/script.js"></script>
 
 </body>
 </html>

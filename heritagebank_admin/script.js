@@ -1,17 +1,20 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const loginForm = document.getElementById('loginForm');
+    // The form ID in your index.php is 'adminLoginForm', not 'loginForm'.
+    // Let's update this to match for clarity.
+    const loginForm = document.getElementById('adminLoginForm');
 
     if (loginForm) {
         loginForm.addEventListener('submit', function(event) {
-            const usernameInput = document.getElementById('username');
+            // We are using 'email', not 'username'.
+            const emailInput = document.getElementById('email');
             const passwordInput = document.getElementById('password');
 
             // Basic client-side validation
-            if (usernameInput.value.trim() === '' || passwordInput.value.trim() === '') {
-                alert('Please enter both username and password.');
+            if (emailInput.value.trim() === '' || passwordInput.value.trim() === '') {
+                // Update the alert message to be specific to email and password
+                alert('Please enter both email and password.');
                 event.preventDefault(); // Stop form submission
             }
-            // You could add more sophisticated validation here (e.g., email format check)
         });
     }
 

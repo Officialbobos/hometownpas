@@ -2,6 +2,11 @@
 // C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\manage_transfer_modal.php
 session_start();
 
+error_log("manage_transfer_modal.php: SESSION_ID: " . session_id());
+error_log("manage_transfer_modal.php: Checking session variables...");
+error_log("manage_transfer_modal.php: admin_user_id: " . ($_SESSION['admin_user_id'] ?? 'NOT SET'));
+error_log("manage_transfer_modal.php: is_admin: " . ($_SESSION['is_admin'] ?? 'NOT SET'));
+
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../Config.php';
 require_once __DIR__ . '/../functions.php'; // For getCollection()
