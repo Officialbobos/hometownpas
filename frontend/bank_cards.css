@@ -209,7 +209,7 @@ h2 {
     font-weight: bold; /* Bold as in screenshot */
     color: rgba(255,255,255,0.9); /* Slightly off-white for contrast on green */
     position: absolute;
-    top: 35px; /* Aligned with top padding */
+    top: 60px; /* Aligned with top padding */
     left: 20px; /* Aligned with left padding */
     z-index: 2;
     white-space: nowrap; /* Prevent wrapping for bank name */
@@ -293,10 +293,10 @@ h2 {
 p.card-cvv-mock {
     font-size: 0.5em;
     font-weight: bold; /* Looks bold in screenshot */
-    text-align: center middle below; /* below the card holder in line with the network logo  */
+    text-align: center; /* center horizontally */
     color: rgba(255,255,255,0.8); /* Slightly brighter white for contrast */
     position: absolute;
-    bottom: 35px; /* Position above the footer and below card number */
+    bottom: 15px; /* Position above the footer and below card number */
     left: 50%;
     transform: translateX(-50%); /* Centering trick */
     width: calc(100% - 50px); /* Account for padding */
