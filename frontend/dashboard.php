@@ -1,17 +1,19 @@
 <?php
 // Path: C:\xampp\htdocs\hometownbank\frontend\dashboard.php
 // Assuming dashboard.php is in the 'frontend' folder, so paths to Config and functions need to go up one level.
+session_start(); // Ensure session is started for this specific debug point
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-error_log("DEBUG: dashboard.php accessed.");
-error_log("DEBUG: SESSION user_logged_in: " . print_r($_SESSION['user_logged_in'] ?? 'NOT SET', true));
-error_log("DEBUG: SESSION user_id: " . print_r($_SESSION['user_id'] ?? 'NOT SET', true));
-error_log("DEBUG: SESSION 2fa_verified: " . print_r($_SESSION['2fa_verified'] ?? 'NOT SET', true));
-error_log("DEBUG: SESSION auth_step: " . print_r($_SESSION['auth_step'] ?? 'NOT SET', true));
-
+error_log("--- dashboard.php TOP DEBUG ---");
+error_log("DEBUG: dashboard.php - SESSION user_logged_in: " . print_r($_SESSION['user_logged_in'] ?? 'NOT SET', true));
+error_log("DEBUG: dashboard.php - SESSION user_id: " . print_r($_SESSION['user_id'] ?? 'NOT SET', true));
+error_log("DEBUG: dashboard.php - SESSION 2fa_verified: " . print_r($_SESSION['2fa_verified'] ?? 'NOT SET', true));
+error_log("DEBUG: dashboard.php - SESSION auth_step: " . print_r($_SESSION['auth_step'] ?? 'NOT SET', true));
+error_log("DEBUG: dashboard.php - Full SESSION DUMP: " . print_r($_SESSION, true));
+error_log("--- End TOP DEBUG ---");
 
 // Load Composer's autoloader FIRST.
 // This is crucial because Dotenv and other libraries are loaded through it.
