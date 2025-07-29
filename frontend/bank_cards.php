@@ -218,7 +218,7 @@ try {
     </div>
     <script>
         // These variables must be defined before cards.js is loaded
-        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/')); ?>; // Ensure this is also trimmed for consistency, although it wouldn't cause // issues in JS fetch directly
+        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/'); ?>; // *** ADDED '/' to ensure API calls are correct ***
         // Assuming 'frontend' is directly under your BASE_URL for frontend assets
         const FRONTEND_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/frontend'); ?>;
         const currentUserId = <?php echo json_encode($user_id); ?>;
