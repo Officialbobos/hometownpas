@@ -232,30 +232,30 @@ h2 {
 
 /* Chip */
 .card-item .chip {
-    width: 48px; /* Wider to match screenshot */
-    height: 32px; /* Taller to match screenshot */
+    width: 20px; /* Wider to match screenshot */
+    height: 17px; /* Taller to match screenshot */
     background-color: #d4af37; /* Gold color */
     border-radius: 5px;
     position: absolute;
-    top: 90px; /* Position below bank name */
-    left: 25px; /* Aligned with left padding */
+    top: 70px; /* Position below bank name */
+    left: 20px; /* Aligned with left padding */
     z-index: 2;
 }
 
 /* Card Number */
 .card-number {
     font-family: var(--font-family-card-number);
-    font-size: 1.8em; /* Significantly larger to match screenshot prominence */
+    font-size: 1.2em; /* Significantly larger to match screenshot prominence */
     letter-spacing: 2.5px; /* Increased spacing between numbers */
-    line-height: 1.2em; /* Ensure lines are close for two-line number */
+    line-height: 1em; /* Ensure lines are close for two-line number */
     color: #fff; /* White for dark card backgrounds */
     text-align: center; /* Centered horizontally */
     white-space: pre-wrap; /* Allows line breaks based on content (e.g., if you add \n in PHP) */
     word-break: break-all; /* Ensures long numbers wrap if needed */
     position: absolute;
-    top: 130px; /* Position below chip */
+    top: 100px; /* Position below chip */
     left: 50%;
-    transform: translateX(-50%); /* Centering trick */
+    transform: translateX(-30%); /* Centering trick */
     width: calc(100% - 50px); /* Account for 25px padding on each side */
     z-index: 2;
 }
@@ -292,12 +292,12 @@ h2 {
 
 /* CVV Mock Text */
 p.card-cvv-mock {
-    font-size: 0.8em;
+    font-size: 0.5em;
     font-weight: bold; /* Looks bold in screenshot */
-    text-align: center; /* Centered horizontally */
+    text-align: center below; /* Centered horizontally  */
     color: rgba(255,255,255,0.8); /* Slightly brighter white for contrast */
     position: absolute;
-    bottom: 65px; /* Position above the footer and below card number */
+    bottom: 35px; /* Position above the footer and below card number */
     left: 50%;
     transform: translateX(-50%); /* Centering trick */
     width: calc(100% - 50px); /* Account for padding */
@@ -307,7 +307,7 @@ p.card-cvv-mock {
 /* Card Network Logo (Verve) */
 .card-network-logo-img {
     position: absolute;
-    bottom: 15px; /* Position from bottom edge */
+    bottom: 10px; /* Position from bottom edge */
     right: 25px; /* Aligned with right padding */
     height: 30px; /* Larger to match screenshot prominence */
     width: auto; /* Maintain aspect ratio */
@@ -318,16 +318,16 @@ p.card-cvv-mock {
 
 /* Card Status */
 .card-status {
-    font-size: 0.9em;
+    font-size: 0.6em;
     text-align: right;
-    opacity: 0.9;
+    opacity: 0.7;
     font-weight: bold;
     padding: 5px 10px;
     border-radius: 5px;
     display: inline-block;
     position: absolute;
-    top: 25px; /* Align with top bank name/logo */
-    right: 25px; /* Position on the right, aligned with padding */
+    top: 20px; /* Align with top bank name/logo */
+    right: 20px; /* Position on the right, aligned with padding */
     z-index: 2;
 }
 .card-status.active { background-color: #d4edda; color: #155724; }
