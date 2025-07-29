@@ -125,7 +125,8 @@ try {
 
                 // --- MODIFIED: CVV should never be exposed; KEEP placeholder ---
                 'display_cvv' => 'XXX',
-                'status' => '$status', // Raw status for logic
+                // Ensure 'status' is always projected, provide a default if it's missing from the document
+                'status' => [ '$ifNull' => [ '$status', 'pending' ] ], // <--- Added $ifNull here
                 // Map card_network for logo display as per frontend's renderCard logic
                 'card_network' => [ // This is what frontend uses for logo path
                     '$switch' => [
@@ -157,9 +158,13 @@ try {
     // The following loop is now mostly for setting default values if fields are null from $unwind or missing from documents.
     $formattedCards = [];
     foreach ($cards as $card) {
+        // We already added '$ifNull' in the aggregation pipeline for 'status',
+        // so $card['status'] should now always exist and have a default if it was missing.
+        $currentCardStatus = $card['status']; // No need for ?? 'pending' here now due to $ifNull in projection
+
         $status_display_text = 'Unknown';
         $status_display_class = 'status-info';
-        switch ($card['status'] ?? 'pending') {
+        switch ($currentCardStatus) { // This line is now safe
             case 'active':
                 $status_display_text = 'Active';
                 $status_display_class = 'status-active';
@@ -177,7 +182,7 @@ try {
                 $status_display_class = 'status-cancelled';
                 break;
             default:
-                $status_display_text = ucfirst($card['status'] ?? 'Unknown');
+                $status_display_text = ucfirst($currentCardStatus); // Use the (now guaranteed) value
                 $status_display_class = 'status-info';
                 break;
         }
@@ -189,7 +194,7 @@ try {
             'expiry_date_display' => $card['expiry_date_display'] ?? 'MM/YY',
             'display_cvv' => 'XXX', // Always hardcode for security
             'card_network' => $card['card_network'] ?? 'Default',
-            'is_active' => $card['status'] === 'active', // Derived from status for convenience
+            'is_active' => ($currentCardStatus === 'active'), // Derived from status for convenience
             'card_logo_src' => $card['card_logo_src'] ?? null, // From MongoDB aggregation if paths are absolute
             'bank_name' => $card['bank_name'] ?? 'HOMETOWN BANK',
             'bank_logo_src' => $card['bank_logo_src'] ?? null,
@@ -199,7 +204,7 @@ try {
             'currency' => $card['currency'] ?? 'USD',
             'status_display_text' => $status_display_text,
             'status_display_class' => $status_display_class,
-            'status' => $card['status'] ?? 'pending' // Original status from DB
+            'status' => $currentCardStatus // Original status from DB (now always present)
         ];
     }
 
