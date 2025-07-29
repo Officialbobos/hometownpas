@@ -644,15 +644,17 @@ p.card-cvv-mock {
         left: 20px;
     }
     .card-item .chip {
-        width: 45px;
-        height: 30px;
-        top: 75px; /* Adjusted based on new desktop values */
+        width: 40px;
+        height: 20px;
+        top: 50px; /* Adjusted based on new desktop values */
         left: 20px;
+        bottom: 10px;
+        position:absolute;
     }
     .card-number {
         font-size: 1.3rem; /* Adjusted from desktop's 1.8em */
         letter-spacing: 2px;
-        top: 115px; /* Adjusted based on new desktop values */
+        top: 110px; /* Adjusted based on new desktop values */
         width: calc(100% - 40px); /* Adjust width for reduced padding */
         position: absolute;
         text-align: center;
@@ -665,8 +667,10 @@ p.card-cvv-mock {
     }
     p.card-cvv-mock {
         font-size: 0.75em;
-        bottom: 55px; /* Adjusted based on new desktop values */
+        bottom: 10px; /* Adjusted based on new desktop values */
         width: calc(100% - 40px);
+        position: absolute;
+        text-align: center;
     }
     .card-network-logo-img {
         height: 25px; /* Adjusted from desktop's 30px */
@@ -786,7 +790,7 @@ p.card-cvv-mock {
     .card-number {
         font-size: 1.2em; /* Reduced card number font size */
         letter-spacing: 1.5px;
-        top: 70px; /* Adjusted vertical position under the chip */
+        top: 60px; /* Adjusted vertical position under the chip */
         width: calc(100% - 30px); /* Adjust width based on new padding */
         text-align: center; /* Centered horizontally */
         position: absolute; /* Ensure it stays in the right place */
@@ -876,7 +880,7 @@ p.card-cvv-mock {
         left: 10px;
     }
     .card-item h4 {
-        font-size: 0.8em; /* Smallest bank name text */
+        font-size: 0.5em; /* Smallest bank name text */
         top: 10px;
         left: 10px;
     }
