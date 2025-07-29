@@ -13,10 +13,9 @@ require_once __DIR__ . '/../../vendor/autoload.php'; // Adjusted path to root ve
 require_once __DIR__ . '/../../Config.php'; // Adjusted path to root Config.php
 require_once __DIR__ . '/../../functions.php'; // Adjusted path to root functions.php
 
-// Check if the admin is NOT logged in, redirect to login page
-if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    // Corrected redirect to admin login page using rtrim for BASE_URL
-    header('Location: ' . rtrim(BASE_URL, '/') . '/admin/login');
+// 2. Correct the authentication check to look for 'admin_logged_in'
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
 
