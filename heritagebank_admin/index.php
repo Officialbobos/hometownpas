@@ -13,17 +13,18 @@ use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 $message = '';
-$message_type = ''; // 'success', 'error', 'warning'
+$message_type = '';
 
 // If admin is already logged in (session is active)
 if (isset($_SESSION['admin_user_id'])) {
-    error_log("index.php: Admin already logged in. Redirecting to dashboard.php."); // ADD THIS LINE
-    header('Location: dashboard.php'); // Redirect to admin dashboard
+    error_log("index.php: Admin already logged in. Redirecting to dashboard.php.");
+    // --- CORRECTED LINE ---
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/dashboard.php');
     exit();
 }
 
 // Handle admin login form submission
-if (isset($_POST['admin_login'])) {
+if (isset($_POST['admin_user_id'])) {
     $email = sanitize_input($_POST['email'] ?? '');
     $password = $_POST['password'] ?? ''; // Passwords are not sanitized with htmlspecialchars
 
