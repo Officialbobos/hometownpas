@@ -16,28 +16,37 @@ require_once __DIR__ . '/../functions.php';
 use MongoDB\Client; // Required for getMongoDBClient() if it returns a Client instance
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
-use MongoDB\Database; // Required for type hinting $mongoDb
-
-// 3. Get MongoDB Client - CRITICAL FOR AJAX ENDPOINTS
-$mongoDb = getMongoDBClient();
-
-// Check if MongoDB client is available
-if (!$mongoDb || !($mongoDb instanceof Database)) { // Ensure it's a Database instance
-    error_log("ERROR: MongoDB database object not available in api/get_user_cards.php. Type: " . gettype($mongoDb));
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database connection error.']);
-    exit;
-}
-
-// Check if user is logged in
-if (!isset($_SESSION['user_id'])) {
-    error_log("DEBUG: Session User ID: Not Set in get_user_cards.php. Redirecting to login.");
-    http_response_code(401); // Unauthorized
-    echo json_encode(['success' => false, 'message' => 'User not authenticated. Please log in again.']);
-    exit;
-}
+// Removed: use MongoDB\Database; // No longer needed for type hinting $mongoDb directly here
 
 try {
+    // 3. Get MongoDB Client instance (assuming getMongoDBClient() returns a Client object)
+    $mongoClientInstance = getMongoDBClient();
+
+    // Check if MongoDB client is available and is indeed a Client object
+    if (!$mongoClientInstance || !($mongoClientInstance instanceof Client)) {
+        error_log("ERROR: MongoDB Client instance not available or incorrect type in api/get_user_cards.php. Type: " . gettype($mongoClientInstance));
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Database connection error (Client initialization).']);
+        exit;
+    }
+
+    // Now, select the specific database using the MONGODB_DB_NAME constant
+    if (!defined('MONGODB_DB_NAME')) {
+        error_log("ERROR: MONGODB_DB_NAME is not defined in Config.php or environment.");
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Server configuration error: Database name not set.']);
+        exit;
+    }
+    $mongoDb = $mongoClientInstance->selectDatabase(MONGODB_DB_NAME);
+
+    // Check if user is logged in
+    if (!isset($_SESSION['user_id'])) {
+        error_log("DEBUG: Session User ID: Not Set in get_user_cards.php. Redirecting to login.");
+        http_response_code(401); // Unauthorized
+        echo json_encode(['success' => false, 'message' => 'User not authenticated. Please log in again.']);
+        exit;
+    }
+
     $userId = $_SESSION['user_id'];
     if (!($userId instanceof ObjectId)) {
         // Convert userId from session string to MongoDB\BSON\ObjectId for queries
@@ -199,11 +208,13 @@ try {
     exit;
 
 } catch (MongoDBDriverException $e) {
+    // Catch specific MongoDB driver exceptions for more precise error logging
     error_log("MongoDB Driver EXCEPTION in get_user_cards.php: " . $e->getMessage() . " Code: " . $e->getCode());
     http_response_code(500); // Internal Server Error
     echo json_encode(['status' => 'error', 'message' => 'Database error: Could not fetch cards. Please try again later.']);
     exit;
 } catch (Exception $e) {
+    // Catch any other general PHP exceptions
     error_log("GENERIC EXCEPTION in get_user_cards.php: " . $e->getMessage() . " Line: " . $e->getLine() . " File: " . $e->getFile());
     http_response_code(500); // Internal Server Error
     echo json_encode(['status' => 'error', 'message' => 'Server error: An unexpected error occurred.']);
