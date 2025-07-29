@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             // Corrected: Check data.status for consistency, as per your PHP API responses
-            if (data.status === 'success' && data.accounts && data.accounts.length > 0) {
+                if (data.status === true && data.accounts && data.accounts.length > 0) {
                 accountIdSelect.innerHTML = '<option value="">Select an Account</option>';
                 data.accounts.forEach(account => {
                     const option = document.createElement('option');
