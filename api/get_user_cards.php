@@ -83,7 +83,7 @@ try {
                     ]
                 ],
                 // --- MODIFIED: CVV should never be exposed; KEEP placeholder, remove "(Mock)" ---
-                'display_cvv' => 'XXX', // CVV should never be exposed; use a placeholder
+                'display_cvv' => 'XXX', 
                 'card_network' => '$card_type', // --- POTENTIAL FIX: Assuming card_type is the network, based on sample
                 'is_active' => '$is_active',
                 'account_type' => '$accountInfo.account_type',
