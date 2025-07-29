@@ -1,18 +1,21 @@
 <?php
 // Path: C:\xampp\htdocs\hometownbank\frontend\dashboard.php
-// Assuming dashboard.php is in the 'frontend' folder, so paths to Config and functions need to go up one level.
+session_start();
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// --- REMOVE TEMPORARY DEBUG CODE FOR INI_SET & ERROR_REPORTING ---
+// These are now handled by Config.php based on APP_DEBUG.
+// ini_set('display_errors', 1);
+// ini_set('display_startup_errors', 1);
+// error_reporting(E_ALL);
 
-error_log("--- dashboard.php TOP DEBUG ---");
-error_log("DEBUG: dashboard.php - SESSION user_logged_in: " . print_r($_SESSION['user_logged_in'] ?? 'NOT SET', true));
-error_log("DEBUG: dashboard.php - SESSION user_id: " . print_r($_SESSION['user_id'] ?? 'NOT SET', true));
-error_log("DEBUG: dashboard.php - SESSION 2fa_verified: " . print_r($_SESSION['2fa_verified'] ?? 'NOT SET', true));
-error_log("DEBUG: dashboard.php - SESSION auth_step: " . print_r($_SESSION['auth_step'] ?? 'NOT SET', true));
-error_log("DEBUG: dashboard.php - Full SESSION DUMP: " . print_r($_SESSION, true));
-error_log("--- End TOP DEBUG ---");
+// --- REMOVE TEMPORARY DEBUG LOGS ---
+// error_log("--- dashboard.php TOP DEBUG ---");
+// error_log("DEBUG: dashboard.php - SESSION user_logged_in: " . print_r($_SESSION['user_logged_in'] ?? 'NOT SET', true));
+// error_log("DEBUG: dashboard.php - SESSION user_id: " . print_r($_SESSION['user_id'] ?? 'NOT SET', true));
+// error_log("DEBUG: dashboard.php - SESSION 2fa_verified: " . print_r($_SESSION['2fa_verified'] ?? 'NOT SET', true));
+// error_log("DEBUG: dashboard.php - SESSION auth_step: " . print_r($_SESSION['auth_step'] ?? 'NOT SET', true));
+// error_log("DEBUG: dashboard.php - Full SESSION DUMP: " . print_r($_SESSION, true));
+// error_log("--- End TOP DEBUG ---");
 
 // Load Composer's autoloader FIRST.
 // This is crucial because Dotenv and other libraries are loaded through it.
@@ -29,7 +32,7 @@ if (file_exists($dotenvPath . '/.env')) {
     $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
     try {
         $dotenv->load(); // This will only run if .env file exists
-        error_log("DEBUG: .env file EXISTS locally. Loaded Dotenv."); // Optional: for debugging local environment
+        // error_log("DEBUG: .env file EXISTS locally. Loaded Dotenv."); // Optional: for debugging local environment
     } catch (Dotenv\Exception\InvalidPathException $e) {
         // This catch is mostly for local dev if .env is missing or unreadable.
         error_log("Dotenv load error locally on path " . $dotenvPath . ": " . $e->getMessage());
@@ -37,12 +40,11 @@ if (file_exists($dotenvPath . '/.env')) {
 } else {
     // This block will execute on Render, as .env should NOT exist there.
     // Environment variables are expected to be set via Render's Config Vars.
-    error_log("DEBUG: .env file DOES NOT exist. Skipping Dotenv load. (Expected on Render)"); // Optional: for debugging Render environment
+    // error_log("DEBUG: .env file DOES NOT exist. Skipping Dotenv load. (Expected on Render)"); // Optional: for debugging Render environment
 }
 // If .env doesn't exist (like on Render), the variables are assumed to be pre-loaded
 // into the environment by the hosting platform (e.g., Render's Config Vars).
 // --- End Dotenv loading ---
-
 
 // Now load your Config.php and functions.php files.
 // Config.php can now safely access $_ENV variables if they're defined in your .env file
@@ -164,6 +166,26 @@ if (!function_exists('get_currency_symbol')) {
         }
     }
 }
+
+// Fetch modal message from DB (this part remains as it fetches specific data)
+$transferModalContent = '';
+$transferModalActive = false;
+
+try {
+    $settingsCollection = getCollection('app_settings');
+    $settings = $settingsCollection->findOne(['setting_name' => 'transfer_modal_message']);
+
+    if ($settings) {
+        $transferModalContent = $settings['content'] ?? '';
+        $transferModalActive = $settings['is_active'] ?? false;
+    }
+} catch (MongoDB\Driver\Exception\Exception $e) {
+    error_log("Error fetching transfer modal settings: " . $e->getMessage());
+    // Fail gracefully: modal won't show if there's a DB error
+} catch (Exception $e) {
+    error_log("General error fetching transfer modal settings: " . $e->getMessage());
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -364,6 +386,133 @@ if (!function_exists('get_currency_symbol')) {
             <button class="close-modal-button" id="closeTransferModal">Close</button>
         </div>
     </div>
+
+    <?php if ($transferModalActive && !empty($transferModalContent)): ?>
+    <div id="transferInfoModal" class="app-modal">
+        <div class="app-modal-content">
+            <span class="close-app-modal-button">&times;</span>
+            <h3>Important Transfer Information</h3>
+            <p><?php echo htmlspecialchars($transferModalContent); ?></p>
+            <button class="app-modal-button">Understood</button>
+        </div>
+    </div>
+
+    <style>
+    /* Basic Modal Styles (for app-modal) */
+    .app-modal {
+        display: none; /* Hidden by default */
+        position: fixed; /* Stay in place */
+        z-index: 2000; /* Sit on top, higher than transfer-modal-overlay */
+        left: 0;
+        top: 0;
+        width: 100%; /* Full width */
+        height: 100%; /* Full height */
+        overflow: auto; /* Enable scroll if needed */
+        background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
+        justify-content: center;
+        align-items: center;
+        padding-top: 50px; /* Adjust as needed */
+    }
+
+    .app-modal-content {
+        background-color: #fefefe;
+        margin: auto; /* Center vertically and horizontally */
+        padding: 30px;
+        border: 1px solid #888;
+        width: 80%; /* Could be responsive */
+        max-width: 500px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        position: relative;
+        text-align: center;
+        color: #333;
+    }
+
+    .app-modal-content h3 {
+        color: #007bff;
+        margin-top: 0;
+        margin-bottom: 20px;
+        font-size: 1.5em;
+    }
+
+    .app-modal-content p {
+        font-size: 1.1em;
+        line-height: 1.6;
+        margin-bottom: 25px;
+    }
+
+    .close-app-modal-button {
+        color: #aaa;
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .close-app-modal-button:hover,
+    .close-app-modal-button:focus {
+        color: #333;
+        text-decoration: none;
+    }
+
+    .app-modal-button {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 25px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1em;
+        transition: background-color 0.3s ease;
+    }
+
+    .app-modal-button:hover {
+        background-color: #0056b3;
+    }
+    </style>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const transferInfoModal = document.getElementById('transferInfoModal');
+        // Ensure buttons exist before attaching handlers
+        const closeInfoModalButton = transferInfoModal ? transferInfoModal.querySelector('.close-app-modal-button') : null;
+        const infoModalOkButton = transferInfoModal ? transferInfoModal.querySelector('.app-modal-button') : null;
+
+        if (transferInfoModal) {
+            const hasSeenTransferInfoModal = sessionStorage.getItem('hasSeenTransferInfoModal');
+
+            if (!hasSeenTransferInfoModal) {
+                transferInfoModal.style.display = 'flex'; // Use flex to center content
+            }
+
+            if (closeInfoModalButton) {
+                closeInfoModalButton.onclick = function() {
+                    transferInfoModal.style.display = 'none';
+                    sessionStorage.setItem('hasSeenTransferInfoModal', 'true'); // Mark as seen
+                }
+            }
+
+            if (infoModalOkButton) {
+                infoModalOkButton.onclick = function() {
+                    transferInfoModal.style.display = 'none';
+                    sessionStorage.setItem('hasSeenTransferInfoModal', 'true'); // Mark as seen
+                }
+            }
+
+            // Close the modal if the user clicks anywhere outside of it
+            window.onclick = function(event) {
+                if (event.target == transferInfoModal) {
+                    transferInfoModal.style.display = 'none';
+                    sessionStorage.setItem('hasSeenTransferInfoModal', 'true'); // Mark as seen
+                }
+            }
+        }
+    });
+    </script>
+    <?php endif; ?>
+
 
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 

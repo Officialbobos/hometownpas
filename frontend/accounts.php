@@ -154,6 +154,28 @@ if (!function_exists('get_currency_symbol')) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 
+    <style>
+        /* This style block should ideally be moved to accounts.css */
+        .back-to-dashboard {
+            margin-bottom: 20px;
+            text-align: left; /* Align the button to the left */
+        }
+
+        .back-to-dashboard a {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        .back-to-dashboard a:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body class="dashboard-page">
     <header class="dashboard-header">
@@ -166,83 +188,74 @@ if (!function_exists('get_currency_symbol')) {
             <a href="<?php echo BASE_URL; ?>/logout">Logout</a>
         </div>
     </header>
-
-    <div class="dashboard-container">
-        <aside class="sidebar">
-            <ul>
-                <li><a href="<?php echo BASE_URL; ?>/dashboard"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
-                <li class="active"><a href="<?php echo BASE_URL; ?>/accounts"><i class="fas fa-wallet"></i> <span>My Accounts</span></a></li>
-                <li><a href="<?php echo BASE_URL; ?>/profile"><i class="fas fa-user-circle"></i> <span>Profile</span></a></li>
-                <li><a href="<?php echo BASE_URL; ?>/statements"><i class="fas fa-file-alt"></i> <span>Statements</span></a></li>
-                <li><a href="<?php echo BASE_URL; ?>/transfer"><i class="fas fa-exchange-alt"></i> <span>Transfers</span></a></li>
-                <li><a href="<?php echo BASE_URL; ?>/transactions"><i class="fas fa-history"></i> <span>Transaction History</span></a></li>
-                <li><a href="<?php echo BASE_URL; ?>/settings"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
-                <li><a href="<?php echo BASE_URL; ?>/logout"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
-            </ul>
-        </aside>
-
-        <main class="accounts-content">
-            <?php
-            // Display messages (e.g., from failed account fetch)
-            if (isset($_SESSION['message'])) {
-                $message_type = $_SESSION['message_type'] ?? 'info';
-                echo '<div class="alert ' . htmlspecialchars($message_type) . '">' . htmlspecialchars($_SESSION['message']) . '</div>';
-                unset($_SESSION['message']); // Clear the message after displaying
-                unset($_SESSION['message_type']);
-            }
-            ?>
-            <div class="card">
-                <h2>Your Bank Accounts</h2>
-
-                <?php if (!empty($user_accounts)): ?>
-                    <div class="account-card-container"> <?php foreach ($user_accounts as $account): ?>
-                            <div class="account-card">
-                                <h3>
-                                    <?php
-                                        switch (strtolower($account['account_type'] ?? '')) {
-                                            case 'checking':
-                                                echo '<i class="fas fa-money-check-alt"></i>';
-                                                break;
-                                            case 'savings':
-                                                echo '<i class="fas fa-piggy-bank"></i>';
-                                                break;
-                                            case 'current':
-                                                echo '<i class="fas fa-hand-holding-usd"></i>';
-                                                break;
-                                            default:
-                                                echo '<i class="fas fa-wallet"></i>';
-                                                break;
-                                        }
-                                    ?>
-                                    <?php echo htmlspecialchars(ucwords($account['account_type'] ?? 'N/A')) . ' Account'; ?>
-                                </h3>
-                                <p><span class="detail-label">Account Number:</span> <span class="detail-value"><?php echo htmlspecialchars($account['account_number'] ?? 'N/A'); ?></span></p>
-                                <p><span class="detail-label">Currency:</span> <span class="detail-value"><?php echo htmlspecialchars(strtoupper($account['currency'] ?? 'N/A')); ?></span></p>
-
-                                <?php if (!empty($account['sort_code'])): ?>
-                                    <p><span class="detail-label">Sort Code:</span> <span class="detail-value"><?php echo htmlspecialchars($account['sort_code']); ?></span></p>
-                                <?php endif; ?>
-
-                                <?php if (!empty($account['iban'])): ?>
-                                    <p><span class="detail-label">IBAN:</span> <span class="detail-value"><?php echo htmlspecialchars($account['iban']); ?></span></p>
-                                <?php endif; ?>
-
-                                <?php if (!empty($account['swift_bic'])): ?>
-                                    <p><span class="detail-label">SWIFT/BIC:</span> <span class="detail-value"><?php echo htmlspecialchars($account['swift_bic']); ?></span></p>
-                                <?php endif; ?>
-
-                                <p class="balance">
-                                    <span class="balance-label">Current Balance:</span><br>
-                                    <span class="balance-amount"><?php echo formatCurrency($account['balance'] ?? 0, $account['currency'] ?? 'USD'); ?></span>
-                                </p>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <p class="no-accounts">You currently have no bank accounts linked to your profile.</p>
-                <?php endif; ?>
+    <main class="accounts-content">
+        <?php
+        // Display messages (e.g., from failed account fetch)
+        if (isset($_SESSION['message'])) {
+            $message_type = $_SESSION['message_type'] ?? 'info';
+            echo '<div class="alert ' . htmlspecialchars($message_type) . '">' . htmlspecialchars($_SESSION['message']) . '</div>';
+            unset($_SESSION['message']); // Clear the message after displaying
+            unset($_SESSION['message_type']);
+        }
+        ?>
+        <div class="card">
+            <div class="back-to-dashboard">
+                <a href="<?php echo BASE_URL; ?>/app/dashboard.php">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
             </div>
-        </main>
+
+            <h2>Your Bank Accounts</h2>
+
+            <?php if (!empty($user_accounts)): ?>
+                <div class="account-card-container"> <?php foreach ($user_accounts as $account): ?>
+                        <div class="account-card">
+                            <h3>
+                                <?php
+                                    switch (strtolower($account['account_type'] ?? '')) {
+                                        case 'checking':
+                                            echo '<i class="fas fa-money-check-alt"></i>';
+                                            break;
+                                        case 'savings':
+                                            echo '<i class="fas fa-piggy-bank"></i>';
+                                            break;
+                                        case 'current':
+                                            echo '<i class="fas fa-hand-holding-usd"></i>';
+                                            break;
+                                        default:
+                                            echo '<i class="fas fa-wallet"></i>';
+                                            break;
+                                    }
+                                ?>
+                                <?php echo htmlspecialchars(ucwords($account['account_type'] ?? 'N/A')) . ' Account'; ?>
+                            </h3>
+                            <p><span class="detail-label">Account Number:</span> <span class="detail-value"><?php echo htmlspecialchars($account['account_number'] ?? 'N/A'); ?></span></p>
+                            <p><span class="detail-label">Currency:</span> <span class="detail-value"><?php echo htmlspecialchars(strtoupper($account['currency'] ?? 'N/A')); ?></span></p>
+
+                            <?php if (!empty($account['sort_code'])): ?>
+                                <p><span class="detail-label">Sort Code:</span> <span class="detail-value"><?php echo htmlspecialchars($account['sort_code']); ?></span></p>
+                            <?php endif; ?>
+
+                            <?php if (!empty($account['iban'])): ?>
+                                <p><span class="detail-label">IBAN:</span> <span class="detail-value"><?php echo htmlspecialchars($account['iban']); ?></span></p>
+                            <?php endif; ?>
+
+                            <?php if (!empty($account['swift_bic'])): ?>
+                                <p><span class="detail-label">SWIFT/BIC:</span> <span class="detail-value"><?php echo htmlspecialchars($account['swift_bic']); ?></span></p>
+                            <?php endif; ?>
+
+                            <p class="balance">
+                                <span class="balance-label">Current Balance:</span><br>
+                                <span class="balance-amount"><?php echo formatCurrency($account['balance'] ?? 0, $account['currency'] ?? 'USD'); ?></span>
+                            </p>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <p class="no-accounts">You currently have no bank accounts linked to your profile.</p>
+            <?php endif; ?>
+        </div>
+    </main>
     </div>
     <script src="<?php echo BASE_URL; ?>/frontend/script.js"></script>
 </body>

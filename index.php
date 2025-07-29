@@ -279,7 +279,9 @@ switch ($path) {
     case 'api/admin/delete_transaction':
         require __DIR__ . '/heritagebank_admin/api/delete_transaction.php';
         break;
-
+    case 'admin/manage_transfer_modal':
+        require __DIR__ . '/heritagebank_admin/manage_transfer_modal.php';
+        break;
     default:
         http_response_code(404);
         // It's crucial to have an actual 404.php file or a robust error page.

@@ -26,9 +26,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const amountCurrencySymbol = document.getElementById('amount_currency_symbol');
     const amountInput = document.getElementById('amount');
 
-    // Modal elements
-    const transferModal = document.getElementById('transferConfirmationModal');
-    const closeButton = document.querySelector('.close-button');
+    // Modal elements (existing transfer confirmation modal)
+    const transferConfirmationModal = document.getElementById('transferConfirmationModal'); // Renamed for clarity
+    const closeButton = transferConfirmationModal ? transferConfirmationModal.querySelector('.close-button') : null; // Select close button specific to this modal
+
+    // NEW: Elements for the general app message modal (Important Transfer Information)
+    const transferInfoModal = document.getElementById('transferInfoModal');
+    const closeInfoModalButton = transferInfoModal ? transferInfoModal.querySelector('.close-app-modal-button') : null; // Use new class name
+    const infoModalOkButton = transferInfoModal ? transferInfoModal.querySelector('.app-modal-button') : null; // Use new class name
+
 
     // Global variables passed from PHP (ensure these are correctly outputted in your HTML)
     // Example: <script>const userAccountsData = <?php echo json_encode($user_accounts_data_for_js); ?>;</script>
@@ -186,35 +192,64 @@ document.addEventListener('DOMContentLoaded', function() {
      * Opens the transfer confirmation modal and populates it with transfer details.
      * @param {object} details - An object containing transfer information.
      */
-    function openModal(details) {
+    function openTransferConfirmationModal(details) { // Renamed function
         document.getElementById('modalAmount').textContent = (details.currency || '') + ' ' + (details.amount || 'N/A');
         document.getElementById('modalRecipient').textContent = details.recipient_name || 'N/A';
         document.getElementById('modalMethod').textContent = details.method || 'N/A';
         document.getElementById('modalStatus').textContent = details.status || 'N/A';
         document.getElementById('modalReference').textContent = details.reference || 'N/A';
-        transferModal.style.display = 'block';
-        
+        transferConfirmationModal.style.display = 'block';
     }
 
     /**
      * Closes the transfer confirmation modal.
      */
-    function closeModal() {
-        transferModal.style.display = 'none';
+    function closeTransferConfirmationModal() { // Renamed function
+        transferConfirmationModal.style.display = 'none';
         // You might want to redirect the user or reset the form after closing the modal,
         // depending on your UX flow. For now, we'll just close it.
         // window.location.href = 'transfer.php'; // Example: refresh the page
     }
 
+
     // --- Event Listeners ---
     sourceAccountSelect.addEventListener('change', updateAccountBalanceDisplay);
     transferMethodSelect.addEventListener('change', showHideTransferFields);
-    closeButton.onclick = closeModal;
 
-    // Close modal if user clicks outside of it
+    // Ensure closeButton exists before attaching event listener
+    if (closeButton) {
+        closeButton.onclick = closeTransferConfirmationModal;
+    }
+
+
+    // NEW: Event Listeners for the general app message modal
+    if (transferInfoModal) {
+        if (closeInfoModalButton) {
+            closeInfoModalButton.onclick = function() {
+                transferInfoModal.style.display = 'none';
+                sessionStorage.setItem('hasSeenTransferInfoModal', 'true'); // Mark as seen
+            }
+        }
+
+        if (infoModalOkButton) {
+            infoModalOkButton.onclick = function() {
+                transferInfoModal.style.display = 'none';
+                sessionStorage.setItem('hasSeenTransferInfoModal', 'true'); // Mark as seen
+            }
+        }
+    }
+
+
+    // Close modals if user clicks outside of them
     window.onclick = function(event) {
-        if (event.target == transferModal) {
-            closeModal();
+        // Transfer Confirmation Modal
+        if (event.target == transferConfirmationModal) {
+            closeTransferConfirmationModal();
+        }
+        // General App Message Modal
+        if (event.target == transferInfoModal) {
+            transferInfoModal.style.display = 'none';
+            sessionStorage.setItem('hasSeenTransferInfoModal', 'true'); // Mark as seen
         }
     }
 
@@ -224,11 +259,21 @@ document.addEventListener('DOMContentLoaded', function() {
     updateAccountBalanceDisplay();
     showHideTransferFields();
 
-    // Check if modal should be shown on page load (from successful transfer)
+    // Check if transfer confirmation modal should be shown on page load (from successful transfer)
     // These variables (`showModalOnLoad`, `modalDetails`) must be defined in your
     // `transfer.php` file using PHP's `json_encode` for this to work.
     if (typeof showModalOnLoad !== 'undefined' && showModalOnLoad === true && typeof modalDetails !== 'undefined') {
-        openModal(modalDetails);
+        openTransferConfirmationModal(modalDetails);
+    }
+
+    // NEW: Check if general app message modal should be shown on page load
+    if (transferInfoModal) { // Check if the element exists
+        const hasSeenTransferInfoModal = sessionStorage.getItem('hasSeenTransferInfoModal');
+        // This variable `transferModalActive` must be defined in your PHP and outputted to JS.
+        // E.g., <script>const transferModalActive = <?php echo json_encode($transferModalActive); ?>;</script>
+        if (typeof transferModalActive !== 'undefined' && transferModalActive === true && !hasSeenTransferInfoModal) {
+            transferInfoModal.style.display = 'flex'; // Use flex to center content
+        }
     }
 
     console.log("Heritage Bank transfer script initialized and ready!");

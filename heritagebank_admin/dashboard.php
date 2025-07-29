@@ -2,15 +2,18 @@
 // C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\dashboard.php
 session_start(); // Start the session
 
-ini_set('display_errors', 1); // For development: Display all errors
-ini_set('display_startup_errors', 1); // For development: Display startup errors
-error_reporting(E_ALL); // For development: Report all errors
+// --- REMOVE TEMPORARY DEBUG CODE FOR INI_SET & ERROR_REPORTING ---
+// These are now handled by Config.php based on APP_DEBUG.
+// ini_set('display_errors', 1); // For development: Display all errors
+// ini_set('display_startup_errors', 1); // For development: Display startup errors
+// error_reporting(E_ALL); // For development: Report all errors
 
 // Load Composer's autoloader for MongoDB classes and Dotenv
 require_once __DIR__ . '/../vendor/autoload.php';
 
 // Include necessary files for MongoDB connection and utility functions
-require_once __DIR__ . '/../Config.php';
+// Config.php should be loaded before functions.php if functions rely on its constants.
+require_once __DIR__ . '/../Config.php'; // This defines APP_DEBUG and error settings
 require_once __DIR__ . '/../functions.php'; // This should contain getMongoDBClient() and getCollection()
 
 use MongoDB\BSON\UTCDateTime; // Ensure UTCDateTime is used for date handling
@@ -18,8 +21,11 @@ use MongoDB\Driver\Exception\Exception as MongoDBDriverException; // For general
 
 // Check if the admin is NOT logged in, redirect to login page
 // Using $_SESSION['admin_user_id'] as the primary indicator for admin login
+// Assuming 'index.php' in the current directory is your admin login page.
+// If your admin login is through the main index.php router (e.g., 'admin/login'),
+// you might need to use BASE_URL here: header('Location: ' . BASE_URL . '/admin/login');
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: index.php'); // Redirect to admin login if not authenticated
+    header('Location: ' . BASE_URL . '/admin/login'); // Redirect to admin login if not authenticated
     exit;
 }
 
@@ -328,7 +334,7 @@ if (isset($_SESSION['admin_message'])) {
         <div class="dashboard-header">
             <img src="https://i.imgur.com/YmC3kg3.png" alt="Hometown Bank Logo" class="logo">
             <h2>Welcome, <?php echo htmlspecialchars($admin_full_name); ?>!</h2>
-            <a href="logout.php" class="logout-button">Logout</a>
+            <a href="<?php echo BASE_URL; ?>/admin/logout" class="logout-button">Logout</a>
         </div>
 
         <div class="dashboard-content">
@@ -362,11 +368,12 @@ if (isset($_SESSION['admin_message'])) {
 
             <nav class="dashboard-nav">
                 <ul>
-                    <li><a href="users/users_management.php">User Management</a></li>
-                    <li><a href="transactions_history.php">Transaction History</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>/admin/users">User Management</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>/admin/transactions">Transaction History</a></li>
                     <li><a href="#">Reports & Analytics</a></li>
                     <li><a href="#">System Settings</a></li>
-                    <li><a href="transfer_approvals.php">Transfer Approvals</a></li>
+                    <li><a href="#">Transfer Approvals</a></li> 
+                  <li><a href="<?php echo BASE_URL; ?>/admin/manage_transfer_modal">Manage Transfer Modal</a></li>
                 </ul>
             </nav>
         </div>

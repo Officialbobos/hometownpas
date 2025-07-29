@@ -1433,6 +1433,79 @@ body.profile-page, body.dashboard-page { /* Added body.dashboard-page to cover a
     color: #dc3545; /* Red for debit and all transfer types */
 }
 
+/* Basic Modal Styles (for the general app message modal) */
+.app-modal {
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    z-index: 2000; /* Sit on top, higher than transfer-modal-overlay */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
+    justify-content: center;
+    align-items: center;
+    padding-top: 50px; /* Adjust as needed */
+}
+
+.app-modal-content {
+    background-color: #fefefe;
+    margin: auto; /* Center vertically and horizontally */
+    padding: 30px;
+    border: 1px solid #888;
+    width: 80%; /* Could be responsive */
+    max-width: 500px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    position: relative;
+    text-align: center;
+    color: #333;
+}
+
+.app-modal-content h3 {
+    color: #007bff;
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 1.5em;
+}
+
+.app-modal-content p {
+    font-size: 1.1em;
+    line-height: 1.6;
+    margin-bottom: 25px;
+}
+
+.close-app-modal-button { /* Changed class name to be specific */
+    color: #aaa;
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-app-modal-button:hover,
+.close-app-modal-button:focus {
+    color: #333;
+    text-decoration: none;
+}
+
+.app-modal-button { /* Changed class name to be specific */
+    background-color: #007bff;
+    color: white;
+    padding: 10px 25px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.3s ease;
+}
+
+.app-modal-button:hover {
+    background-color: #0056b3;
+}
 
 /* The Bank Card Display (Specific for individual card display on manage_card.php, if any) */
 /* Note: This block assumes a separate .bank-card-display container.
