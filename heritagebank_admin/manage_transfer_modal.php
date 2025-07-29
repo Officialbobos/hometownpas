@@ -1,6 +1,5 @@
 <?php
 // C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\manage_transfer_modal.php
-session_start();
 
 error_log("manage_transfer_modal.php: SESSION_ID: " . session_id());
 error_log("manage_transfer_modal.php: Checking session variables...");
@@ -14,9 +13,8 @@ require_once __DIR__ . '/../functions.php'; // For getCollection()
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
-// Check if the admin is NOT logged in
-if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    // Corrected redirect to admin login page using rtrim for BASE_URL
+// 2. Correct the authentication check to look for 'admin_logged_in'
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
