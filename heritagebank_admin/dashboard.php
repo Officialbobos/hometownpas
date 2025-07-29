@@ -24,7 +24,7 @@ use MongoDB\Driver\Exception\Exception as MongoDBDriverException; // For general
 // Assuming 'index.php' in the current directory is your admin login page.
 // If your admin login is through the main index.php router (e.g., 'admin/login'),
 // you might need to use BASE_URL here: header('Location: ' . BASE_URL . '/admin/login');
-if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
