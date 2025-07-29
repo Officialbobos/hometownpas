@@ -1,10 +1,6 @@
 <?php
 // Path: C:\xampp\htdocs\hometownbank\frontend\bank_cards.php
 
-// For development:
-ini_set('display_errors', 1); // Enable error display for debugging
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
 // Ensure session is started and Config/functions are available.
 // In a production setup with index.php as a router, these might be handled globally.
