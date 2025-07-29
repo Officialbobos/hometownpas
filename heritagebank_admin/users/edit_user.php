@@ -1,30 +1,33 @@
 <?php
 session_start();
-require_once '../../Config.php'; // Ensure Config.php has MongoDB connection details and B2 credentials
+require_once '../../Config.php';
 
 // Use MongoDB PHP Library
-require_once '../../functions.php'; // This is good to have for future database operations
+require_once '../../functions.php';
 use MongoDB\Client;
-use MongoDB\BSON\ObjectId; // For working with MongoDB's unique IDs
+use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\UTCDateTime;
 
 // Include AWS SDK for PHP (for Backblaze B2 S3 Compatible API)
 require '../../vendor/autoload.php';
 use Aws\S3\S3Client;
 use Aws\Exception\AwsException;
 
-
 // Check if admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: ../index.php'); // Corrected redirect to admin login page
+    header('Location: ../index.php');
     exit;
 }
 
-$user_id_str = isset($_GET['id']) ? $_GET['id'] : '';
-$user_id = null;
-$user_data = null;
-$accounts_data = []; // Initialize array to hold account data
+// --- Initialize Variables ---
 $message = '';
 $message_type = '';
+
+$user_id_from_url = isset($_GET['id']) ? $_GET['id'] : '';
+$user_id = null;
+$user_data = null;
+$accounts_data = [];
+$current_profile_image_url = '';
 
 // Re-fetch message if it came from a redirect (e.g., from manage_users.php after delete)
 if (isset($_GET['message']) && isset($_GET['type'])) {
@@ -34,8 +37,7 @@ if (isset($_GET['message']) && isset($_GET['type'])) {
 
 // Establish MongoDB connection
 try {
-    // Assuming MONGO_URI and MONGO_DB are defined in Config.php
-    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);    
+    $client = new Client(MONGODB_CONNECTION_URI);
     $database = $client->selectDatabase(MONGODB_DB_NAME);
     $usersCollection = $database->selectCollection('users');
     $accountsCollection = $database->selectCollection('accounts');
@@ -47,83 +49,96 @@ try {
 $s3Client = null;
 try {
     $s3Client = new S3Client([
-        'version' => 'latest',
-        'region'  => B2_REGION,
-        'endpoint' => B2_ENDPOINT, // e.g., 'https://s3.us-west-004.backblazeb2.com'
+        'version'     => 'latest',
+        'region'      => B2_REGION,
+        'endpoint'    => B2_ENDPOINT,
         'credentials' => [
             'key'    => B2_APPLICATION_KEY_ID,
             'secret' => B2_APPLICATION_KEY,
         ],
-        'http'    => [
+        'http'        => [
             'verify' => false // Set to true in production with proper CA certificates
         ]
     ]);
 } catch (AwsException $e) {
-    // Handle error, though this usually indicates a misconfiguration in credentials/endpoint
     error_log("B2 S3Client initialization error: " . $e->getMessage());
-    $message = "B2 storage initialization error: " . $e->getMessage();
+    $message = "An error occurred while initializing file storage. Image functionality may not work.";
     $message_type = 'error';
-    // Die or disable image functionality if B2 is critical
 }
 
-
-// Function to fetch user and account data (can be called initially and after update)
-function fetchUserData($usersCollection, $accountsCollection, $user_id) {
-    global $s3Client; // Access the global S3 client
+// --- Functions ---
+/**
+ * Fetches user and account data from the database.
+ * @param \MongoDB\Collection $usersCollection
+ * @param \MongoDB\Collection $accountsCollection
+ * @param string|null $userIdFromUrl The user ID from the URL as a string.
+ * @return array An associative array with user_data, accounts_data, and profile_image_url.
+ */
+function fetchUserData(
+    $usersCollection,
+    $accountsCollection,
+    $userIdFromUrl,
+    $s3Client
+) {
     $userData = null;
     $accountsData = [];
-    $profile_image_url = ''; // To store the pre-signed URL for display
+    $profileImageUrl = '';
 
-    if ($user_id) {
-        // Fetch user data
-        $userData = $usersCollection->findOne(['_id' => $user_id]);
+    if (!empty($userIdFromUrl)) {
+        try {
+            $userId = new ObjectId($userIdFromUrl);
+            $userData = $usersCollection->findOne(['_id' => $userId]);
 
-        // Fetch associated account data if user found
-        if ($userData) {
-            // Convert BSON document to associative array for consistency if needed
-            $userData = (array) $userData;
+            if ($userData) {
+                $userData = (array) $userData;
 
-            // Generate pre-signed URL for profile image from B2
-            if (!empty($userData['profile_image_key']) && $s3Client) {
-                try {
-                    $command = $s3Client->getCommand('GetObject', [
-                        'Bucket' => B2_BUCKET_NAME,
-                        'Key'    => $userData['profile_image_key'],
-                    ]);
-                    $request = $s3Client->createPresignedRequest($command, '+60 minutes'); // URL valid for 60 minutes
-                    $profile_image_url = (string) $request->getUri();
-                } catch (AwsException $e) {
-                    error_log("Error generating pre-signed URL for '{$userData['profile_image_key']}': " . $e->getMessage());
-                    $profile_image_url = ''; // Fallback to no image if URL generation fails
-                    // Optionally, add a user-friendly message here too
+                // Fetch associated accounts
+                $cursorAccounts = $accountsCollection->find(['user_id' => $userId]);
+                foreach ($cursorAccounts as $accountDoc) {
+                    $accountsData[] = (array) $accountDoc;
+                }
+
+                // Generate pre-signed URL for profile image from B2
+                if (!empty($userData['profile_image_key']) && $s3Client) {
+                    try {
+                        $command = $s3Client->getCommand('GetObject', [
+                            'Bucket' => B2_BUCKET_NAME,
+                            'Key'    => $userData['profile_image_key'],
+                        ]);
+                        $request = $s3Client->createPresignedRequest($command, '+60 minutes');
+                        $profileImageUrl = (string) $request->getUri();
+                    } catch (AwsException $e) {
+                        error_log("Error generating pre-signed URL: " . $e->getMessage());
+                        $profileImageUrl = '';
+                    }
                 }
             }
-
-            // Accounts are linked by user_id
-            $cursorAccounts = $accountsCollection->find(['user_id' => $user_id]);
-            foreach ($cursorAccounts as $accountDoc) {
-                $accountsData[] = (array) $accountDoc; // Convert each account BSON document to array
-            }
+        } catch (MongoDB\Driver\Exception\InvalidArgumentException $e) {
+            // Invalid ObjectId format
+            $userData = null;
         }
     }
-    return ['user_data' => $userData, 'accounts_data' => $accountsData, 'profile_image_url' => $profile_image_url];
+    return ['user_data' => $userData, 'accounts_data' => $accountsData, 'profile_image_url' => $profileImageUrl];
 }
 
-// Fetch data initially
-$fetched_data = fetchUserData($usersCollection, $accountsCollection, $user_id);
+// --- Initial Data Fetch ---
+$fetched_data = fetchUserData($usersCollection, $accountsCollection, $user_id_from_url, $s3Client);
 $user_data = $fetched_data['user_data'];
 $accounts_data = $fetched_data['accounts_data'];
-$current_profile_image_url = $fetched_data['profile_image_url']; // URL for display
+$current_profile_image_url = $fetched_data['profile_image_url'];
 
-if (!$user_data && $user_id && empty($message)) { // Check $user_id is not null/invalid
+// If a valid user ID was provided but no user was found, set an error message
+if (!$user_data && !empty($user_id_from_url) && empty($message)) {
     $message = "No user found with the provided ID.";
     $message_type = 'error';
-    $user_id = null; // Invalidate user_id if not found, to prevent form display
+    $user_id = null;
+} elseif ($user_data) {
+    $user_id = $user_data['_id']; // Set the ObjectId for use in POST logic
 }
 
-// Handle form submission for updating user and accounts
+
+// --- Handle Form Submission ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
-    // Collect updated user data
     $first_name = trim($_POST['first_name'] ?? '');
     $last_name = trim($_POST['last_name'] ?? '');
     $email = trim($_POST['email'] ?? '');
@@ -136,339 +151,294 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
     $membership_number = trim($_POST['membership_number'] ?? '');
     $admin_created_at_str = trim($_POST['admin_created_at'] ?? '');
     $new_password = $_POST['new_password'] ?? '';
-    $remove_profile_image = isset($_POST['remove_profile_image']); // Check if the "remove image" checkbox is ticked
+    $remove_profile_image = isset($_POST['remove_profile_image']);
 
-    // Get current profile_image_key from the database for potential deletion
     $old_profile_image_key = $user_data['profile_image_key'] ?? null;
-    $profile_image_key_to_save = $old_profile_image_key; // Default to existing key
-
-    $uploaded_new_image_key = null; // To track if a new image was uploaded in this request
-
-    // Collect updated account data
-    $submitted_accounts = $_POST['accounts'] ?? []; // This will be an array of arrays
+    $profile_image_key_to_save = $old_profile_image_key;
+    $uploaded_new_image_key = null;
+    $is_valid = true;
 
     // --- Validation ---
-    // Basic user data validation
     if (empty($first_name) || empty($last_name) || empty($email) || empty($home_address) || empty($phone_number) || empty($nationality) || empty($date_of_birth) || empty($gender) || empty($occupation) || empty($membership_number) || empty($admin_created_at_str)) {
         $message = 'All user fields (except new password and profile image) are required.';
         $message_type = 'error';
+        $is_valid = false;
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $message = 'Invalid email format.';
         $message_type = 'error';
+        $is_valid = false;
     } elseif (!empty($new_password) && strlen($new_password) < 6) {
         $message = 'New password must be at least 6 characters long.';
         $message_type = 'error';
+        $is_valid = false;
     } elseif (!in_array($gender, ['Male', 'Female', 'Other'])) {
         $message = 'Invalid gender selected.';
         $message_type = 'error';
+        $is_valid = false;
     } elseif (!preg_match("/^\d{4}-\d{2}-\d{2}$/", $date_of_birth) || !strtotime($date_of_birth)) {
         $message = 'Invalid Date of Birth format. Please use YYYY-MM-DD.';
         $message_type = 'error';
-    } else {
-        // Convert admin_created_at to MongoDB Date object
+        $is_valid = false;
+    }
+
+    // Convert and validate admin_created_at
+    if ($is_valid) {
         try {
-            $admin_created_at = new MongoDB\BSON\UTCDateTime(strtotime($admin_created_at_str) * 1000); // MongoDB expects milliseconds
+            $admin_created_at = new UTCDateTime(strtotime($admin_created_at_str) * 1000);
         } catch (Exception $e) {
-            $message = 'Invalid "Created At" date/time format. Please use YYYY-MM-DDTHH:MM (e.g., 2025-07-01T14:30).';
+            $message = 'Invalid "Created At" date/time format. Please use YYYY-MM-DDTHH:MM.';
             $message_type = 'error';
+            $is_valid = false;
         }
+    }
 
-        if (empty($message)) { // Only proceed if date parsing was successful
+    // Check for duplicate email
+    if ($is_valid) {
+        $existing_user_with_email = $usersCollection->findOne([
+            'email' => $email,
+            '_id' => ['$ne' => $user_id]
+        ]);
+        if ($existing_user_with_email) {
+            $message = "Error updating user: Email address already exists for another user.";
+            $message_type = 'error';
+            $is_valid = false;
+        }
+    }
 
-            // Check for duplicate email (excluding current user)
-            $existing_user_with_email = $usersCollection->findOne([
-                'email' => $email,
-                '_id' => ['$ne' => $user_id] // Exclude the current user
-            ]);
-            if ($existing_user_with_email) {
-                $message = "Error updating user: Email address already exists for another user.";
+    // Validation for account data
+    if ($is_valid) {
+        $submitted_accounts = $_POST['accounts'] ?? [];
+        foreach ($submitted_accounts as $index => $account) {
+            $acc_type = trim($account['account_type'] ?? '');
+            $acc_number = trim($account['account_number'] ?? '');
+            $balance = floatval($account['balance'] ?? 0);
+            $currency = trim($account['currency'] ?? '');
+
+            if (empty($acc_type) || empty($acc_number) || empty($currency)) {
+                $message = "Account " . ($index + 1) . ": Account type, number, and currency are required.";
                 $message_type = 'error';
+                $is_valid = false;
+                break;
+            }
+            if (!is_numeric($balance) || $balance < 0) {
+                $message = "Account " . ($index + 1) . ": Balance must be a non-negative number.";
+                $message_type = 'error';
+                $is_valid = false;
+                break;
+            }
+            if (!in_array($currency, ['USD', 'EUR', 'GBP', 'NGN'])) {
+                $message = "Account " . ($index + 1) . ": Invalid currency selected.";
+                $message_type = 'error';
+                $is_valid = false;
+                break;
+            }
+        }
+    }
+
+    if ($is_valid) {
+        // --- Handle Profile Image Upload / Removal ---
+        $image_operation_success = true;
+
+        if ($remove_profile_image) {
+            if ($old_profile_image_key && $s3Client) {
+                try {
+                    $s3Client->deleteObject([
+                        'Bucket' => B2_BUCKET_NAME,
+                        'Key'    => $old_profile_image_key,
+                    ]);
+                    $profile_image_key_to_save = null;
+                } catch (AwsException $e) {
+                    $message = 'Error deleting old profile image.';
+                    $message_type = 'error';
+                    $image_operation_success = false;
+                }
+            } else {
+                $profile_image_key_to_save = null;
+            }
+        } elseif (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK) {
+            $file_tmp_path = $_FILES['profile_image']['tmp_name'];
+            $file_name = $_FILES['profile_image']['name'];
+            $file_size = $_FILES['profile_image']['size'];
+            $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+
+            $allowed_ext = ['jpg', 'jpeg', 'png', 'gif'];
+            if (!in_array($file_ext, $allowed_ext)) {
+                $message = 'Invalid image file type. Only JPG, JPEG, PNG, GIF are allowed.';
+                $message_type = 'error';
+                $image_operation_success = false;
+            } elseif ($file_size > 5 * 1024 * 1024) { // 5MB limit
+                $message = 'Image file size exceeds 5MB limit.';
+                $message_type = 'error';
+                $image_operation_success = false;
+            } else {
+                if ($s3Client) {
+                    $new_image_key = 'profile_images/' . uniqid('user_', true) . '.' . $file_ext;
+                    try {
+                        $s3Client->putObject([
+                            'Bucket'      => B2_BUCKET_NAME,
+                            'Key'         => $new_image_key,
+                            'SourceFile'  => $file_tmp_path,
+                            'ACL'         => 'public-read',
+                            'ContentType' => mime_content_type($file_tmp_path)
+                        ]);
+                        $profile_image_key_to_save = $new_image_key;
+                        $uploaded_new_image_key = $new_image_key;
+                    } catch (AwsException $e) {
+                        $message = 'Error uploading new profile image to storage.';
+                        $message_type = 'error';
+                        $image_operation_success = false;
+                        error_log("B2 upload error: " . $e->getMessage());
+                    }
+                } else {
+                    $message = 'Image storage is not configured. Cannot upload image.';
+                    $message_type = 'error';
+                    $image_operation_success = false;
+                }
             }
         }
 
-        if (empty($message)) { // Only proceed if email check passed
-            // Validation for account data
-            $account_validation_error = false;
-            foreach ($submitted_accounts as $index => $account) {
-                $acc_type = trim($account['account_type'] ?? '');
-                $acc_number = trim($account['account_number'] ?? '');
-                $balance = floatval($account['balance'] ?? 0);
-                $currency = trim($account['currency'] ?? '');
-                $sort_code = trim($account['sort_code'] ?? '');
-                $iban = trim($account['iban'] ?? '');
-                $swift_bic = trim($account['swift_bic'] ?? '');
+        // Proceed only if image operation was successful
+        if ($image_operation_success) {
+            $transaction_success = true;
+            $session = null;
 
-                if (empty($acc_type) || empty($acc_number) || empty($currency)) {
-                    $message = "Account " . ($index + 1) . ": Account type, number, and currency are required.";
-                    $message_type = 'error';
-                    $account_validation_error = true;
-                    break;
-                }
-                if (!is_numeric($balance) || $balance < 0) {
-                    $message = "Account " . ($index + 1) . ": Balance must be a non-negative number.";
-                    $message_type = 'error';
-                    $account_validation_error = true;
-                    break;
-                }
-                if (!in_array($currency, ['USD', 'EUR', 'GBP', 'NGN'])) { // Adjust allowed currencies as needed
-                    $message = "Account " . ($index + 1) . ": Invalid currency selected.";
-                    $message_type = 'error';
-                    $account_validation_error = true;
-                    break;
-                }
-                // Add specific validation for IBAN/SWIFT/Sort Code if needed (e.g., regex patterns)
-                if ($currency === 'EUR' && empty($iban)) {
-                    $message = "Account " . ($index + 1) . ": IBAN is required for EUR accounts.";
-                    $message_type = 'error';
-                    $account_validation_error = true;
-                    break;
-                }
-                if ($currency === 'GBP' && empty($sort_code)) {
-                    $message = "Account " . ($index + 1) . ": Sort Code is required for GBP accounts.";
-                    $message_type = 'error';
-                    $account_validation_error = true;
-                    break;
-                }
-            }
+            try {
+                // Start a session for multi-document transaction
+                $session = $client->startSession();
+                $session->startTransaction();
 
-            if (!$account_validation_error) {
-                // --- Handle Profile Image Upload / Removal ---
-                $image_operation_success = true;
+                // 1. Update User Details
+                $user_update_fields = [
+                    'first_name' => $first_name,
+                    'last_name' => $last_name,
+                    'email' => $email,
+                    'home_address' => $home_address,
+                    'phone_number' => $phone_number,
+                    'nationality' => $nationality,
+                    'date_of_birth' => $date_of_birth,
+                    'gender' => $gender,
+                    'occupation' => $occupation,
+                    'membership_number' => $membership_number,
+                    'profile_image_key' => $profile_image_key_to_save,
+                    'created_at' => $admin_created_at
+                ];
 
-                if ($remove_profile_image) {
-                    // If checkbox is ticked, remove the image
-                    if ($old_profile_image_key && $s3Client) {
+                if (!empty($new_password)) {
+                    $user_update_fields['password_hash'] = password_hash($new_password, PASSWORD_DEFAULT);
+                }
+
+                $updateResultUser = $usersCollection->updateOne(
+                    ['_id' => $user_id],
+                    ['$set' => $user_update_fields],
+                    ['session' => $session]
+                );
+
+                if ($updateResultUser->getMatchedCount() === 0) {
+                    $message = "User update failed: User ID not found.";
+                    $message_type = 'error';
+                    $transaction_success = false;
+                }
+
+                // 2. Update Account Details
+                if ($transaction_success) {
+                    foreach ($submitted_accounts as $account) {
+                        try {
+                            $account_mongo_id = new ObjectId($account['id']);
+                        } catch (MongoDB\Driver\Exception\InvalidArgumentException $e) {
+                            $message = "Invalid account ID for an account.";
+                            $message_type = 'error';
+                            $transaction_success = false;
+                            break;
+                        }
+
+                        $account_update_fields = [
+                            'account_type' => trim($account['account_type'] ?? ''),
+                            'account_number' => trim($account['account_number'] ?? ''),
+                            'balance' => floatval($account['balance'] ?? 0),
+                            'currency' => trim($account['currency'] ?? ''),
+                            'sort_code' => empty(trim($account['sort_code'] ?? '')) ? null : trim($account['sort_code']),
+                            'iban' => empty(trim($account['iban'] ?? '')) ? null : trim($account['iban']),
+                            'swift_bic' => empty(trim($account['swift_bic'] ?? '')) ? null : trim($account['swift_bic'])
+                        ];
+
+                        $updateResultAccount = $accountsCollection->updateOne(
+                            ['_id' => $account_mongo_id, 'user_id' => $user_id],
+                            ['$set' => $account_update_fields],
+                            ['session' => $session]
+                        );
+
+                        if ($updateResultAccount->getMatchedCount() === 0) {
+                            $message = "Failed to update an account: Account not found or does not belong to user.";
+                            $message_type = 'error';
+                            $transaction_success = false;
+                            break;
+                        }
+                    }
+                }
+
+                // --- Finalize Transaction ---
+                if ($transaction_success) {
+                    $session->commitTransaction();
+                    $message = "User and account details updated successfully!";
+                    $message_type = 'success';
+
+                    // After successful commit, delete the old image from B2
+                    if ($uploaded_new_image_key && $old_profile_image_key && $s3Client) {
                         try {
                             $s3Client->deleteObject([
                                 'Bucket' => B2_BUCKET_NAME,
                                 'Key'    => $old_profile_image_key,
                             ]);
-                            $profile_image_key_to_save = null; // Set to null in DB
-                            $message = "Profile image removed successfully.";
-                            $message_type = 'success';
                         } catch (AwsException $e) {
-                            $message = 'Error deleting old profile image from B2: ' . $e->getMessage();
-                            $message_type = 'error';
-                            $image_operation_success = false;
+                            error_log("Failed to delete old profile image '{$old_profile_image_key}' from B2: " . $e->getMessage());
                         }
-                    } else {
-                        $profile_image_key_to_save = null; // No old image, just ensure it's null in DB
                     }
-                } elseif (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK) {
-                    // If a new file is uploaded
-                    $file_tmp_path = $_FILES['profile_image']['tmp_name'];
-                    $file_name = $_FILES['profile_image']['name'];
-                    $file_size = $_FILES['profile_image']['size'];
-                    $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-
-                    $allowed_ext = ['jpg', 'jpeg', 'png', 'gif'];
-                    if (!in_array($file_ext, $allowed_ext)) {
-                        $message = 'Invalid image file type. Only JPG, JPEG, PNG, GIF are allowed.';
-                        $message_type = 'error';
-                        $image_operation_success = false;
-                    } elseif ($file_size > 5 * 1024 * 1024) { // 5MB limit
-                        $message = 'Image file size exceeds 5MB limit.';
-                        $message_type = 'error';
-                        $image_operation_success = false;
-                    } else {
-                        // Upload to B2
-                        if ($s3Client) {
-                            $new_image_key = 'profile_images/' . uniqid('user_', true) . '.' . $file_ext;
-                            try {
-                                $s3Client->putObject([
-                                    'Bucket'     => B2_BUCKET_NAME,
-                                    'Key'        => $new_image_key,
-                                    'SourceFile' => $file_tmp_path,
-                                    'ACL'        => 'public-read', // Or private, and use pre-signed URLs for everything
-                                    'ContentType' => mime_content_type($file_tmp_path)
-                                ]);
-                                $profile_image_key_to_save = $new_image_key;
-                                $uploaded_new_image_key = $new_image_key; // Store for potential rollback
-                                
-                                // Old image deletion will happen during transaction commit for safety
-                            } catch (AwsException $e) {
-                                $message = 'Error uploading profile image to B2: ' . $e->getMessage();
-                                $message_type = 'error';
-                                $image_operation_success = false;
-                                error_log("B2 upload error: " . $e->getMessage());
-                            }
-                        } else {
-                            $message = 'B2 storage is not configured. Cannot upload image.';
-                            $message_type = 'error';
-                            $image_operation_success = false;
+                } else {
+                    $session->abortTransaction();
+                    if (empty($message)) {
+                        $message = "Failed to update user or account details. Rolling back changes.";
+                    }
+                    // If transaction aborted, delete the newly uploaded image from B2
+                    if ($uploaded_new_image_key && $s3Client) {
+                        try {
+                            $s3Client->deleteObject([
+                                'Bucket' => B2_BUCKET_NAME,
+                                'Key'    => $uploaded_new_image_key,
+                            ]);
+                        } catch (AwsException $e) {
+                            error_log("Failed to clean up newly uploaded B2 image after abort: " . $e->getMessage());
                         }
                     }
                 }
-                // If no file uploaded and no remove checkbox, $profile_image_key_to_save remains $old_profile_image_key
+            } catch (MongoDB\Driver\Exception\RuntimeException $e) {
+                if (isset($session) && $session->inTransaction()) {
+                    $session->abortTransaction();
+                }
+                $message = "Database error during update: " . $e->getMessage();
+                $message_type = 'error';
+                $transaction_success = false;
 
-                // Proceed only if image operation was successful or no image was provided/changed
-                if ($image_operation_success) {
-                    $transaction_success = true;
-                    $session = null; // Initialize session variable for finally block
-
+                if ($uploaded_new_image_key && $s3Client) {
                     try {
-                        // Start a session for multi-document transaction (requires MongoDB replica set/sharded cluster)
-                        // If not in a replica set/sharded cluster, this will silently not use transactions.
-                        $session = $client->startSession();
-                        $session->startTransaction();
-
-                        // 1. Update User Details
-                        $user_update_fields = [
-                            'first_name' => $first_name,
-                            'last_name' => $last_name,
-                            'email' => $email,
-                            'home_address' => $home_address,
-                            'phone_number' => $phone_number,
-                            'nationality' => $nationality,
-                            'date_of_birth' => $date_of_birth, // Store as string, or convert to ISODate if desired for date queries
-                            'gender' => $gender,
-                            'occupation' => $occupation,
-                            'membership_number' => $membership_number,
-                            'profile_image_key' => $profile_image_key_to_save, // Use the B2 key
-                            'created_at' => $admin_created_at // Stored as MongoDB UTCDateTime
-                        ];
-
-                        if (!empty($new_password)) {
-                            $user_update_fields['password_hash'] = password_hash($new_password, PASSWORD_DEFAULT);
-                        }
-
-                        $updateResultUser = $usersCollection->updateOne(
-                            ['_id' => $user_id],
-                            ['$set' => $user_update_fields],
-                            ['session' => $session]
-                        );
-
-                        if ($updateResultUser->getModifiedCount() === 0 && $updateResultUser->getMatchedCount() === 0) {
-                            // This case means the user was found but no fields were different.
-                            // If you want to force an update message even if no changes, remove this check.
-                            // For now, let's allow it to pass if no actual changes but other parts of transaction succeed.
-                            // However, if the user was not matched at all, then it's an error.
-                            if ($updateResultUser->getMatchedCount() === 0) {
-                                $message = "User update failed: User ID not found.";
-                                $message_type = 'error';
-                                $transaction_success = false;
-                            }
-                        }
-
-                        // 2. Update Account Details
-                        if ($transaction_success) {
-                            foreach ($submitted_accounts as $account) {
-                                // Ensure account ID from form is a valid ObjectId
-                                try {
-                                    $account_mongo_id = new ObjectId($account['id']);
-                                } catch (MongoDB\Driver\Exception\InvalidArgumentException $e) {
-                                    $message = "Invalid account ID format for account: " . htmlspecialchars($account['account_number'] ?? 'N/A');
-                                    $message_type = 'error';
-                                    $transaction_success = false;
-                                    break;
-                                }
-
-                                $acc_type = trim($account['account_type'] ?? '');
-                                $acc_number = trim($account['account_number'] ?? '');
-                                $balance = floatval($account['balance'] ?? 0);
-                                $currency = trim($account['currency'] ?? '');
-                                // MongoDB stores null as BSON Null
-                                $sort_code = empty(trim($account['sort_code'] ?? '')) ? null : trim($account['sort_code']);
-                                $iban = empty(trim($account['iban'] ?? '')) ? null : trim($account['iban']);
-                                $swift_bic = empty(trim($account['swift_bic'] ?? '')) ? null : trim($account['swift_bic']);
-
-                                $account_update_fields = [
-                                    'account_type' => $acc_type,
-                                    'account_number' => $acc_number,
-                                    'balance' => $balance,
-                                    'currency' => $currency,
-                                    'sort_code' => $sort_code,
-                                    'iban' => $iban,
-                                    'swift_bic' => $swift_bic
-                                ];
-
-                                $updateResultAccount = $accountsCollection->updateOne(
-                                    ['_id' => $account_mongo_id, 'user_id' => $user_id], // Ensure account belongs to this user
-                                    ['$set' => $account_update_fields],
-                                    ['session' => $session]
-                                );
-
-                                if ($updateResultAccount->getModifiedCount() === 0 && $updateResultAccount->getMatchedCount() === 0) {
-                                    // As with user update, if matched count is 0, it's an error.
-                                    if ($updateResultAccount->getMatchedCount() === 0) {
-                                        $message = "Failed to update account " . htmlspecialchars($acc_number) . ": Account not found or does not belong to user.";
-                                        $message_type = 'error';
-                                        $transaction_success = false;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        // --- Finalize Transaction ---
-                        if ($transaction_success) {
-                            $session->commitTransaction();
-                            $message = "User and account details updated successfully!";
-                            $message_type = 'success';
-
-                            // After successful commit, delete the old image from B2 if a new one was uploaded
-                            if ($uploaded_new_image_key && $old_profile_image_key && $s3Client) {
-                                try {
-                                    $s3Client->deleteObject([
-                                        'Bucket' => B2_BUCKET_NAME,
-                                        'Key'    => $old_profile_image_key,
-                                    ]);
-                                    // Log success for old image deletion, but don't fail the entire request if this fails
-                                } catch (AwsException $e) {
-                                    error_log("Failed to delete old profile image '{$old_profile_image_key}' from B2: " . $e->getMessage());
-                                    // You might want to add a message to the user that old image cleanup failed
-                                }
-                            }
-                        } else {
-                            $session->abortTransaction();
-                            if (empty($message)) {
-                                $message = "Failed to update user or account details. Rolling back changes.";
-                            }
-                            // If transaction aborted, delete the newly uploaded image from B2
-                            if ($uploaded_new_image_key && $s3Client) {
-                                try {
-                                    $s3Client->deleteObject([
-                                        'Bucket' => B2_BUCKET_NAME,
-                                        'Key'    => $uploaded_new_image_key,
-                                    ]);
-                                } catch (AwsException $e) {
-                                    error_log("Failed to clean up newly uploaded B2 image '{$uploaded_new_image_key}' after transaction abort: " . $e->getMessage());
-                                }
-                            }
-                        }
-                    } catch (MongoDB\Driver\Exception\RuntimeException $e) {
-                        // Catch exceptions during transaction or database operations
-                        if (isset($session) && $session->inTransaction()) {
-                            $session->abortTransaction();
-                        }
-                        $message = "Database error during update: " . $e->getMessage();
-                        $message_type = 'error';
-                        $transaction_success = false;
-
-                        // If database operation failed, delete the newly uploaded image from B2
-                        if ($uploaded_new_image_key && $s3Client) {
-                            try {
-                                $s3Client->deleteObject([
-                                    'Bucket' => B2_BUCKET_NAME,
-                                    'Key'    => $uploaded_new_image_key,
-                                ]);
-                            } catch (AwsException $e) {
-                                error_log("Failed to clean up newly uploaded B2 image '{$uploaded_new_image_key}' after database error: " . $e->getMessage());
-                            }
-                        }
-                    } finally {
-                        if (isset($session)) {
-                            $session->endSession(); // Always end the session
-                        }
+                        $s3Client->deleteObject([
+                            'Bucket' => B2_BUCKET_NAME,
+                            'Key'    => $uploaded_new_image_key,
+                        ]);
+                    } catch (AwsException $e) {
+                        error_log("Failed to clean up newly uploaded B2 image after database error: " . $e->getMessage());
                     }
-
-                    // Re-fetch updated data to refresh the form with latest changes
-                    $fetched_data = fetchUserData($usersCollection, $accountsCollection, $user_id);
-                    $user_data = $fetched_data['user_data'];
-                    $accounts_data = $fetched_data['accounts_data'];
-                    $current_profile_image_url = $fetched_data['profile_image_url']; // Update URL for display
+                }
+            } finally {
+                if (isset($session)) {
+                    $session->endSession();
                 }
             }
+
+            // Re-fetch updated data to refresh the form
+            $fetched_data = fetchUserData($usersCollection, $accountsCollection, $user_id, $s3Client);
+            $user_data = $fetched_data['user_data'];
+            $accounts_data = $fetched_data['accounts_data'];
+            $current_profile_image_url = $fetched_data['profile_image_url'];
         }
     }
 }
@@ -570,7 +540,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
             color: #721c24;
             border-color: #f5c6cb;
         }
-
+        
         /* Form styling */
         .form-standard .form-group {
             margin-bottom: 15px;
@@ -680,11 +650,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
             <?php endif; ?>
 
             <?php if ($user_data): ?>
-            <form action="edit_user.php?id=<?php echo htmlspecialchars($user_data['_id']); ?>" method="POST" class="form-standard" enctype="multipart/form-data">
+            <form action="edit_user.php?id=<?php echo htmlspecialchars($user_id); ?>" method="POST" class="form-standard" enctype="multipart/form-data">
                 <h3>User Information</h3>
                 <div class="form-group">
                     <label for="id">User ID:</label>
-                    <input type="text" id="id" name="id" value="<?php echo htmlspecialchars($user_data['_id']); ?>" readonly>
+                    <input type="text" id="id" name="id" value="<?php echo htmlspecialchars($user_id); ?>" readonly>
                 </div>
                 <div class="form-group">
                     <label for="membership_number">Membership Number:</label>
@@ -752,10 +722,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
                 <div class="form-group">
                     <label for="admin_created_at">Account Creation Date & Time</label>
                     <input type="datetime-local" id="admin_created_at" name="admin_created_at" value="<?php
-                        if (isset($user_data['created_at']) && $user_data['created_at'] instanceof MongoDB\BSON\UTCDateTime) {
+                        if (isset($user_data['created_at']) && $user_data['created_at'] instanceof UTCDateTime) {
                             echo htmlspecialchars(date('Y-m-d\TH:i', $user_data['created_at']->toDateTime()->getTimestamp()));
                         } else {
-                            // Fallback if created_at is not set or not a UTCDateTime object
                             echo '';
                         }
                     ?>" required>

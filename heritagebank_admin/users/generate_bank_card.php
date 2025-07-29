@@ -24,11 +24,11 @@ $accounts_for_card_generation = []; // Stores accounts for the selected user
 // Establish MongoDB connection
 $mongoClient = null;
 try {
-   $client = new MongoDB\Client(MONGODB_CONNECTION_URI);   
-    $database = $client->selectDatabase(MONGODB_DB_NAME);
-    $usersCollection = $database->selectCollection('users');
-    $accountsCollection = $database->selectCollection('accounts');
-    $bankCardsCollection = $database->selectCollection('bank_cards'); // New collection for cards
+   $client = new MongoDB\Client(MONGODB_CONNECTION_URI);
+   $database = $client->selectDatabase(MONGODB_DB_NAME);
+   $usersCollection = $database->selectCollection('users');
+   $accountsCollection = $database->selectCollection('accounts');
+   $bankCardsCollection = $database->selectCollection('bank_cards'); // New collection for cards
 
 } catch (Exception $e) {
     error_log("ERROR: Could not connect to MongoDB. " . $e->getMessage());
@@ -55,29 +55,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 if ($user_for_card_generation) {
-                    // Convert BSON document to associative array for consistency
-                    $user_for_card_generation = (array) $user_for_card_generation;
+                    // Check if an active card already exists for this user
+                    $existing_card = $bankCardsCollection->findOne(['user_id' => $user_for_card_generation['_id'], 'is_active' => true]);
 
-                    // User found, now fetch their accounts
-                    // MongoDB's _id is an ObjectId, so we need to pass it as such
-                    $user_id_obj = $user_for_card_generation['_id'];
-
-                    $cursorAccounts = $accountsCollection->find(['user_id' => $user_id_obj]);
-                    foreach ($cursorAccounts as $accountDoc) {
-                        // Convert each account BSON document to array
-                        $account = (array) $accountDoc;
-                        // For the form, we'll use 'id' as 'account_id' for consistency with original HTML
-                        $account['account_id'] = (string) $account['_id']; // Convert ObjectId to string
-                        $accounts_for_card_generation[] = $account;
-                    }
-
-                    if (empty($accounts_for_card_generation)) {
-                        $message = 'User found, but has no associated bank accounts. Cannot generate card.';
+                    if ($existing_card) {
+                        $message = 'This user already has an active bank card. Cannot generate a new one.';
                         $message_type = 'error';
+                        // Keep the form in step 1 by not setting $display_account_selection to true
                     } else {
-                        $display_account_selection = true; // Show the second part of the form
-                        $message = 'User found. Please select an account to generate a card for.';
-                        $message_type = 'success';
+                        // User found, now fetch their accounts
+                        $user_for_card_generation = (array) $user_for_card_generation;
+                        $user_id_obj = $user_for_card_generation['_id'];
+                        $cursorAccounts = $accountsCollection->find(['user_id' => $user_id_obj]);
+
+                        foreach ($cursorAccounts as $accountDoc) {
+                            $account = (array) $accountDoc;
+                            $account['account_id'] = (string) $account['_id'];
+                            $accounts_for_card_generation[] = $account;
+                        }
+
+                        if (empty($accounts_for_card_generation)) {
+                            $message = 'User found, but has no associated bank accounts. Cannot generate card.';
+                            $message_type = 'error';
+                        } else {
+                            $display_account_selection = true; // Show the second part of the form
+                            $message = 'User found. Please select an account to link the card to.';
+                            $message_type = 'success';
+                        }
                     }
                 } else {
                     $message = 'User not found with the provided identifier.';
@@ -90,15 +94,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'generate_card') {
-        $user_id_str = trim($_POST['user_id_hidden'] ?? ''); // This will be the string _id
-        $account_id_str = trim($_POST['account_id'] ?? ''); // This will be the string _id
+        $user_id_str = trim($_POST['user_id_hidden'] ?? '');
+        $account_id_str = trim($_POST['account_id'] ?? '');
         $admin_created_at_str = trim($_POST['created_at'] ?? '');
 
         $user_id_obj = null;
         $account_id_obj = null;
 
         try {
-            // Convert string IDs back to MongoDB ObjectIds
             if (!empty($user_id_str)) {
                 $user_id_obj = new ObjectId($user_id_str);
             }
@@ -113,10 +116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$user_id_obj || !$account_id_obj) {
             $message = 'Invalid user or account selected. Please try again.';
             $message_type = 'error';
-            // Attempt to re-display form for better UX if IDs were just malformed
             if ($user_id_obj) {
                 $display_account_selection = true;
-                // Re-fetch user and accounts data for form persistence
                 $user_for_card_generation = (array) $usersCollection->findOne(['_id' => $user_id_obj]);
                 $cursorAccounts = $accountsCollection->find(['user_id' => $user_id_obj]);
                 foreach ($cursorAccounts as $accountDoc) {
@@ -127,82 +128,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } else {
             try {
-                // Get user's full name for card holder
-                $user_data_for_name = $usersCollection->findOne(['_id' => $user_id_obj], [
-                    'projection' => ['first_name' => 1, 'last_name' => 1]
-                ]);
-                $card_holder_name = '';
-                if ($user_data_for_name) {
-                    $card_holder_name = strtoupper($user_data_for_name['first_name'] . ' ' . $user_data_for_name['last_name']);
-                }
-
-                if (empty($card_holder_name)) {
-                    $message = 'Could not retrieve user name for card generation.';
+                // Check again for an existing active card to prevent race conditions
+                $existing_card_for_user = $bankCardsCollection->findOne(['user_id' => $user_id_obj, 'is_active' => true]);
+                if ($existing_card_for_user) {
+                    $message = 'This user already has an active bank card. Cannot generate a new one.';
                     $message_type = 'error';
+                    // Re-fetch user/account data to keep the form populated for better UX
+                    $display_account_selection = true;
+                    $user_for_card_generation = (array) $usersCollection->findOne(['_id' => $user_id_obj]);
+                    $cursorAccounts = $accountsCollection->find(['user_id' => $user_id_obj]);
+                    foreach ($cursorAccounts as $accountDoc) {
+                        $account = (array) $accountDoc;
+                        $account['account_id'] = (string) $account['_id'];
+                        $accounts_for_card_generation[] = $account;
+                    }
                 } else {
-                    // --- Simulate Card Generation with Type and Prefixes ---
-                    $card_types = ['Visa', 'MasterCard', 'Verve'];
-                    $card_type = $card_types[array_rand($card_types)]; // Randomly pick a type
-
-                    $prefix = '';
-                    if ($card_type === 'Visa') {
-                        $prefix = '4';
-                    } elseif ($card_type === 'MasterCard') {
-                        $mc_prefixes = ['51', '52', '53', '54', '55'];
-                        $prefix = $mc_prefixes[array_rand($mc_prefixes)];
-                    } elseif ($card_type === 'Verve') {
-                        $prefix = '5061'; // Common Verve prefix
-                    }
-
-                    // Generate remaining digits for a 16-digit number
-                    $remaining_digits_length = 16 - strlen($prefix);
-                    $random_digits = '';
-                    for ($i = 0; $i < $remaining_digits_length; $i++) {
-                        $random_digits .= mt_rand(0, 9);
-                    }
-                    $card_number_raw = $prefix . $random_digits;
-                    $card_number_display = wordwrap($card_number_raw, 4, ' ', true);
-
-                    $expiry_month = str_pad(mt_rand(1, 12), 2, '0', STR_PAD_LEFT);
-                    $expiry_year_full = date('Y') + mt_rand(3, 7); // 3 to 7 years from current year
-                    $expiry_year_short = date('y', strtotime($expiry_year_full . '-01-01'));
-                    $cvv = str_pad(mt_rand(1, 999), 3, '0', STR_PAD_LEFT);
-
-                    // Convert admin_created_at to MongoDB UTCDateTime object
-                    $created_at_mongo = null;
-                    try {
-                        $dateTimeObj = new DateTime($admin_created_at_str);
-                        $created_at_mongo = new UTCDateTime($dateTimeObj->getTimestamp() * 1000); // MongoDB expects milliseconds
-                    } catch (Exception $e) {
-                        // Fallback to current time if conversion fails
-                        $created_at_mongo = new UTCDateTime(time() * 1000);
-                        error_log("Warning: Invalid 'created_at' date format, using current time for card. " . $e->getMessage());
-                    }
-
-                    // Optional: Check if a card already exists for this account
-                    $existing_card = $bankCardsCollection->findOne([
-                        'account_id' => $account_id_obj,
-                        'is_active' => true
+                    $user_data_for_name = $usersCollection->findOne(['_id' => $user_id_obj], [
+                        'projection' => ['first_name' => 1, 'last_name' => 1]
                     ]);
+                    $card_holder_name = '';
+                    if ($user_data_for_name) {
+                        $card_holder_name = strtoupper($user_data_for_name['first_name'] . ' ' . $user_data_for_name['last_name']);
+                    }
 
-                    if ($existing_card) {
-                        $message = 'A bank card already exists and is active for the selected account. Cannot generate a new one.';
+                    if (empty($card_holder_name)) {
+                        $message = 'Could not retrieve user name for card generation.';
                         $message_type = 'error';
                     } else {
-                        // Insert card details into the database
-                        // PIN is not set by admin, it will be set by the user (NULL initially)
-                        $is_active = true; // Or false if you want user activation to be mandatory
+                        // --- Simulate Card Generation with Type and Prefixes ---
+                        $card_types = ['Visa', 'MasterCard', 'Verve'];
+                        $card_type = $card_types[array_rand($card_types)];
 
+                        $prefix = '';
+                        if ($card_type === 'Visa') {
+                            $prefix = '4';
+                        } elseif ($card_type === 'MasterCard') {
+                            $mc_prefixes = ['51', '52', '53', '54', '55'];
+                            $prefix = $mc_prefixes[array_rand($mc_prefixes)];
+                        } elseif ($card_type === 'Verve') {
+                            $prefix = '5061';
+                        }
+
+                        $remaining_digits_length = 16 - strlen($prefix);
+                        $random_digits = '';
+                        for ($i = 0; $i < $remaining_digits_length; $i++) {
+                            $random_digits .= mt_rand(0, 9);
+                        }
+                        $card_number_raw = $prefix . $random_digits;
+                        $card_number_display = wordwrap($card_number_raw, 4, ' ', true);
+
+                        $expiry_month = str_pad(mt_rand(1, 12), 2, '0', STR_PAD_LEFT);
+                        $expiry_year_full = date('Y') + mt_rand(3, 7);
+                        $expiry_year_short = date('y', strtotime($expiry_year_full . '-01-01'));
+                        $cvv = str_pad(mt_rand(1, 999), 3, '0', STR_PAD_LEFT);
+
+                        $created_at_mongo = null;
+                        try {
+                            $dateTimeObj = new DateTime($admin_created_at_str);
+                            $created_at_mongo = new UTCDateTime($dateTimeObj->getTimestamp() * 1000);
+                        } catch (Exception $e) {
+                            $created_at_mongo = new UTCDateTime(time() * 1000);
+                            error_log("Warning: Invalid 'created_at' date format, using current time for card. " . $e->getMessage());
+                        }
+
+                        // Insert card details into the database with 'pending_activation' status
                         $insert_data = [
                             'user_id' => $user_id_obj,
-                            'account_id' => $account_id_obj, // Link the card to the specific account
-                            'card_number' => $card_number_raw, // Store raw number
+                            // As per your request, the card is for the user, not just one account.
+                            // However, we link it to one account for initial association.
+                            'primary_account_id' => $account_id_obj,
+                            'card_number' => $card_number_raw,
                             'card_type' => $card_type,
-                            'expiry_month' => (int)$expiry_month, // Store as integer
-                            'expiry_year' => (int)$expiry_year_full, // Store full year as integer
+                            'expiry_month' => (int)$expiry_month,
+                            'expiry_year' => (int)$expiry_year_full,
                             'card_holder_name' => $card_holder_name,
-                            'is_active' => $is_active,
-                            'pin' => null, // PIN is NULL initially
+                            'is_active' => false, // Set to false for pending activation
+                            'status' => 'pending_activation', // New field to track status
+                            'pin' => null,
                             'created_at' => $created_at_mongo,
                             'updated_at' => new UTCDateTime(time() * 1000)
                         ];
@@ -210,18 +212,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $insertResult = $bankCardsCollection->insertOne($insert_data);
 
                         if ($insertResult->getInsertedCount() === 1) {
-                            $message = "Mock {$card_type} card generated and stored successfully for " . $card_holder_name . ".";
+                            $message = "Mock {$card_type} card generated and stored successfully for " . $card_holder_name . ". It is now awaiting user activation.";
                             $message_type = 'success';
                             $generated_card_info = [
                                 'holder_name' => $card_holder_name,
                                 'card_number' => $card_number_display,
-                                'expiry_date' => $expiry_month . '/' . $expiry_year_short, // Display short year (e.g., 28)
-                                'cvv' => $cvv,
-                                'card_type' => $card_type // Pass type for styling
+                                'expiry_date' => $expiry_month . '/' . $expiry_year_short,
+                                'cvv' => 'XXX', // Do not show the real CVV to the admin
+                                'card_type' => $card_type
                             ];
-                            // Clear inputs after successful generation to show initial form
-                            $_POST = array(); // Clears all POST data to reset the form
-                            $display_account_selection = false; // Reset to step 1
+                            $_POST = array();
+                            $display_account_selection = false;
                             $user_for_card_generation = null;
                             $accounts_for_card_generation = [];
                         } else {
@@ -426,9 +427,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             letter-spacing: 1px; /* Add some spacing */
             margin-bottom: 20px; /* Provide space below it */
             text-shadow: 0 1px 2px rgba(0,0,0,0.3); /* Subtle shadow for depth */
-            /* If you want to use an image logo, you might remove this h4 or hide it */
-            /* If keeping as text, its current flow placement is fine, or you can absolutely position it: */
-            /* position: absolute; top: 25px; left: 25px; */
         }
 
         /* New: Styles for an actual bank logo image if you decide to use one */
@@ -550,7 +548,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <input type="hidden" name="user_id_hidden" value="<?php echo htmlspecialchars((string)$user_for_card_generation['_id']); ?>">
 
                         <div class="form-group">
-                            <label for="account_id">Select Account for Card</label>
+                            <label for="account_id">Select Account to Link Card to</label>
                             <select id="account_id" name="account_id" required>
                                 <option value="">-- Select an Account --</option>
                                 <?php foreach ($accounts_for_card_generation as $account): ?>
@@ -560,7 +558,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                            <small>The card will be linked to this specific account.</small>
+                            <small>The card will be linked to this primary account.</small>
                         </div>
 
                         <div class="form-group">
@@ -580,7 +578,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="card-display <?php echo strtolower($generated_card_info['card_type']); ?>">
                     <h4>HOMETOWN BANK</h4>
                     <div class="chip"></div>
-                    <div class="card-number"><?php echo $generated_card_info['card_number']; ?></div>
+                    <div class="card-number"><?php echo htmlspecialchars($generated_card_info['card_number']); ?></div>
                     <div class="card-footer">
                         <div>
                             <div class="label">CARD HOLDER</div>
@@ -591,8 +589,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <div class="value"><?php echo htmlspecialchars($generated_card_info['expiry_date']); ?></div>
                         </div>
                     </div>
-                   <p style="font-size: 0.8em; text-align: center; margin-top: 10px;">
-                 CVV: XXX
+                    <p style="font-size: 0.8em; text-align: center; margin-top: 10px;">
+                        CVV: XXX
                     </p>
                     <?php
                         $card_logo_path = '';
@@ -605,10 +603,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     ?>
                     <?php if ($card_logo_path): ?>
-                        <img src="<?php echo $card_logo_path; ?>" alt="<?php echo $generated_card_info['card_type']; ?> Logo" class="card-logo">
+                        <img src="<?php echo htmlspecialchars($card_logo_path); ?>" alt="<?php echo htmlspecialchars($generated_card_info['card_type']); ?> Logo" class="card-logo">
                     <?php endif; ?>
                 </div>
                 <p style="text-align: center; font-size: 0.9em; color: #666;">
+                    The user's card has been generated and is awaiting activation.
                 </p>
             <?php endif; ?>
 

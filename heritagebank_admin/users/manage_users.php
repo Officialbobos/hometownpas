@@ -1,9 +1,16 @@
 <?php
+/**
+ * manage_users.php
+ *
+ * Admin panel page to manage user accounts.
+ * Allows administrators to view a list of all users,
+ * and perform actions like editing or deleting a user and their associated data.
+ */
 session_start();
 require_once '../../Config.php'; // Adjust path
 require_once '../../functions.php'; // This is good to have for future database operations
 
-// Check if admin is logged in
+// Check if admin is logged in, if not, redirect to login page
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
@@ -15,7 +22,7 @@ $message_type = '';
 // --- MongoDB Connection ---
 try {
     // MONGO_URI and MONGO_DB_NAME should be defined in Config.php
-    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);   
+    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);  
     $database = $client->selectDatabase(MONGODB_DB_NAME);
     $usersCollection = $database->selectCollection('users');
     $accountsCollection = $database->selectCollection('accounts');
@@ -29,10 +36,10 @@ try {
 
 // --- Handle Delete Action ---
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
-    $user_id_to_delete_str = $_GET['id']; // MongoDB _id is a string/ObjectId
+    $user_id_to_delete_str = $_GET['id'];
     
     try {
-        // Convert string ID to MongoDB\BSON\ObjectId
+        // Convert string ID to a MongoDB\BSON\ObjectId for the query
         $user_id_to_delete = new MongoDB\BSON\ObjectId($user_id_to_delete_str);
 
         // Optional: Get profile image path before deleting user to remove the file
@@ -41,62 +48,66 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
         if ($user_to_delete && isset($user_to_delete['profile_image'])) {
             $profile_image_path_to_delete = $user_to_delete['profile_image'];
         }
-
-        // Delete related records from 'transactions' collection
+        
+        // --- Deletion Cascade: Delete all related documents first ---
+        
+        // Delete related transactions
         $transactionsCollection->deleteMany(['user_id' => $user_id_to_delete]);
         
-        // Delete related records from 'bank_cards' collection
+        // Delete related bank cards
         $bankCardsCollection->deleteMany(['user_id' => $user_id_to_delete]);
 
-        // Delete associated records from 'account_status_history' collection
+        // Delete associated account status history
         $accountStatusHistoryCollection->deleteMany(['user_id' => $user_id_to_delete]);
 
-        // Delete accounts associated with the user
+        // Delete all accounts associated with the user
         $accountsCollection->deleteMany(['user_id' => $user_id_to_delete]);
 
-        // Finally, delete the user record
+        // Finally, delete the user record itself
         $deleteUserResult = $usersCollection->deleteOne(['_id' => $user_id_to_delete]);
 
         if ($deleteUserResult->getDeletedCount() === 1) {
-            $message = "User and all associated data deleted successfully. 🎉";
-            $message_type = 'success';
+            $_SESSION['flash_message'] = "User and all associated data deleted successfully. 🎉";
+            $_SESSION['flash_message_type'] = 'success';
 
             // Delete profile image file from server if it exists
-            // Adjust the path relative to your project root if 'profile_images' is not directly under it
             if ($profile_image_path_to_delete && file_exists('../../' . $profile_image_path_to_delete)) {
                 unlink('../../' . $profile_image_path_to_delete);
             }
         } else {
-            $message = "User not found or already deleted.";
-            $message_type = 'error';
+            $_SESSION['flash_message'] = "User not found or already deleted.";
+            $_SESSION['flash_message_type'] = 'error';
         }
 
     } catch (MongoDB\Driver\Exception\InvalidArgumentException $e) {
-        $message = "Invalid user ID provided for deletion.";
-        $message_type = 'error';
+        $_SESSION['flash_message'] = "Invalid user ID provided for deletion.";
+        $_SESSION['flash_message_type'] = 'error';
         error_log("Invalid user ID for deletion: " . $_GET['id']);
     } catch (Exception $e) {
-        $message = "Error deleting user: " . $e->getMessage();
-        $message_type = 'error';
-        error_log("User deletion error (MongoDB): " . $e->getMessage()); // Log the error for debugging
+        $_SESSION['flash_message'] = "An unexpected error occurred during deletion: " . $e->getMessage();
+        $_SESSION['flash_message_type'] = 'error';
+        error_log("User deletion error: " . $e->getMessage());
     }
     
-    // Redirect to prevent re-submission on refresh and display message
-    header('Location: manage_users.php?message=' . urlencode($message) . '&type=' . urlencode($message_type));
+    // Redirect to the same page to prevent form re-submission and display flash message
+    header('Location: manage_users.php');
     exit;
 }
 
-// Re-fetch message if it came from a redirect after an action (like delete)
-if (isset($_GET['message']) && isset($_GET['type'])) {
-    $message = htmlspecialchars($_GET['message']);
-    $message_type = htmlspecialchars($_GET['type']);
+// --- Fetch Flash Message from Session (if it exists) ---
+if (isset($_SESSION['flash_message'])) {
+    $message = $_SESSION['flash_message'];
+    $message_type = $_SESSION['flash_message_type'];
+    // Clear the session variables so the message doesn't persist on refresh
+    unset($_SESSION['flash_message']);
+    unset($_SESSION['flash_message_type']);
 }
 
 
 // --- Fetch Users (for display) ---
 $users = [];
 try {
-    // Find all users
+    // Find all users and sort by creation date descending
     $allUsers = $usersCollection->find([], ['sort' => ['created_at' => -1]]);
 
     foreach ($allUsers as $userDoc) {
@@ -119,14 +130,17 @@ try {
         $user['savings_account_number'] = $savingsAccount ? $savingsAccount['account_number'] : null;
 
         // Determine common bank details from either account, preferring checking if both exist
-        $primaryAccount = $checkingAccount ?: $savingsAccount; // Use checking if exists, else savings
+        $primaryAccount = $checkingAccount ?: $savingsAccount;
         $user['common_currency'] = $primaryAccount['currency'] ?? 'N/A';
         $user['common_sort_code'] = $primaryAccount['sort_code'] ?? 'N/A';
         $user['common_iban'] = $primaryAccount['iban'] ?? 'N/A';
         $user['common_swift_bic'] = $primaryAccount['swift_bic'] ?? 'N/A';
         
-        // Ensure _id is converted to string for HTML links if it's not already
-        $user['id'] = (string) $user['_id']; 
+        // Ensure _id is converted to string for HTML links
+        $user['id'] = (string) $user['_id'];
+
+        // Format creation date for display
+        $user['created_at_formatted'] = isset($user['created_at']) ? $user['created_at']->toDateTime()->format('M j, Y') : 'N/A';
 
         $users[] = $user;
     }
@@ -364,7 +378,7 @@ try {
                                     <td><?php echo htmlspecialchars($user['email'] ?? 'N/A'); ?></td>
                                     <td><?php echo htmlspecialchars($user['phone_number'] ?? 'N/A'); ?></td>
                                     <td><?php echo htmlspecialchars($user['membership_number'] ?? 'N/A'); ?></td>
-                                    <td><span class="status-<?php echo strtolower(htmlspecialchars($user['account_status'] ?? 'N/A')); ?>"><?php echo htmlspecialchars(ucfirst($user['account_status'] ?? 'N/A')); ?></span></td> 
+                                    <td><span class="status-<?php echo strtolower(htmlspecialchars($user['account_status'] ?? 'N/A')); ?>"><?php echo htmlspecialchars(ucfirst($user['account_status'] ?? 'N/A')); ?></span></td>
                                     <td>
                                         <strong>Currency:</strong> <?php echo htmlspecialchars($user['common_currency'] ?? 'N/A'); ?><br>
                                         <?php if (($user['common_sort_code'] ?? 'N/A') !== 'N/A'): ?>
@@ -388,7 +402,7 @@ try {
                                     </td>
                                     <td>
                                         <a href="edit_user.php?id=<?php echo $user['id']; ?>" class="button-small button-edit">Edit</a>
-                                        <a href="account_status_management.php?user_id=<?php echo $user['id']; ?>" class="button-small button-status">Manage Status</a> 
+                                        <a href="account_status_management.php?user_id=<?php echo $user['id']; ?>" class="button-small button-status">Manage Status</a>
                                         <a href="manage_users.php?action=delete&id=<?php echo $user['id']; ?>" class="button-small button-delete" onclick="return confirm('Are you sure you want to delete this user AND ALL their associated data (accounts, transactions, cards, etc.)? This action cannot be undone.');">Delete</a>
                                     </td>
                                 </tr>

@@ -1,5 +1,11 @@
 <?php
-session_start();
+// PHP error reporting - MUST be at the very top
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// session_start(); // REMOVED - This should be called by the file that includes this one.
+
 require_once '../Config.php'; // Path to Config.php from heritagebank/users/
 
 // Use MongoDB PHP Library
@@ -36,7 +42,7 @@ try {
 $mongoClient = null; // Initialize to null
 try {
     // Assuming MONGO_URI and MONGO_DB are defined in Config.php
-    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);   
+    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);
     $database = $client->selectDatabase(MONGODB_DB_NAME);
     $accountsCollection = $database->selectCollection('accounts');
 

@@ -72,6 +72,11 @@ if (isset($_SESSION['temp_user_id'])) {
     unset($_SESSION['temp_user_id']);
 }
 
+// Check for the transaction alert session variable
+$transaction_alert = $_SESSION['transaction_alert'] ?? null;
+// IMPORTANT: Clear the session variable immediately after fetching it
+unset($_SESSION['transaction_alert']);
+
 
 $user_id = $_SESSION['user_id'];
 // Fetch first_name, last_name, email from session (set during login)
@@ -542,6 +547,106 @@ try {
             <i class="fas fa-sign-out-alt"></i> Logout
         </button>
     </div>
-<script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/user.dashboard.js"></script>
+
+    <?php if ($transaction_alert && (string)$transaction_alert['user_id'] === (string)$_SESSION['user_id']): ?>
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <dialog id="transactionModal" class="transaction-modal status-<?php echo htmlspecialchars(str_replace(' ', '-', strtolower($transaction_alert['status']))); ?>">
+        <h3 id="modalTitle">Transaction Status Update</h3>
+        <p>Hello <?php echo htmlspecialchars($_SESSION['first_name']); ?>,</p>
+        <p>Your transaction with reference number <strong><?php echo htmlspecialchars($transaction_alert['ref_no']); ?></strong> has been updated.</p>
+        <p><strong>New Status:</strong> <span id="modalStatus"><?php echo htmlspecialchars(ucfirst($transaction_alert['status'])); ?></span></p>
+        <p><strong>Recipient:</strong> <?php echo htmlspecialchars($transaction_alert['recipient_name']); ?></p>
+        <p><strong>Amount:</strong> <?php echo htmlspecialchars($transaction_alert['currency'] . ' ' . number_format($transaction_alert['amount'], 2)); ?></p>
+        <p><strong>Bank Comment:</strong> <span id="modalMessage"><?php echo htmlspecialchars($transaction_alert['message'] ?: 'N/A'); ?></span></p>
+        <button id="closeModalButton" class="modal-close-button">Close</button>
+    </dialog>
+    <style>
+        .transaction-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 500px;
+            width: 90%;
+            border-top: 5px solid; /* Dynamic border color */
+            display: none; /* Initially hidden, dialog element handles display */
+        }
+        
+        .transaction-modal h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .transaction-modal p {
+            line-height: 1.6;
+            color: #555;
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        /* Status-based colors for the modal border */
+        .status-completed { border-top-color: #28a745; }
+        .status-declined { border-top-color: #dc3545; }
+        .status-on-hold, .status-restricted { border-top-color: #ffc107; }
+
+        .modal-close-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+
+        .modal-close-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('transactionModal');
+            const backdrop = document.getElementById('modalBackdrop');
+            const closeButton = document.getElementById('closeModalButton');
+
+            if (modal && backdrop) {
+                // The <dialog> element has a showModal() method that handles centering and the backdrop automatically.
+                // However, we are also using a custom backdrop for a consistent look.
+                // We'll show both together.
+                modal.showModal();
+                backdrop.style.display = 'block';
+
+                function closeModal() {
+                    modal.close();
+                    backdrop.style.display = 'none';
+                }
+
+                closeButton.addEventListener('click', closeModal);
+
+                // Close the modal if the user clicks the backdrop
+                backdrop.addEventListener('click', closeModal);
+            }
+        });
+    </script>
+    <?php endif; ?>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/user.dashboard.js"></script>
 </body>
 </html>

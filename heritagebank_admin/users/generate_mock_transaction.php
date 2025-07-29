@@ -1,5 +1,4 @@
 <?php
-session_start();
 require_once '../../Config.php'; // Assuming Config.php contains MongoDB connection details
 require_once '../../functions.php'; // This is good to have for future database operations
 

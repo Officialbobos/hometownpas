@@ -1,18 +1,20 @@
 <?php
-session_start();
-// Ensure Composer autoload is included
-require_once __DIR__ . '/../../vendor/autoload.php'; // Corrected path assuming vendor is in project root
-require_once __DIR__ . '/../../Config.php'; // Correctly include Config.php
-require_once '../../functions.php'; // This is good to have for future database operations
+// C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\users\create_user.php
 
-// Use the MongoDB Client class
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// Load Composer's autoloader for MongoDB classes and Dotenv
+require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../Config.php';
+require_once __DIR__ . '/../../functions.php';
+
 use MongoDB\Client;
-use MongoDB\Exception\Exception as MongoDBException; // Catch general MongoDB exceptions
-use MongoDB\Driver\Exception\BulkWriteException; // Specific exception for write errors (e.g., duplicate key)
-
-// AWS SDK for PHP
-use Aws\S3\S3Client; // You use the S3Client class from the AWS SDK
-use Aws\S3\Exception\S3Exception; // And the S3Exception for error handling
+use MongoDB\Exception\Exception as MongoDBException;
+use MongoDB\Driver\Exception\BulkWriteException;
+use Aws\S3\S3Client;
+use Aws\S3\Exception\S3Exception;
 
 // Check if admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -23,17 +25,7 @@ if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) |
 $message = '';
 $message_type = ''; // 'success' or 'error'
 
-// --- REMOVED LOCAL UPLOAD_DIR DEFINITION AND MKDIR ATTEMPT ---
-// define('UPLOAD_DIR', '/app/uploads/profile_images/');
-// if (!is_dir(UPLOAD_DIR)) {
-//     if (!mkdir(UPLOAD_DIR, 0777, true)) {
-//         error_log('PHP Error: Failed to create upload directory: ' . UPLOAD_DIR . '. Please check underlying permissions or path.');
-//         $message = 'Server configuration error: Could not create upload directory. Contact administrator.';
-//         $message_type = 'error';
-//     }
-// }
-
-// --- Define HomeTown Bank's Fixed Identifiers (Fictional) ---
+// Define HomeTown Bank's Fixed Identifiers (Fictional)
 define('HOMETOWN_BANK_UK_BIC', 'HOMTGB2LXXX');
 define('HOMETOWN_BANK_UK_SORT_CODE_PREFIX', '90');
 define('HOMETOWN_BANK_EUR_BIC', 'HOMTDEFFXXX');
@@ -60,7 +52,6 @@ function generateUniqueNumericId($collection, $field, $length) {
                 $id_candidate .= mt_rand(0, 9);
             }
         }
-
         // Check uniqueness in MongoDB
         try {
             $existing_document = $collection->findOne([$field => $id_candidate], ['projection' => ['_id' => 1]]);
@@ -69,10 +60,9 @@ function generateUniqueNumericId($collection, $field, $length) {
             }
         } catch (MongoDBException $e) {
             error_log("MongoDB Error during unique ID check ($collection->getCollectionName().$field): " . $e->getMessage());
-            return false; // Indicate an F:\xampp\htdocs\phpfile-main\admin\users\create_user.php
+            return false; // Indicate an error
         }
     }
-
     error_log("Failed to generate a unique Numeric ID for $collection->getCollectionName().$field after $max_attempts attempts.");
     return false; // Could not generate a unique ID
 }
@@ -88,7 +78,6 @@ function generateUniqueUkSortCode($accountsCollection): string|false {
     for ($i = 0; $i < $max_attempts; $i++) {
         $last_four = str_pad(mt_rand(0, 9999), 4, '0', STR_PAD_LEFT);
         $sort_code_candidate = HOMETOWN_BANK_UK_SORT_CODE_PREFIX . $last_four;
-
         try {
             $existing_account = $accountsCollection->findOne(['sort_code' => $sort_code_candidate], ['projection' => ['_id' => 1]]);
             if (!$existing_account) {
@@ -109,65 +98,41 @@ function generateUniqueUkSortCode($accountsCollection): string|false {
  * This function is a placeholder and should NOT be used for real banking systems.
  */
 function calculateIbanCheckDigits(string $countryCode, string $bban): string {
-    // This is a simplified placeholder checksum calculation.
-    // Real IBAN calculation uses MOD 97-10 on a string representation
-    // where letters are mapped to numbers (A=10, B=11, etc.).
-    // For demonstration, this aims to return 2 digits.
-
-    $iban_string_for_calc = $bban . strtoupper($countryCode) . '00'; // Append country code + '00' for calculation
+    $iban_string_for_calc = $bban . strtoupper($countryCode) . '00';
     $numeric_string = '';
     for ($i = 0; $i < strlen($iban_string_for_calc); $i++) {
         $char = $iban_string_for_calc[$i];
         if (ctype_alpha($char)) {
-            $numeric_string .= (string)(ord($char) - 55); // A=10, B=11, ..., Z=35
+            $numeric_string .= (string)(ord($char) - 55);
         } else {
             $numeric_string .= $char;
         }
     }
-
-    // Use bcmod for large numbers
     $checksum_val = bcmod($numeric_string, '97');
     $check_digits = 98 - (int)$checksum_val;
-
     return str_pad($check_digits, 2, '0', STR_PAD_LEFT);
 }
 
 /**
  * Generates a unique UK IBAN.
- * Format: GBkk BBBB SSSSSS AAAAAAAA
- * GB (Country Code), kk (Check Digits), BBBB (Bank Code from BIC), SSSSSS (Sort Code), AAAAAAAA (Account Number, typically 8 digits)
- * The total length will be 22 characters (GB + 2 + 4 + 6 + 8).
- *
- * @param MongoDB\Collection $accountsCollection The MongoDB accounts collection.
- * @param string $sortCode The 6-digit sort code for this account.
- * @param string $internalAccountNumber8Digits The 8-digit internal account number part for IBAN.
- * @return string|false The unique UK IBAN, or false on error.
  */
 function generateUniqueUkIban($accountsCollection, string $sortCode, string $internalAccountNumber8Digits): string|false {
     $countryCode = 'GB';
-    $bankCode = substr(HOMETOWN_BANK_UK_BIC, 0, 4); // First 4 chars of BIC as Bank Code
-
+    $bankCode = substr(HOMETOWN_BANK_UK_BIC, 0, 4);
     $max_attempts = 100;
     for ($attempt = 0; $attempt < $max_attempts; $attempt++) {
-        // BBAN for checksum calculation: Bank Code (4) + Sort Code (6) + Account Number (8)
         $bban_for_checksum = $bankCode . $sortCode . $internalAccountNumber8Digits;
-
         $checkDigits = calculateIbanCheckDigits($countryCode, $bban_for_checksum);
-
         $iban_candidate = $countryCode . $checkDigits . $bankCode . $sortCode . $internalAccountNumber8Digits;
-
-        // Check for uniqueness in the database
         try {
             $existing_account = $accountsCollection->findOne(['iban' => $iban_candidate], ['projection' => ['_id' => 1]]);
             if (!$existing_account) {
-                return $iban_candidate; // Found a unique IBAN
+                return $iban_candidate;
             }
         } catch (MongoDBException $e) {
             error_log("MongoDB Error during IBAN uniqueness check: " . $e->getMessage());
             return false;
         }
-
-        // If IBAN exists, regenerate the 8-digit account number part and try again
         $internalAccountNumber8Digits = str_pad(mt_rand(0, 99999999), 8, '0', STR_PAD_LEFT);
     }
     error_log("Failed to generate a unique UK IBAN after $max_attempts attempts.");
@@ -176,38 +141,24 @@ function generateUniqueUkIban($accountsCollection, string $sortCode, string $int
 
 /**
  * Generates a unique German-style EURO IBAN.
- * Format: DEkk BBBBBBBB AAAAAAAAAA
- * DE (Country Code), kk (Check Digits), BBBBBBBB (German Bankleitzahl - 8 digits), AAAAAAAAAA (German Account Number - 10 digits)
- * The total length will be 22 characters (DE + 2 + 8 + 10).
- *
- * @param MongoDB\Collection $accountsCollection The MongoDB accounts collection.
- * @param string $internalAccountNumber10Digits The 10-digit internal account number part for IBAN.
- * @return string|false The unique EURO IBAN, or false on error.
  */
 function generateUniqueEurIban($accountsCollection, string $internalAccountNumber10Digits): string|false {
-    $countryCode = 'DE'; // Example: German IBAN structure
-    $bankleitzahl = HOMETOWN_BANK_EUR_BANK_CODE_BBAN; // Fictional German Bankleitzahl (8 digits)
-
+    $countryCode = 'DE';
+    $bankleitzahl = HOMETOWN_BANK_EUR_BANK_CODE_BBAN;
     $max_attempts = 100;
     for ($attempt = 0; $attempt < $max_attempts; $attempt++) {
-        // BBAN for checksum calculation: BLZ (8) + Account Number (10)
         $bban_for_checksum = $bankleitzahl . $internalAccountNumber10Digits;
-
         $checkDigits = calculateIbanCheckDigits($countryCode, $bban_for_checksum);
-
         $iban_candidate = $countryCode . $checkDigits . $bankleitzahl . $internalAccountNumber10Digits;
-
-        // Check for uniqueness in the database
         try {
             $existing_account = $accountsCollection->findOne(['iban' => $iban_candidate], ['projection' => ['_id' => 1]]);
             if (!$existing_account) {
-                return $iban_candidate; // Found a unique IBAN
+                return $iban_candidate;
             }
         } catch (MongoDBException $e) {
             error_log("MongoDB Error during EUR IBAN uniqueness check: " . $e->getMessage());
             return false;
         }
-        // If IBAN exists, regenerate the 10-digit account number part and try again
         $internalAccountNumber10Digits = str_pad(mt_rand(0, 9999999999), 10, '0', STR_PAD_LEFT);
     }
     error_log("Failed to generate a unique EUR IBAN after $max_attempts attempts.");
@@ -216,51 +167,29 @@ function generateUniqueEurIban($accountsCollection, string $internalAccountNumbe
 
 /**
  * Generates a unique US-style "IBAN" (simulating a BBAN with routing number).
- * This function will create a string in the 'iban' column that reflects this.
- * Format: USkk RRRRRRRRR AAAAAAAAAAAA (US + Check Digits + Routing Number + Account Number)
- *
- * @param MongoDB\Collection $accountsCollection The MongoDB accounts collection.
- * @param string $internalAccountNumberForUSD The internal account number, will be padded/truncated as needed.
- * @return array|false The unique US "IBAN" (BBAN) and its routing number, or false on error.
  */
 function generateUniqueUsdIban($accountsCollection, string $internalAccountNumberForUSD): array|false {
     $countryCode = 'US';
-
-    // The routing number needs to be generated and unique for each account (or at least for the first of a user).
-    // This is now checked against the 'accounts' collection's 'routing_number' field.
     $generatedRoutingNumber = generateUniqueNumericId($accountsCollection, 'routing_number', 9);
     if ($generatedRoutingNumber === false) {
         error_log("Failed to generate a unique US Routing Number for IBAN.");
         return false;
     }
-
-    // US account numbers can be variable length. Let's aim for a 10-digit number for the IBAN part
-    // and ensure the internalAccountNumberForUSD is at least 10 digits for this
     $accountNumberPart = str_pad(substr($internalAccountNumberForUSD, -10), 10, '0', STR_PAD_LEFT);
-
     $max_attempts = 100;
     for ($attempt = 0; $attempt < $max_attempts; $attempt++) {
-        // BBAN for checksum calculation: Routing Number (9) + Account Number (10)
         $bban_for_checksum = $generatedRoutingNumber . $accountNumberPart;
-
-        // Use the simplified IBAN check digits, although real US 'IBANs' are not standard
         $checkDigits = calculateIbanCheckDigits($countryCode, $bban_for_checksum);
-
         $iban_candidate = $countryCode . $checkDigits . $generatedRoutingNumber . $accountNumberPart;
-
-        // Check for uniqueness in the database
         try {
             $existing_account = $accountsCollection->findOne(['iban' => $iban_candidate], ['projection' => ['_id' => 1]]);
             if (!$existing_account) {
-                // Return both the generated IBAN and the routing number so it can be stored separately
                 return ['iban' => $iban_candidate, 'routing_number' => $generatedRoutingNumber];
             }
         } catch (MongoDBException $e) {
             error_log("MongoDB Error during USD 'IBAN' uniqueness check: " . $e->getMessage());
             return false;
         }
-
-        // If "IBAN" exists, regenerate the 10-digit account number part and try again
         $accountNumberPart = str_pad(mt_rand(0, 9999999999), 10, '0', STR_PAD_LEFT);
     }
     error_log("Failed to generate a unique US 'IBAN' after $max_attempts attempts.");
@@ -270,41 +199,37 @@ function generateUniqueUsdIban($accountsCollection, string $internalAccountNumbe
 // --- NEW HELPER FUNCTION FOR GENERATING PRESIGNED B2 URLS ---
 function getPresignedB2Url(string $objectKey, S3Client $b2Client, string $b2BucketName): string {
     if (empty($objectKey)) {
-        return ''; // Return empty string if no object key
+        return '';
     }
     try {
         $command = $b2Client->getCommand('GetObject', [
             'Bucket' => $b2BucketName,
-            'Key'    => $objectKey
+            'Key' => $objectKey
         ]);
-        // Generate a URL that expires in 1 hour (3600 seconds)
         $request = $b2Client->createPresignedRequest($command, '+1 hour');
         return (string) $request->getUri();
     } catch (S3Exception $e) {
         error_log("Error generating pre-signed URL for {$objectKey}: " . $e->getMessage());
-        return ''; // Or return a placeholder image URL, e.g., '/images/placeholder.png'
+        return '';
     }
 }
-
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Collect and sanitize user data
     $first_name = trim($_POST['first_name'] ?? '');
     $last_name = trim($_POST['last_name'] ?? '');
     $email = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? ''; // Don't trim password
+    $password = $_POST['password'] ?? '';
     $home_address = trim($_POST['home_address'] ?? '');
     $phone_number = trim($_POST['phone_number'] ?? '');
     $nationality = trim($_POST['nationality'] ?? '');
     $date_of_birth = trim($_POST['date_of_birth'] ?? '');
     $gender = trim($_POST['gender'] ?? '');
     $occupation = trim($_POST['occupation'] ?? '');
-
     $initial_balance = floatval($_POST['initial_balance'] ?? 0);
     $currency = trim($_POST['currency'] ?? 'GBP');
     $fund_account_type = trim($_POST['fund_account_type'] ?? '');
 
-    // Admin determined creation timestamp
     $admin_created_at_raw = trim($_POST['admin_created_at'] ?? '');
     $admin_created_at_dt = null;
     if (!empty($admin_created_at_raw)) {
@@ -318,14 +243,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $admin_created_at_dt = new DateTime();
     }
-    // Store as MongoDB Date object (or ISO 8601 string)
-    $admin_created_at = $admin_created_at_dt; // Keep as DateTime object for MongoDB
+    $admin_created_at = $admin_created_at_dt;
 
-    // --- NEW: Variable to store B2 object key, not a local path ---
     $profile_image_b2_key = null;
-    $b2Client = null; // Declare B2 client early for use in rollback
+    $b2Client = null;
 
-    // Initial validation
+    // Initial form validation
     if (empty($first_name) || empty($last_name) || empty($email) || empty($password) || empty($home_address) || empty($phone_number) || empty($nationality) || empty($date_of_birth) || empty($gender) || empty($occupation) || empty($admin_created_at)) {
         $message = 'All required fields (marked with *) must be filled.';
         $message_type = 'error';
@@ -350,7 +273,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($initial_balance > 0 && empty($fund_account_type)) {
         $message = 'If an initial balance is provided, you must select an account type to fund.';
         $message_type = 'error';
-    } else {
+    }
+
+    // Only proceed with database operations if no validation errors
+    if ($message_type !== 'error') {
         // --- START B2 PROFILE IMAGE UPLOAD LOGIC ---
         if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK) {
             $file_tmp_path = $_FILES['profile_image']['tmp_name'];
@@ -370,37 +296,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message_type = 'error';
             } else {
                 try {
-                    // Initialize S3Client for Backblaze B2 using environment variables
                     $b2Client = new S3Client([
-                        'version'     => 'latest',
-                        'region'      => getenv('B2_REGION'),
-                        'endpoint'    => getenv('B2_S3_ENDPOINT'),
+                        'version' => 'latest',
+                        'region' => getenv('B2_REGION'),
+                        'endpoint' => getenv('B2_S3_ENDPOINT'),
                         'credentials' => [
-                            'key'    => getenv('B2_ACCOUNT_ID'),
+                            'key' => getenv('B2_ACCOUNT_ID'),
                             'secret' => getenv('B2_APPLICATION_KEY'),
                         ],
-                        'use_path_style_endpoint' => true, // Often necessary for S3-compatible services
+                        'use_path_style_endpoint' => true,
                     ]);
 
-                    // Define the object key (path/filename) in the B2 bucket
                     $new_file_name = uniqid('profile_', true) . '.' . $file_ext;
-                    // Store in a 'profile_images' virtual folder within your bucket
                     $profile_image_b2_key = 'profile_images/' . $new_file_name;
 
                     $result = $b2Client->putObject([
-                        'Bucket'     => getenv('B2_BUCKET_NAME'),
-                        'Key'        => $profile_image_b2_key,
-                        'SourceFile' => $file_tmp_path, // Path to the temporary uploaded file
-                        'ContentType' => $file_type, // Set content type for proper browser display
+                        'Bucket' => getenv('B2_BUCKET_NAME'),
+                        'Key' => $profile_image_b2_key,
+                        'SourceFile' => $file_tmp_path,
+                        'ContentType' => $file_type,
                     ]);
-
-                    // At this point, the file is uploaded to B2. We store its key in MongoDB.
-                    // The actual public URL will be generated using a pre-signed URL later when displaying.
-
                 } catch (S3Exception $e) {
                     $message = "Failed to upload profile image to cloud storage: " . $e->getMessage();
                     $message_type = 'error';
-                    error_log("B2 Upload Error: " . $e->getMessage()); // Log detailed error
+                    error_log("B2 Upload Error: " . $e->getMessage());
                 } catch (Exception $e) {
                     $message = "An unexpected error occurred during image upload: " . $e->getMessage();
                     $message_type = 'error';
@@ -409,40 +328,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         // --- END B2 PROFILE IMAGE UPLOAD LOGIC ---
-
-        if ($message_type == 'error') {
-            goto end_of_post_processing; // Jump to end if image upload failed
-        }
-
-        // --- MongoDB Operations ---
-        $mongoClient = null; // Declare outside try for finally block scope
+    }
+    
+    // Only proceed with MongoDB if no errors so far
+    if ($message_type !== 'error') {
+        $mongoClient = null;
         $session = null;
-        $transaction_success = true; // Assume success until an error occurs
-        $new_user_id = null; // To hold the user ID for potential B2 rollback
-
+        $transaction_success = false; // Changed to false by default
+        $new_user_id = null;
+        
         try {
-            // Establish MongoDB connection
             $mongoClient = new Client(MONGODB_CONNECTION_URI);
             $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME);
 
-            // Get collections
             $usersCollection = $mongoDb->users;
             $accountsCollection = $mongoDb->accounts;
 
-            // Start a session and a transaction for atomicity
             $session = $mongoClient->startSession();
             $session->startTransaction();
 
-            // Hash the password
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-            // Generate unique Membership Number (12 digits, numeric only)
             $membership_number = generateUniqueNumericId($usersCollection, 'membership_number', 12);
             if ($membership_number === false) {
                 throw new Exception("Failed to generate unique Membership Number.");
             }
 
-            // Determine and ensure unique username
             $username_for_db = strtolower($first_name . '.' . $last_name);
             if (empty($username_for_db) || strlen($username_for_db) > 50) {
                 $username_for_db = strtolower(explode('@', $email)[0]);
@@ -460,7 +371,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            // Prepare user document for insertion
             $user_document = [
                 'username' => $username_for_db,
                 'first_name' => $first_name,
@@ -470,34 +380,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'home_address' => $home_address,
                 'phone_number' => $phone_number,
                 'nationality' => $nationality,
-                'date_of_birth' => new MongoDB\BSON\UTCDateTime(strtotime($date_of_birth) * 1000), // Store DOB as BSON Date
+                'date_of_birth' => new MongoDB\BSON\UTCDateTime(strtotime($date_of_birth) * 1000),
                 'gender' => $gender,
                 'occupation' => $occupation,
                 'membership_number' => $membership_number,
-                // --- Store the B2 object key instead of local path ---
                 'profile_image_key' => $profile_image_b2_key,
-                'created_at' => new MongoDB\BSON\UTCDateTime($admin_created_at->getTimestamp() * 1000), // Store as BSON Date
-                'status' => 'active', // Default status for new users
+                'created_at' => new MongoDB\BSON\UTCDateTime($admin_created_at->getTimestamp() * 1000),
+                'status' => 'active',
                 'last_login' => null,
                 'email_verified' => false,
                 'kyc_status' => 'pending',
                 'two_factor_enabled' => true
             ];
 
-            // Insert user document
             $insert_user_result = $usersCollection->insertOne($user_document, ['session' => $session]);
-            $new_user_id = $insert_user_result->getInsertedId(); // Get the MongoDB ObjectId
+            $new_user_id = $insert_user_result->getInsertedId();
 
             if (!$new_user_id) {
                 throw new Exception("Failed to insert user document.");
             }
 
             $accounts_created_messages = [];
-
-            // Determine common sort_code, swift_bic, and routing_number based on currency once
             $common_sort_code = NULL;
             $common_swift_bic = NULL;
-            $common_routing_number = NULL; // For USD
+            $common_routing_number = NULL;
 
             if ($currency === 'GBP') {
                 $common_sort_code = generateUniqueUkSortCode($accountsCollection);
@@ -549,7 +455,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $checking_initial_balance = ($initial_balance > 0 && $fund_account_type === 'Checking') ? $initial_balance : 0;
 
             $account_document_checking = [
-                'user_id' => $new_user_id, // Reference to the user's ObjectId
+                'user_id' => $new_user_id,
                 'account_number' => $checking_account_number,
                 'account_type' => $checking_account_type,
                 'balance' => $checking_initial_balance,
@@ -558,12 +464,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'routing_number' => $checking_routing_number,
                 'iban' => $checking_iban,
                 'swift_bic' => $common_swift_bic,
-                'created_at' => new MongoDB\BSON\UTCDateTime($admin_created_at->getTimestamp() * 1000), // Store as BSON Date
+                'created_at' => new MongoDB\BSON\UTCDateTime($admin_created_at->getTimestamp() * 1000),
                 'status' => 'active'
             ];
             $accountsCollection->insertOne($account_document_checking, ['session' => $session]);
             $accounts_created_messages[] = "Checking Account: **" . $checking_account_number . "** (Balance: " . number_format($checking_initial_balance, 2) . " " . $currency . ")<br>IBAN/BBAN: **" . $checking_iban . "**";
-
 
             // 2. Create Savings Account
             $savings_account_number = generateUniqueNumericId($accountsCollection, 'account_number', 12);
@@ -583,7 +488,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $eur_iban_part_account_number = str_pad(substr($savings_account_number, -10), 10, '0', STR_PAD_LEFT);
                 $savings_iban = generateUniqueEurIban($accountsCollection, $eur_iban_part_account_number);
             } elseif ($currency === 'USD') {
-                // Reuse the common_routing_number generated for Checking for Savings.
                 $usd_iban_details_savings = generateUniqueUsdIban($accountsCollection, $savings_account_number);
                 if ($usd_iban_details_savings !== false) {
                     $savings_iban = $usd_iban_details_savings['iban'];
@@ -601,7 +505,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $savings_initial_balance = ($initial_balance > 0 && $fund_account_type === 'Savings') ? $initial_balance : 0;
 
             $account_document_savings = [
-                'user_id' => $new_user_id, // Reference to the user's ObjectId
+                'user_id' => $new_user_id,
                 'account_number' => $savings_account_number,
                 'account_type' => $savings_account_type,
                 'balance' => $savings_initial_balance,
@@ -616,49 +520,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $accountsCollection->insertOne($account_document_savings, ['session' => $session]);
             $accounts_created_messages[] = "Savings Account: **" . $savings_account_number . "** (Balance: " . number_format($savings_initial_balance, 2) . " " . $currency . ")<br>IBAN/BBAN: **" . $savings_iban . "**";
 
-            // Add common bank details to success message
             if ($common_sort_code) $accounts_created_messages[] = "User's Common Sort Code: **" . $common_sort_code . "**";
             if ($common_routing_number) $accounts_created_messages[] = "User's Common Routing Number: **" . $common_routing_number . "**";
             if ($common_swift_bic) $accounts_created_messages[] = "User's Common SWIFT/BIC: **" . $common_swift_bic . "**";
 
-            // If all operations were successful, commit the transaction
             $session->commitTransaction();
+            $transaction_success = true;
             $message = "User '{$first_name} {$last_name}' created successfully! <br>Membership Number: **{$membership_number}**<br>Initial Account Details:<br>" . implode("<br>", $accounts_created_messages);
             $message_type = 'success';
-            $_POST = array(); // Clear form fields on success
-
+            $_POST = [];
         } catch (BulkWriteException $e) {
             $error_code = $e->getCode();
-            if ($error_code === 11000) {
-                $message = "Error creating user/account: A unique value (like email, membership number, or account number) already exists. Please check and try again.";
-            } else {
-                $message = "Database write error: " . $e->getMessage();
-            }
+            $message = ($error_code === 11000) ? "Error creating user/account: A unique value already exists." : "Database write error: " . $e->getMessage();
             $message_type = 'error';
-            $transaction_success = false;
             error_log("MongoDB BulkWriteException: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
         } catch (MongoDBException $e) {
             $message = "MongoDB Error: " . $e->getMessage();
             $message_type = 'error';
-            $transaction_success = false;
             error_log("MongoDB General Error: " . $e->getMessage());
         } catch (Exception $e) {
             $message = "An unexpected error occurred: " . $e->getMessage();
             $message_type = 'error';
-            $transaction_success = false;
             error_log("General Exception: " . $e->getMessage());
         } finally {
-            // Always end the session, whether committed, aborted, or an error occurred before transaction start
             if (isset($session)) {
                 $session->endSession();
             }
-
-            // --- NEW: Rollback B2 upload if MongoDB transaction failed ---
-            if (!$transaction_success && $profile_image_b2_key && $b2Client) {
+            if (!$transaction_success && $profile_image_b2_key && isset($b2Client)) {
                 try {
                     $b2Client->deleteObject([
                         'Bucket' => getenv('B2_BUCKET_NAME'),
-                        'Key'    => $profile_image_b2_key,
+                        'Key' => $profile_image_b2_key,
                     ]);
                     error_log("Uploaded B2 object deleted due to transaction rollback: " . $profile_image_b2_key);
                 } catch (S3Exception $deleteE) {
@@ -669,7 +561,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
-    end_of_post_processing:; // Label for goto statement
 }
 ?>
 
@@ -679,16 +570,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeTown Bank - Create User</title>
-    <link rel="stylesheet" href="../style.css">
-    <link rel="stylesheet" href="create_user.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/users/create_user.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        .readonly-field { background-color: #e9e9e9; cursor: not-allowed; }
+        .required-asterisk { color: red; font-weight: bold; margin-left: 5px; }
+        .dashboard-container { display: flex; flex-direction: column; min-height: 100vh; background-color: #fff; margin: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); overflow: hidden; }
+        .dashboard-header .logo { max-height: 50px; width: auto; margin-right: 20px; }
+        .dashboard-header h2 { margin: 0; font-size: 1.8em; flex-grow: 1; }
+        .logout-button { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; }
+        .logout-button:hover { background-color: #c82333; }
+        .dashboard-content { padding: 30px; flex-grow: 1; }
+        .dashboard-content h3 { color: #007bff; font-size: 1.6em; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
+        .form-standard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .form-standard .full-width { grid-column: 1 / -1; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+        .form-group .button-primary { background-color: #28a745; color: white; padding: 12px 25px; border: none; border-radius: 6px; font-size: 1.1em; cursor: pointer; transition: background-color 0.3s ease; grid-column: 1 / -1; }
+        .form-group .button-primary:hover { background-color: #218838; }
+        .message.success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .message.error { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+    </style>
 </head>
 <body>
     <div class="dashboard-container">
         <header class="dashboard-header">
-            <img src="../../images/logo.png" alt="HomeTown Bank Pa Logo" class="logo">
+            <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/logo.png" alt="HomeTown Bank Pa Logo" class="logo">
             <h2>Create New User</h2>
-            <a href="../logout.php" class="logout-button">Logout</a>
+            <a href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/logout.php" class="logout-button">Logout</a>
         </header>
 
         <main class="dashboard-content">
@@ -696,7 +613,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <p class="message <?php echo $message_type; ?>"><?php echo $message; ?></p>
             <?php endif; ?>
 
-            <form action="create_user.php" method="POST" class="form-standard" enctype="multipart/form-data">
+            <form action="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/users/create_user.php" method="POST" class="form-standard" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="first_name">First Name <span class="required-asterisk">*</span></label>
                     <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($_POST['first_name'] ?? ''); ?>" required>
@@ -789,19 +706,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <button type="submit" class="button-primary">Create User</button>
             </form>
 
-            <p><a href="users_management.php" class="back-link">&larr; Back to User Management</a></p>
+            <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/users/users_management.php" class="back-link">&larr; Back to User Management</a></p>
         </main>
     </div>
     <style>
-        .readonly-field {
-            background-color: #e9e9e9;
-            cursor: not-allowed;
+        .readonly-field { background-color: #e9e9e9; cursor: not-allowed; }
+        .required-asterisk { color: red; font-weight: bold; margin-left: 5px; }
+        .dashboard-container { display: flex; flex-direction: column; min-height: 100vh; background-color: #fff; margin: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); overflow: hidden; }
+        .dashboard-header { background-color: #007bff; color: white; padding: 20px 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0056b3; }
+        .dashboard-header .logo { max-height: 50px; width: auto; margin-right: 20px; }
+        .dashboard-header h2 { margin: 0; font-size: 1.8em; flex-grow: 1; }
+        .logout-button { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; }
+        .logout-button:hover { background-color: #c82333; }
+        .dashboard-content { padding: 30px; flex-grow: 1; }
+        .dashboard-content h3 { color: #007bff; font-size: 1.6em; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
+        .form-standard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .form-standard .full-width { grid-column: 1 / -1; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1em;
         }
-        .required-asterisk {
-            color: red;
-            font-weight: bold;
-            margin-left: 5px;
-        }
+        .form-group .button-primary { background-color: #28a745; color: white; padding: 12px 25px; border: none; border-radius: 6px; font-size: 1.1em; cursor: pointer; transition: background-color 0.3s ease; grid-column: 1 / -1; }
+        .form-group .button-primary:hover { background-color: #218838; }
+        .message.success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .message.error { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
     </style>
 </body>
 </html>
