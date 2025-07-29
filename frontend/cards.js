@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const freezeActionButton = document.getElementById('freezeActionButton');
     const reportActionButton = document.getElementById('reportActionButton');
     const setPinActionButton = document.getElementById('setPinActionButton');
-
+    const activateActionButton = document.getElementById('activateActionButton'); // NEW: Activate button
 
     // --- Function to show custom message box ---
     function showMessageBox(message, type = 'info') {
@@ -26,15 +26,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         messageBoxContentParagraph.textContent = message;
         // Clear previous classes ensuring only one type class is active
-        messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'message-box-info'); // Corrected to use 'message-box-info'
+        messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'message-box-info');
 
-        // Apply type-specific classes for styling (matching your CSS classes for message-box-overlay)
+        // Apply type-specific classes for styling
         if (type === 'success') {
             messageBoxContentWrapper.classList.add('message-box-success');
         } else if (type === 'error') {
             messageBoxContentWrapper.classList.add('message-box-error');
         } else {
-            messageBoxContentWrapper.classList.add('message-box-info'); // Use 'message-box-info' for clarity
+            messageBoxContentWrapper.classList.add('message-box-info');
         }
 
         messageBoxOverlay.classList.add('show'); // Show the overlay
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check if PHP_BASE_URL and FRONTEND_BASE_URL are defined by PHP
     if (typeof PHP_BASE_URL === 'undefined' || typeof FRONTEND_BASE_URL === 'undefined') {
         console.error("Critical JavaScript variables (PHP_BASE_URL, FRONTEND_BASE_URL) are not defined. Check PHP include.");
-        showMessageBox("Application error: Path configuration missing. Please contact support.", 'error'); // Use 'error' type
+        showMessageBox("Application error: Path configuration missing. Please contact support.", 'error');
         return; // Stop execution if critical variables are missing
     }
 
@@ -52,14 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const noCardsMessage = document.getElementById('noCardsMessage');
     const orderCardForm = document.getElementById('orderCardForm');
     const accountIdSelect = document.getElementById('accountId');
-    const orderCardSubmitButton = orderCardForm ? orderCardForm.querySelector('button[type="submit"]') : null; // Get the submit button, safely
+    const orderCardSubmitButton = orderCardForm ? orderCardForm.querySelector('button[type="submit"]') : null;
 
     // Handle message box dismissal
     if (messageBoxButton) {
         messageBoxButton.addEventListener('click', () => {
-            messageBoxOverlay.classList.remove('show'); // Hide the overlay
-            messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'message-box-info'); // Clear classes
-            messageBoxContentParagraph.textContent = ''; // Clear the message text
+            messageBoxOverlay.classList.remove('show');
+            messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'message-box-info');
+            messageBoxContentParagraph.textContent = '';
         });
     }
 
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         accountIdSelect.innerHTML = '<option value="">-- Loading Accounts --</option>';
         try {
-            const response = await fetch(`${PHP_BASE_URL}api/get_user_accounts.php`); // PHP_BASE_URL should already have the trailing slash
+            const response = await fetch(`${PHP_BASE_URL}api/get_user_accounts.php`);
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -93,12 +93,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     accountIdSelect.appendChild(option);
                 });
             } else {
-                accountIdSelect.innerHTML = '<option value="" disabled>No Accounts Found</option>'; // Use disabled
+                accountIdSelect.innerHTML = '<option value="" disabled>No Accounts Found</option>';
                 console.warn("No accounts found for the user or error fetching accounts:", data.message || "Unknown error");
-                showMessageBox(data.message || "No bank accounts found for your profile. Please add an account before ordering a card.", 'info'); // Use 'info' or 'warning' type
+                showMessageBox(data.message || "No bank accounts found for your profile. Please add an account before ordering a card.", 'info');
             }
         } catch (error) {
-            accountIdSelect.innerHTML = '<option value="" disabled>Error Loading Accounts</option>'; // Use disabled
+            accountIdSelect.innerHTML = '<option value="" disabled>Error Loading Accounts</option>';
             console.error("Error fetching user accounts:", error);
             if (error.message.includes("Failed to fetch")) {
                 showMessageBox("Failed to load accounts: Could not connect to the server. Please check your network or server status.", 'error');
@@ -112,55 +112,84 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-   // Function to render a single card HTML
-function renderCard(card) {
-    let bankBrandingHtml = '';
-    if (card.bank_logo_src && card.bank_logo_src !== '') {
-        bankBrandingHtml = `<img src="${card.bank_logo_src}" alt="${card.bank_name || 'Bank'} Logo" class="bank-logo-on-card" onerror="this.src='${PHP_BASE_URL}images/default_logo.png'; this.alt='Default Bank Logo';">`;
-    } else if (card.bank_name) {
-        bankBrandingHtml = `<h4>${card.bank_name}</h4>`;
+    // Function to render a single card HTML
+    function renderCard(card) {
+        let bankBrandingHtml = '';
+        if (card.bank_logo_src && card.bank_logo_src !== '') {
+            bankBrandingHtml = `<img src="${card.bank_logo_src}" alt="${card.bank_name || 'Bank'} Logo" class="bank-logo-on-card">`;
+        } else if (card.bank_name) {
+            bankBrandingHtml = `<h4>${card.bank_name}</h4>`;
+        } else {
+            bankBrandingHtml = `<h4>Hometown Bank</h4>`;
+        }
+
+        let cardNetworkLogoHtml = '';
+        if (card.card_network) {
+            let networkLogoSrc = '';
+            const cardNetworkLower = card.card_network.toLowerCase();
+
+            if (cardNetworkLower === 'visa') {
+                networkLogoSrc = 'https://i.imgur.com/6JWzGpy.png';
+            } else if (cardNetworkLower === 'verve') {
+                networkLogoSrc = 'https://i.imgur.com/un1E3AG.png';
+            } else if (cardNetworkLower === 'mastercard' || cardNetworkLower === 'master') {
+                networkLogoSrc = 'https://i.imgur.com/hYwvs0x.png';
+            } else {
+                networkLogoSrc = `${PHP_BASE_URL}images/default_network_logo.png`;
+            }
+
+            cardNetworkLogoHtml = `<img src="${networkLogoSrc}" alt="${card.card_network} Logo" class="card-network-logo-img" onerror="this.src='${PHP_BASE_URL}images/default_network_logo.png'; this.alt='Default Network Logo';">`;
+        }
+
+        const networkClass = card.card_network ? card.card_network.toLowerCase() : '';
+
+        // Function to mask the card number, showing all digits but adding spaces
+        const formatCardNumber = (cardNumber) => {
+            if (!cardNumber || typeof cardNumber !== 'string') {
+                return '**** **** **** ****'; // Default masked if invalid
+            }
+            // Ensure card number is exactly 16 digits or handle various lengths
+            // If card.card_number is already masked from backend, just format it with spaces
+            return cardNumber.replace(/(.{4})/g, '$1 ').trim();
+        };
+
+        // Determine the card number to display
+        // Assuming card.card_number from API is the full or already masked number you want to display
+        const displayCardNumber = formatCardNumber(card.card_number);
+
+        return `
+            <div class="card-item ${networkClass}" data-card-id="${card.id}">
+                ${bankBrandingHtml}
+                <div class="chip"></div>
+                <div class="card-number">${displayCardNumber}</div>
+                <p class="card-cvv-mock">CVV: ***</p>
+
+                <div class="card-footer">
+                    <div>
+                        <div class="label">Card Holder</div>
+                        <div class="value">${card.card_holder_name || currentUserFullName}</div>
+                    </div>
+                    <div>
+                        <div class="label">Expires</div>
+                        <div class="value">${card.expiry_date_display}</div>
+                    </div>
+                </div>
+
+                ${cardNetworkLogoHtml}
+                <span class="card-status ${card.status_display_class}">${card.status_display_text}</span>
+            </div>
+        `;
     }
 
-    let cardNetworkLogoHtml = '';
-    if (card.card_network) {
-        // Corrected default logo path in onerror
-        cardNetworkLogoHtml = `<img src="${PHP_BASE_URL}images/${card.card_network.toLowerCase()}_logo.png" alt="${card.card_network} Logo" class="card-network-logo-img" onerror="this.src='${PHP_BASE_URL}images/default_logo.png'; this.alt='Default Network Logo';">`;
-    }
-
-    const networkClass = card.card_network ? card.card_network.toLowerCase() : '';
-
-    return `
-        <div class="card-item ${networkClass}" data-card-id="${card.id}">
-            ${bankBrandingHtml}
-            <div class="chip"></div>
-            <div class="card-number">${card.card_number ? card.card_number.replace(/(.{4})/g, '$1 ').trim() : 'N/A'}</div>
-            <p class="card-cvv-mock">CVV: ***</p>
-
-            <div class="card-footer">
-                <div>
-                    <div class="label">Card Holder</div>
-                    <div class="value">${card.card_holder_name || currentUserFullName}</div>
-                </div>
-                <div>
-                    <div class="label">Expires</div>
-                    <div class="value">${card.expiry_date_display}</div>
-                </div>
-            </div>
-
-            ${cardNetworkLogoHtml}
-            <span class="card-status ${card.status_display_class}">${card.status_display_text}</span>
-            </div>
-    `;
-}
     // Function to fetch and display user's bank cards
     async function fetchUserCards() {
         if (!userCardList) {
             console.error("User card list container not found.");
             return;
         }
-        cardsLoadingMessage.style.display = 'block'; // Show loading message
-        userCardList.innerHTML = ''; // Clear previous cards
-        noCardsMessage.style.display = 'none'; // Hide "no cards" message initially
+        cardsLoadingMessage.style.display = 'block';
+        userCardList.innerHTML = '';
+        noCardsMessage.style.display = 'none';
 
         try {
             const response = await fetch(`${PHP_BASE_URL}api/get_user_cards.php`, {
@@ -183,40 +212,36 @@ function renderCard(card) {
             if (result.status === 'success' && result.cards && result.cards.length > 0) {
                 result.cards.forEach(card => {
                     const cardHtml = renderCard(card);
-                    const tempDiv = document.createElement('div'); // Create a temporary div
+                    const tempDiv = document.createElement('div');
                     tempDiv.innerHTML = cardHtml;
-                    const cardElement = tempDiv.firstElementChild; // Get the actual card item
+                    const cardElement = tempDiv.firstElementChild;
 
                     if (cardElement) {
-                        // Add click listener to the cardElement itself (the div with class="card-item")
-                        // This allows clicking anywhere on the card to go to details, unless a button is clicked
                         cardElement.addEventListener('click', (event) => {
-                            // Prevent navigation if the click originated from within a button or a specific interactive element
                             if (event.target.closest('.card-actions button')) {
-                                // If a button was clicked, handle its specific action (e.g., freezeCard, reportCard)
                                 const button = event.target.closest('.card-actions button');
                                 const cardId = button.dataset.cardId;
                                 if (button.classList.contains('freeze-btn')) {
                                     const currentStatus = button.dataset.status;
-                                    toggleCardStatus(cardId, currentStatus); // Call a function to toggle status
+                                    toggleCardStatus(cardId, currentStatus);
                                 } else if (button.classList.contains('report-btn')) {
-                                    reportLostStolen(cardId); // Call a function to report
+                                    reportLostStolen(cardId);
                                 } else if (button.classList.contains('set-pin-btn')) {
                                     window.location.href = `${FRONTEND_BASE_URL}/set_card_pin.php?card_id=${cardId}`;
+                                } else if (button.classList.contains('activate-btn')) { // Handle activate button click
+                                    activateCard(cardId);
                                 }
-                                event.stopPropagation(); // Stop the event from bubbling up to the cardElement
+                                event.stopPropagation();
                                 return;
                             }
-                            // If it's not a button, navigate to the manage_card page
                             window.location.href = `${FRONTEND_BASE_URL}/manage_card.php?card_id=${card.id}`;
                         });
-
-                        userCardList.appendChild(cardElement); // Append the actual element
+                        userCardList.appendChild(cardElement);
                     }
                 });
             } else {
-                noCardsMessage.style.display = 'block'; // Show "no cards" message
-                noCardsMessage.textContent = result.message || "No bank cards found. Order a new one below!"; // Display message from API or default
+                noCardsMessage.style.display = 'block';
+                noCardsMessage.textContent = result.message || "No bank cards found. Order a new one below!";
             }
         } catch (error) {
             console.error('Error fetching cards:', error);
@@ -232,7 +257,7 @@ function renderCard(card) {
                 showMessageBox(`Failed to load cards: ${error.message}`, 'error');
             }
         } finally {
-            cardsLoadingMessage.style.display = 'none'; // Hide loading message
+            cardsLoadingMessage.style.display = 'none';
         }
     }
 
@@ -242,7 +267,7 @@ function renderCard(card) {
             console.error("Action card select element not found.");
             return;
         }
-        actionCardSelect.innerHTML = '<option value="">-- Loading Cards --</option>'; // Initial loading state
+        actionCardSelect.innerHTML = '<option value="">-- Loading Cards --</option>';
         try {
             const response = await fetch(`${PHP_BASE_URL}api/get_user_cards.php`, {
                 method: 'GET',
@@ -266,8 +291,10 @@ function renderCard(card) {
                 result.cards.forEach(card => {
                     const option = document.createElement('option');
                     option.value = card.id;
-                    option.textContent = `${card.card_type} (${card.display_card_number}) - Status: ${card.status_display_text}`;
-                    option.dataset.status = card.status; // Store current status in dataset
+                    // Ensure 'display_card_number' exists or provide a fallback
+                    const displayNum = card.display_card_number || (card.card_number ? card.card_number.slice(-4) : '****');
+                    option.textContent = `${card.card_type} (...${displayNum}) - Status: ${card.status_display_text}`;
+                    option.dataset.status = card.status;
                     actionCardSelect.appendChild(option);
                 });
                 // Enable buttons if cards are available
@@ -278,6 +305,7 @@ function renderCard(card) {
                 freezeActionButton.disabled = true;
                 reportActionButton.disabled = true;
                 setPinActionButton.disabled = true;
+                if (activateActionButton) activateActionButton.disabled = true; // Disable new button
             }
         } catch (error) {
             console.error('Error populating action card select:', error);
@@ -285,6 +313,7 @@ function renderCard(card) {
             freezeActionButton.disabled = true;
             reportActionButton.disabled = true;
             setPinActionButton.disabled = true;
+            if (activateActionButton) activateActionButton.disabled = true; // Disable new button
             showMessageBox(`Failed to load cards for actions: ${error.message}`, 'error');
         }
     }
@@ -294,38 +323,54 @@ function renderCard(card) {
         actionCardSelect.addEventListener('change', () => {
             const selectedOption = actionCardSelect.options[actionCardSelect.selectedIndex];
             const cardId = selectedOption.value;
-            const cardStatus = selectedOption.dataset.status; // Get the status from the dataset
+            const cardStatus = selectedOption.dataset.status;
+
+            // Reset all buttons to disabled first
+            freezeActionButton.disabled = true;
+            reportActionButton.disabled = true;
+            setPinActionButton.disabled = true;
+            if (activateActionButton) activateActionButton.disabled = true;
+
+            // Reset button texts
+            freezeActionButton.textContent = '❄️ Freeze/Unfreeze Card';
+
 
             if (cardId) {
-                freezeActionButton.disabled = false;
-                reportActionButton.disabled = false;
-                setPinActionButton.disabled = false;
-
-                // Update freeze button text based on card status
-                if (cardStatus === 'active') { // Assuming 'active' means not frozen
-                    freezeActionButton.textContent = '❄️ Freeze Card';
-                    freezeActionButton.dataset.status = 'active';
-                } else if (cardStatus === 'frozen') {
-                    freezeActionButton.textContent = '🔓 Unfreeze Card';
-                    freezeActionButton.dataset.status = 'frozen';
-                } else { // Handle other statuses if necessary
-                    freezeActionButton.textContent = 'Freeze/Unfreeze Card';
-                    freezeActionButton.disabled = true; // Disable if status is not clearly active/frozen
-                }
-                freezeActionButton.dataset.cardId = cardId; // Set cardId on the button for easy access
+                // Set cardId on all relevant buttons
+                freezeActionButton.dataset.cardId = cardId;
                 reportActionButton.dataset.cardId = cardId;
                 setPinActionButton.dataset.cardId = cardId;
-            } else {
-                freezeActionButton.disabled = true;
-                reportActionButton.disabled = true;
-                setPinActionButton.disabled = true;
-                freezeActionButton.textContent = '❄️ Freeze/Unfreeze Card'; // Reset text
+                if (activateActionButton) activateActionButton.dataset.cardId = cardId;
+
+
+                // Enable/Disable buttons based on card status
+                if (cardStatus === 'active') {
+                    freezeActionButton.disabled = false;
+                    freezeActionButton.textContent = '❄️ Freeze Card';
+                    freezeActionButton.dataset.status = 'active'; // Update dataset status
+                    reportActionButton.disabled = false;
+                    setPinActionButton.disabled = false;
+                } else if (cardStatus === 'frozen') {
+                    freezeActionButton.disabled = false;
+                    freezeActionButton.textContent = '🔓 Unfreeze Card';
+                    freezeActionButton.dataset.status = 'frozen'; // Update dataset status
+                    reportActionButton.disabled = false; // Still allow reporting
+                    setPinActionButton.disabled = false; // Still allow PIN setting
+                } else if (cardStatus === 'pending_activation') { // NEW: Handle pending activation state
+                    if (activateActionButton) activateActionButton.disabled = false;
+                    reportActionButton.disabled = false; // Allow reporting even if pending
+                    // Other actions (freeze, set pin) might be disabled until activated
+                } else if (cardStatus === 'lost' || cardStatus === 'stolen' || cardStatus === 'cancelled') {
+                    // All actions should be disabled for lost/stolen/cancelled cards
+                    // Potentially show a message like "Card cannot be managed"
+                    showMessageBox(`This card is ${cardStatus} and cannot be managed further.`, 'info');
+                }
+                // For any other statuses, keep buttons disabled by default (as per initial reset)
             }
         });
     }
 
-    // --- Card Action Functions (Stubs for now) ---
-    // You will need to implement the actual AJAX calls for these
+    // --- Card Action Functions ---
     async function toggleCardStatus(cardId, currentStatus) {
         if (!cardId) {
             showMessageBox("Please select a card first.", 'info');
@@ -342,8 +387,8 @@ function renderCard(card) {
             const result = await response.json();
             if (result.status === 'success') {
                 showMessageBox(result.message, 'success');
-                fetchUserCards(); // Refresh cards display
-                populateActionCardSelect(); // Refresh action dropdown
+                fetchUserCards();
+                populateActionCardSelect();
             } else {
                 showMessageBox(result.message, 'error');
             }
@@ -364,10 +409,41 @@ function renderCard(card) {
         }
         showMessageBox(`Reporting card as lost/stolen...`, 'info');
         try {
-            const response = await fetch(`${PHP_BASE_URL}api/update_card_status.php`, { // Assuming you use the same API for this
+            const response = await fetch(`${PHP_BASE_URL}api/update_card_status.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ card_id: cardId, action: 'report_lost_stolen' })
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                showMessageBox(result.message, 'success');
+                fetchUserCards();
+                populateActionCardSelect();
+            } else {
+                showMessageBox(result.message, 'error');
+            }
+        } catch (error) {
+            console.error("Error reporting card:", error);
+            showMessageBox(`Failed to report card: ${error.message}`, 'error');
+        }
+    }
+
+    // NEW: Function to activate a card
+    async function activateCard(cardId) {
+        if (!cardId) {
+            showMessageBox("Please select a card to activate.", 'info');
+            return;
+        }
+        const confirmActivate = confirm("Are you sure you want to activate this card?");
+        if (!confirmActivate) {
+            return;
+        }
+        showMessageBox(`Activating card...`, 'info');
+        try {
+            const response = await fetch(`${PHP_BASE_URL}api/update_card_status.php`, { // Assuming this API can handle activation
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ card_id: cardId, action: 'activate' })
             });
             const result = await response.json();
             if (result.status === 'success') {
@@ -378,10 +454,11 @@ function renderCard(card) {
                 showMessageBox(result.message, 'error');
             }
         } catch (error) {
-            console.error("Error reporting card:", error);
-            showMessageBox(`Failed to report card: ${error.message}`, 'error');
+            console.error("Error activating card:", error);
+            showMessageBox(`Failed to activate card: ${error.message}`, 'error');
         }
     }
+
 
     // --- NEW: Event listeners for action buttons ---
     if (freezeActionButton) {
@@ -411,27 +488,37 @@ function renderCard(card) {
         setPinActionButton.addEventListener('click', () => {
             const cardId = setPinActionButton.dataset.cardId;
             if (cardId) {
-                window.location.href = `${FRONTEND_BASE_URL}/my_cards?action=set_pin&card_id=${cardId}`; // Updated URL for consistency with initial redirect
+                window.location.href = `${FRONTEND_BASE_URL}/set_card_pin.php?card_id=${cardId}`; // Using the more direct page
             } else {
                 showMessageBox("Please select a card to set its PIN.", 'info');
             }
         });
     }
 
+    if (activateActionButton) { // NEW: Event listener for activate button
+        activateActionButton.addEventListener('click', () => {
+            const cardId = activateActionButton.dataset.cardId;
+            if (cardId) {
+                activateCard(cardId);
+            } else {
+                showMessageBox("Please select a card to activate.", 'info');
+            }
+        });
+    }
 
     // Call functions on page load
-    fetchUserAccounts(); // Populate the account dropdown
-    fetchUserCards();    // Display existing cards
-    populateActionCardSelect(); // NEW: Populate the action card dropdown
+    fetchUserAccounts();
+    fetchUserCards();
+    populateActionCardSelect();
 
     // Handle order card form submission
-    if (orderCardForm) { // Ensure form exists before adding listener
+    if (orderCardForm) {
         orderCardForm.addEventListener('submit', async (e) => {
-            e.preventDefault(); // Prevent default form submission
+            e.preventDefault();
 
             if (orderCardSubmitButton) {
                 orderCardSubmitButton.disabled = true;
-                orderCardSubmitButton.textContent = 'Ordering...'; // Or add a spinner icon
+                orderCardSubmitButton.textContent = 'Ordering...';
             }
 
             const formData = new FormData(orderCardForm);
@@ -453,14 +540,13 @@ function renderCard(card) {
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                    showMessageBox(data.message, 'success'); // Show success message
-                    orderCardForm.reset(); // Clear the form fields
-                    // Re-set readonly card holder name after reset
+                    showMessageBox(data.message, 'success');
+                    orderCardForm.reset();
                     document.getElementById('cardHolderName').value = currentUserFullName;
-                    fetchUserCards(); // Refresh the card list to show the new card
-                    populateActionCardSelect(); // NEW: Refresh the action card dropdown
+                    fetchUserCards();
+                    populateActionCardSelect();
                 } else {
-                    showMessageBox(data.message, 'error'); // Show error message from server
+                    showMessageBox(data.message, 'error');
                 }
             } catch (error) {
                 console.error('Error ordering card:', error);
@@ -476,7 +562,7 @@ function renderCard(card) {
             } finally {
                 if (orderCardSubmitButton) {
                     orderCardSubmitButton.disabled = false;
-                    orderCardSubmitButton.textContent = 'Place Card Order'; // Revert text
+                    orderCardSubmitButton.textContent = 'Place Card Order';
                 }
             }
         });

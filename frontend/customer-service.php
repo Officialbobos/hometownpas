@@ -1,5 +1,5 @@
 <?php
-// Path: C:\xampp\htdocs\hometownbank\frontend\customer_service.php
+//hometownbank\frontend\customer_service.php
 
 // Ensure session is started.
 if (session_status() == PHP_SESSION_NONE) {
@@ -11,20 +11,14 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-echo "DEBUG: customer-service.php - Start of file.<br>\n"; // ADDED DEBUG
 
 // Include Composer's autoloader for any libraries (like PHPMailer for sendEmail)
 require_once __DIR__ . '/../vendor/autoload.php';
-echo "DEBUG: customer-service.php - After autoload.php include.<br>\n"; // ADDED DEBUG
 
 // Include your custom configuration and functions files
 require_once __DIR__ . '/../Config.php';
-echo "DEBUG: customer-service.php - After Config.php include.<br>\n"; // ADDED DEBUG
 
 require_once __DIR__ . '/../functions.php'; // For sanitize_input, getMongoDBClient(), sendEmail(), etc.
-echo "DEBUG: customer-service.php - After functions.php include.<br>\n"; // ADDED DEBUG
-
-echo "DEBUG: customer-service.php - All PHP includes processed. Preparing HTML.<br>\n"; // ADDED DEBUG
 
 // No specific backend logic is needed for a static customer service display page
 // unless you plan to dynamically fetch FAQs from a database, etc.
