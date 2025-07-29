@@ -1,32 +1,42 @@
 <?php
 // index.php
 
-// --- START TEMPORARY DEBUG CODE ---
-// Force display errors for debugging on Render (remove for production)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+session_start(); // Start the session at the very beginning of the script.
 
-error_log("--- SCRIPT START ---");
+// --- REMOVE TEMPORARY DEBUG CODE FOR INI_SET & ERROR_REPORTING ---
+// These are now handled by Config.php based on APP_DEBUG.
+// ini_set('display_errors', 1);
+// ini_set('display_startup_errors', 1);
+// error_reporting(E_ALL);
+
+error_log("--- SCRIPT START (index.php) ---");
+
+// 1. Load Composer's autoloader FIRST.
+// This is essential as Config.php and potentially functions.php depend on it (e.g., for Dotenv and MongoDB classes).
 require __DIR__ . '/vendor/autoload.php';
 
-// Check if MongoDB extension is loaded
+// 2. Load Config.php. This will define all global constants (like BASE_URL, MONGODB_CONNECTION_URI)
+// and set up error reporting based on APP_DEBUG from your .env.
+require_once __DIR__ . '/Config.php';
+
+// 3. Load functions.php. This should come after Config.php if functions rely on Config.php constants.
+require_once __DIR__ . '/functions.php'; // Contains getMongoDBClient()
+
+error_log("--- After requires in index.php (Config.php and functions.php loaded) ---");
+
+// --- MongoDB Extension/Class Existence Checks (Keep for robust debugging, especially on Render builds) ---
+// These checks are good to have early in the entry point.
 if (!extension_loaded('mongodb')) {
+    error_log('FATAL ERROR: MongoDB PHP extension is not loaded!');
     die('<h1>FATAL ERROR: MongoDB PHP extension is not loaded!</h1><p>Please check your Dockerfile, build logs, and PHP configuration.</p>');
 }
 
-// Check if MongoDB Client class exists (Composer autoloading)
 if (!class_exists('MongoDB\Client')) {
+    error_log('FATAL ERROR: MongoDB\Client class not found!');
     die('<h1>FATAL ERROR: MongoDB\Client class not found!</h1><p>This usually means Composer\'s autoloader failed or the MongoDB driver was not correctly installed/enabled.</p><p>Ensure `composer install` ran successfully and `docker-php-ext-enable mongodb` completed in your Dockerfile.</p>');
 }
+// --- END MongoDB Extension/Class Existence Checks ---
 
-// --- END TEMPORARY DEBUG CODE ---
-
-session_start();
-require_once __DIR__ . '/Config.php';
-require_once __DIR__ . '/functions.php'; // Contains getMongoDBClient()
-
-error_log("--- After requires ---");
 
 use MongoDB\Client;
 
@@ -35,12 +45,13 @@ $mongoClient = null;
 $mongoDb = null;
 try {
     error_log("--- Attempting to get MongoDB Client in index.php ---");
-    $mongoClient = getMongoDBClient();
+    $mongoClient = getMongoDBClient(); // This function should get the client using MONGODB_CONNECTION_URI from Config.php
     error_log("--- MongoDB Client obtained. Attempting to select database ---");
-    $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME);
+    $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME); // MONGODB_DB_NAME is also from Config.php
     error_log("--- MongoDB database selected successfully ---");
 } catch (Exception $e) {
     error_log("Failed to connect to MongoDB in index.php: " . $e->getMessage());
+    // In production, consider a more generic error page instead of exposing the message.
     die("<h1>Service Unavailable: Database connection failed.</h1><p>Error: " . htmlspecialchars($e->getMessage()) . "</p>");
 }
 
@@ -85,44 +96,48 @@ $authenticated_routes = [
     'my_cards',
     'set_card_pin',
     'statements',
-    //'verify_code',
+    // 'verify_code', // Removed from authenticated_routes as it has its own distinct auth check below
     'api/get_user_cards',
     'api/get_user_accounts',
     'api/order_card',
     'api/set_card_pin',
     // ... potentially other API/frontend routes that require authentication
 ];
+
 // Check authentication for authenticated routes
 if (in_array($path, $authenticated_routes) && !str_starts_with($path, 'admin/')) {
     // This block handles routes that require a user to be fully logged in (after 2FA)
     if (
         !isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true ||
         !isset($_SESSION['user_id']) ||
-        !isset($_SESSION['2fa_verified']) || $_SESSION['2fa_verified'] !== true // <-- ADD THIS LINE
+        !isset($_SESSION['2fa_verified']) || $_SESSION['2fa_verified'] !== true
     ) {
+        // Log the redirection for debugging
+        error_log("Authentication failed for path: " . $path . ". Redirecting to login.");
         header('Location: ' . BASE_URL . '/login');
         exit;
     }
-
 } elseif ($path === 'verify_code') {
     // This block specifically handles the 2FA verification page
     // It checks if the user is in the 'awaiting_2fa' state, meaning they passed initial login
     if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' || !isset($_SESSION['temp_user_id'])) {
         // If not in the correct 2FA pending state, redirect them back to login
+        error_log("Attempted to access verify_code without being in 'awaiting_2fa' state. Redirecting to login.");
         header('Location: ' . BASE_URL . '/login');
         exit;
     }
 }
 
 // Admin authentication check (if different from user authentication)
-// If admin authentication is distinct, you'd add similar logic here:
-// if (str_starts_with($path, 'admin/') || str_starts_with($path, 'api/admin/')) {
-//     if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-//         header('Location: ' . BASE_URL . '/admin/login'); // Redirect to admin login page
-//         exit;
-//     }
-// }
-
+// It's highly recommended to implement a robust admin authentication system.
+if (str_starts_with($path, 'admin') || str_starts_with($path, 'api/admin')) {
+    // Example: If an admin login page is 'admin/login'
+    if ($path !== 'admin/login' && (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true)) {
+        error_log("Admin authentication failed for path: " . $path . ". Redirecting to admin login.");
+        header('Location: ' . BASE_URL . '/admin/login'); // Redirect to admin login page
+        exit;
+    }
+}
 
 // --- ALL ROUTER LOGIC IN ONE SWITCH STATEMENT ---
 switch ($path) {
@@ -131,11 +146,6 @@ switch ($path) {
     case 'login':
         require __DIR__ . '/frontend/login.php';
         break;
-    // case 'register': // Removed as per your instruction (if no frontend register.php)
-    // If you add a frontend/register.php later, uncomment and adjust path:
-    // case 'register':
-    //     require __DIR__ . '/frontend/register.php';
-    //     break;
     case 'logout':
         require __DIR__ . '/frontend/logout.php';
         break;
@@ -200,6 +210,9 @@ switch ($path) {
     // --- Admin Panel Routes ---
     case 'admin':
         require __DIR__ . '/heritagebank_admin/admin_dashboard.php';
+        break;
+    case 'admin/login': // Explicit admin login route if separate
+        require __DIR__ . '/heritagebank_admin/admin_login.php'; // Create this file
         break;
     case 'admin/users':
         require __DIR__ . '/heritagebank_admin/manage_users.php';
@@ -269,11 +282,14 @@ switch ($path) {
 
     default:
         http_response_code(404);
-        // IMPORTANT: Your frontend directory listing did not show '404.php'.
-        // If this file does not exist, the next error will be 'Failed to open stream: 404.php'.
-        // For now, if 404.php doesn't exist, this will echo a simple message.
-        echo "404 Not Found";
-        // If you do have a 404.php in frontend/, uncomment the line below:
-        // require __DIR__ . '/frontend/404.php';
+        // It's crucial to have an actual 404.php file or a robust error page.
+        // For development, simply echoing "404 Not Found" is fine.
+        // For production, create frontend/404.php for a user-friendly error.
+        if (file_exists(__DIR__ . '/frontend/404.php')) {
+            require __DIR__ . '/frontend/404.php';
+        } else {
+            echo "<h1>404 Not Found</h1><p>The page you requested could not be found.</p>";
+        }
         break;
 }
+error_log("--- SCRIPT END ---");
