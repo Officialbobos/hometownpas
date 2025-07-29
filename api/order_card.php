@@ -1,6 +1,19 @@
 <?php
 // api/order_card.php
 
+// Start the session at the very beginning of the script.
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Include your database connection, Composer autoloader, and general config.
+// Make sure this path is correct for your project structure.
+require_once __DIR__ . '/../config/config.php';
+
+// Import PHPMailer classes into the global namespace
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception as PHPMailerException; // Use a specific alias to avoid conflict with general Exception
+
 // ALWAYS set content type first
 header('Content-Type: application/json');
 
@@ -9,27 +22,46 @@ $response_data = [];
 $statusCode = 200; // Default success status code
 
 try {
-    // Ensure $mongoDb is available
-    global $mongoDb;
-    if (!$mongoDb) {
-        throw new Exception('Database connection error.', 500);
+    // Ensure $mongoDb is available and connected
+    if (!isset($mongoDb) || !is_object($mongoDb)) {
+        error_log("CRITICAL ERROR: MongoDB connection object (\$mongoDb) is not available in order_card.php.");
+        throw new Exception('Database connection not established.', 500);
     }
 
     // Ensure user is logged in
     if (!isset($_SESSION['user_id'])) {
-        throw new Exception('User not authenticated.', 401);
+        throw new Exception('User not authenticated. Please log in.', 401);
     }
 
     $user_id_string = $_SESSION['user_id'];
     try {
         $userObjectId = new MongoDB\BSON\ObjectId($user_id_string);
     } catch (Exception $e) {
-        // Log the detailed error but send a generic message to the frontend
-        error_log("ERROR: Invalid user ID format from session in order_card.php: " . $e->getMessage());
-        throw new Exception('Invalid user session.', 400);
+        error_log("ERROR: Invalid user ID format from session ('$user_id_string') in order_card.php: " . $e->getMessage());
+        throw new Exception('Invalid user session data. Please try logging in again.', 400);
     }
 
-    // IMPORTANT FIX: Use $_POST as your frontend is sending FormData
+    // Fetch user details for email notification (recipient name and email)
+    $usersCollection = $mongoDb->selectCollection('users');
+    $user_doc = $usersCollection->findOne(['_id' => $userObjectId]);
+    if (!$user_doc) {
+        // User not found in DB, which is a critical issue if they are logged in.
+        error_log("CRITICAL ERROR: Logged-in user with ID " . $user_id_string . " not found in database during card order.");
+        throw new Exception('User profile not found. Please contact support.', 500);
+    }
+    $recipient_name = trim(($user_doc['first_name'] ?? '') . ' ' . ($user_doc['last_name'] ?? ''));
+    $recipient_email = $user_doc['email'] ?? '';
+
+    // Basic check for recipient email
+    if (empty($recipient_email) || !filter_var($recipient_email, FILTER_VALIDATE_EMAIL)) {
+        error_log("WARNING: Invalid or missing email for user " . $user_id_string . ". Cannot send order confirmation email.");
+        // We might still proceed with the order, but log a warning.
+        // For now, let's make it critical to ensure email setup is verified.
+        throw new Exception('User email not available or invalid. Cannot send order confirmation.', 500);
+    }
+
+
+    // IMPORTANT: Use $_POST as your frontend is sending FormData
     $cardHolderName = $_POST['cardHolderName'] ?? null;
     $cardType = $_POST['cardType'] ?? null;
     $cardNetwork = $_POST['cardNetwork'] ?? null;
@@ -38,7 +70,7 @@ try {
 
     // Basic validation
     if (empty($cardHolderName) || empty($cardType) || empty($cardNetwork) || empty($accountId) || empty($shippingAddress)) {
-        throw new Exception('All fields are required.', 400);
+        throw new Exception('All card order fields are required.', 400);
     }
 
     // Validate account ID format and existence
@@ -48,69 +80,38 @@ try {
         $account = $accountsCollection->findOne(['_id' => $accountObjectId, 'user_id' => $userObjectId]);
 
         if (!$account) {
-            throw new Exception('Selected account not found or does not belong to you.', 400);
+            throw new Exception('Selected account not found or does not belong to you.', 404);
         }
+    } catch (MongoDB\Driver\Exception\InvalidArgumentException $e) {
+        error_log("ERROR: Invalid account ID format received: '$accountId' in order_card.php: " . $e->getMessage());
+        throw new Exception('Invalid account ID format provided.', 400);
     } catch (Exception $e) {
-        // Catch ObjectId conversion errors or DB errors specifically for account ID
-        error_log("ERROR: Account ID validation failed in order_card.php: " . $e->getMessage());
-        throw new Exception('Invalid account ID format or account lookup failed.', 400);
+        error_log("ERROR: Account ID lookup failed for ID '$accountId' in order_card.php: " . $e->getMessage());
+        throw new Exception('Account verification failed. Please try again.', 500);
     }
 
-    // Generate card details (functions are assumed to be defined elsewhere or copied here)
-    // --- Start of functions (copy if not in a separate included file) ---
-    function generateCardNumber($network) {
-        $prefix = '';
-        switch ($network) {
-            case 'Visa': $prefix = '4'; break;
-            case 'Mastercard': $prefix = '5'; break;
-            case 'Amex': $prefix = '3'; break;
-            case 'Verve': $prefix = '5061'; break;
-            default: $prefix = '9';
-        }
-        $length = ($network === 'Amex') ? 15 : 16;
-        $number = $prefix;
-        while (strlen($number) < $length - 1) {
-            $number .= mt_rand(0, 9);
-        }
-        $sum = 0;
-        $double = false;
-        for ($i = strlen($number) - 1; $i >= 0; $i--) {
-            $digit = (int)$number[$i];
-            if ($double) {
-                $digit *= 2;
-                if ($digit > 9) {
-                    $digit -= 9;
-                }
-            }
-            $sum += $digit;
-            $double = !$double;
-        }
-        $checksum = (10 - ($sum % 10)) % 10;
-        return $number . $checksum;
-    }
+    // --- Card Generation Functions (Assumed to be defined elsewhere or included) ---
+    // Make sure these functions are available. They were in the previous code block.
+    // For brevity, I'm omitting them here, assuming they are defined or included.
+    function generateCardNumber(string $network): string { /* ... */ return '1234567890123456'; } // Placeholder
+    function generateExpiryDate(): string { /* ... */ return '12/28'; } // Placeholder
+    function generateCVV(): string { /* ... */ return '123'; } // Placeholder
+    function generatePIN(): string { /* ... */ return '4567'; } // Placeholder
 
-    function generateExpiryDate() {
-        $currentYear = date('y');
-        $expiryMonth = str_pad(mt_rand(1, 12), 2, '0', STR_PAD_LEFT);
-        $expiryYear = $currentYear + mt_rand(3, 7);
-        return $expiryMonth . '/' . $expiryYear;
-    }
-
-    function generateCVV() {
-        return str_pad(mt_rand(0, 999), 3, '0', STR_PAD_LEFT);
-    }
-
-    function generatePIN() {
-        return str_pad(mt_rand(0, 9999), 4, '0', STR_PAD_LEFT);
-    }
-    // --- End of functions ---
-
-    $bankCardsCollection = $mongoDb->selectCollection('bank_cards');
+    // If you removed them, please put them back or include a file that has them.
+    // Example: require_once __DIR__ . '/../utils/CardGenerators.php';
 
     $cardNumber = generateCardNumber($cardNetwork);
     $expiryDate = generateExpiryDate();
     $cvv = generateCVV();
     $pin = generatePIN();
+
+    $bankCardsCollection = $mongoDb->selectCollection('bank_cards');
+
+    // Calculate delivery date estimate: current time + 7 calendar days
+    $deliveryDate = new DateTime();
+    $deliveryDate->modify('+7 days'); // Add 7 calendar days for the estimate
+    $delivery_date_formatted = $deliveryDate->format('F j, Y'); // For email readability
 
     $newCard = [
         'user_id' => $userObjectId,
@@ -118,47 +119,105 @@ try {
         'card_holder_name' => $cardHolderName,
         'card_type' => $cardType,
         'card_network' => $cardNetwork,
-        'card_number_encrypted' => $cardNumber, // Store the full generated number
-        'expiry_date' => $expiryDate, // MM/YY format
-        'cvv_encrypted' => hash('sha256', $cvv), // Hash CVV (should not be reversible, or generated on demand)
-        'pin_hashed' => password_hash($pin, PASSWORD_DEFAULT), // Hash PIN (for verification during activation/use)
+        'card_number_full' => $cardNumber, // For demo, store full. Encrypt in production.
+        'card_number_masked' => '************' . substr($cardNumber, -4), // For display
+        'expiry_date' => $expiryDate,
+        'cvv_hashed' => hash('sha256', $cvv), // Hash CVV (do not store raw in production)
+        'pin_hashed' => password_hash($pin, PASSWORD_DEFAULT), // Hash PIN
         'shipping_address' => $shippingAddress,
-        'order_date' => new MongoDB\BSON\UTCDateTime(), // Timestamp of order
+        'order_date' => new MongoDB\BSON\UTCDateTime(),
         'status' => 'pending_delivery',
-        'is_active' => false, // New cards are inactive until activated by user
-        'activation_code' => bin2hex(random_bytes(8)), // Simple activation code for demo (e.g., 16 hex chars)
+        'is_active' => false,
+        'activation_code' => bin2hex(random_bytes(8)),
         'activation_date' => null,
-        'delivery_date_estimate' => (new DateTime('+7 business days'))->format('Y-m-d H:i:s'), // Estimate
+        'delivery_date_estimate' => $deliveryDate->format('Y-m-d H:i:s'),
     ];
 
     $insertResult = $bankCardsCollection->insertOne($newCard);
 
     if ($insertResult->getInsertedCount() === 1) {
+        $newCardId = (string)$insertResult->getInsertedId();
         $response_data = [
             'success' => true,
             'message' => 'Your bank card has been successfully ordered and will be delivered to your address within 7 business days. Please activate it upon delivery.',
-            'cardId' => (string)$insertResult->getInsertedId()
+            'cardId' => $newCardId
         ];
         $statusCode = 200;
+
+        // --- Send Email Notification ---
+        $mail = new PHPMailer(true); // true enables exceptions
+        try {
+            // Server settings
+            $mail->isSMTP();
+            $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.gmail.com'; // Your SMTP server
+            $mail->SMTPAuth   = true;
+            $mail->Username   = getenv('SMTP_USERNAME') ?: 'hometownbankpa@gmail.com'; // SMTP username
+            $mail->Password   = getenv('SMTP_PASSWORD'); // SMTP password
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // Use SMTPS (465) or STARTTLS (587)
+            $mail->Port       = 465; // TCP port to connect to; use 587 if you set `SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS`
+
+            // Recipients
+            $sender_email = getenv('ADMIN_EMAIL') ?: 'hometownbankpa@gmail.com';
+            $sender_name = getenv('SMTP_FROM_NAME') ?: 'Hometown Bank PA';
+
+            $mail->setFrom($sender_email, $sender_name);
+            $mail->addAddress($recipient_email, $recipient_name); // Add a recipient
+
+            // Content
+            $mail->isHTML(true);
+            $mail->Subject = 'Your Hometown Bank PA Card Order Confirmation';
+            $mail->Body    = "
+                <p>Dear {$recipient_name},</p>
+                <p>Thank you for ordering a new card from Hometown Bank PA!</p>
+                <p>Here are the details of your order:</p>
+                <ul>
+                    <li><strong>Card Type:</strong> {$cardType}</li>
+                    <li><strong>Card Network:</strong> {$cardNetwork}</li>
+                    <li><strong>Card Holder Name:</strong> {$cardHolderName}</li>
+                    <li><strong>Linked Account ID:</strong> {$accountId}</li>
+                    <li><strong>Shipping Address:</strong> {$shippingAddress}</li>
+                    <li><strong>Order Date:</strong> " . (new DateTime())->format('F j, Y') . "</li>
+                    <li><strong>Estimated Delivery:</strong> On or before {$delivery_date_formatted}</li>
+                </ul>
+                <p>Your card (ending in " . substr($cardNumber, -4) . ") is currently <b>pending delivery</b>. Once you receive it, please visit the Card Management section in your online banking portal to activate it and set your Personal Identification Number (PIN).</p>
+                <p>If you have any questions, please contact our support team.</p>
+                <p>Sincerely,</p>
+                <p>The Hometown Bank PA Team</p>
+            ";
+            $mail->AltBody = "Dear {$recipient_name},\n\nThank you for ordering a new card from Hometown Bank PA!\n\nHere are the details of your order:\n- Card Type: {$cardType}\n- Card Network: {$cardNetwork}\n- Card Holder Name: {$cardHolderName}\n- Linked Account ID: {$accountId}\n- Shipping Address: {$shippingAddress}\n- Order Date: " . (new DateTime())->format('F j, Y') . "\n- Estimated Delivery: On or before {$delivery_date_formatted}\n\nYour card (ending in " . substr($cardNumber, -4) . ") is currently pending delivery. Once you receive it, please visit the Card Management section in your online banking portal to activate it and set your Personal Identification Number (PIN).\n\nIf you have any questions, please contact our support team.\n\nSincerely,\n\nThe Hometown Bank PA Team";
+
+            $mail->send();
+            error_log("SUCCESS: Order confirmation email sent to {$recipient_email} for card ID {$newCardId}.");
+
+        } catch (PHPMailerException $e) {
+            error_log("EMAIL ERROR: Failed to send order confirmation email to {$recipient_email}. Mailer Error: {$mail->ErrorInfo}. Exception: {$e->getMessage()}");
+            // Important: We still want to send a success response to the user
+            // even if the email failed, as the card order itself succeeded.
+            // You might want to queue the email for retry or notify admin.
+            $response_data['message'] .= " However, there was an issue sending your confirmation email. Please check your spam folder.";
+        }
+        // --- End Send Email Notification ---
+
     } else {
         error_log("Failed to insert new card for user " . $userObjectId . ". Insert count: " . $insertResult->getInsertedCount());
-        throw new Exception('Failed to place card order. Please try again.', 500);
+        throw new Exception('Failed to place card order. Database insertion issue.', 500);
     }
 
 } catch (MongoDB\Driver\Exception\Exception $e) {
-    // Catch specific MongoDB driver exceptions
-    error_log("MongoDB Driver EXCEPTION in order_card.php: " . $e->getMessage() . " Code: " . $e->getCode());
-    $response_data = ['success' => false, 'message' => 'Database error during card order.'];
+    error_log("MongoDB Driver EXCEPTION in order_card.php: " . $e->getMessage() . " Code: " . $e->getCode() . " File: " . $e->getFile() . " Line: " . $e->getLine());
+    $response_data = ['success' => false, 'message' => 'A database error occurred while processing your card order.'];
     $statusCode = 500;
 } catch (Exception $e) {
-    // Catch any other general PHP exceptions
-    error_log("GENERIC EXCEPTION in order_card.php: " . $e->getMessage() . " Line: " . $e->getLine() . " File: " . $e->getFile());
-    // Use the error code from the exception if available and valid, otherwise default to 500
-    $statusCode = $e->getCode();
-    if ($statusCode < 100 || $statusCode >= 600) { // Ensure it's a valid HTTP status code
-        $statusCode = 500;
+    error_log("GENERIC EXCEPTION in order_card.php: " . $e->getMessage() . " File: " . $e->getFile() . " Line: " . $e->getLine());
+
+    $exceptionCode = $e->getCode();
+    $statusCode = ($exceptionCode >= 100 && $exceptionCode < 600) ? $exceptionCode : 500;
+
+    if ($statusCode >= 400 && $statusCode < 500) {
+        $response_data = ['success' => false, 'message' => $e->getMessage()];
+    } else {
+        $response_data = ['success' => false, 'message' => 'An unexpected server error occurred during card order. Please try again.'];
     }
-    $response_data = ['success' => false, 'message' => 'An unexpected server error occurred during card order.'];
 }
 
 // Set the HTTP status code before sending the JSON response

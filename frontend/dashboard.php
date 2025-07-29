@@ -173,6 +173,9 @@ if (!function_exists('get_currency_symbol')) {
     <title>HomeTown Bank Pa - Dashboard</title>
     <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/dashboard.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script>
+        const BASE_URL_JS = "<?php echo rtrim(BASE_URL, '/'); ?>";
+    </script>
 </head>
 <body>
     <div class="container">
@@ -196,27 +199,52 @@ if (!function_exists('get_currency_symbol')) {
                 <?php if (empty($user_accounts)): ?>
                     <p class="loading-message" id="accountsLoadingMessage">No accounts found. Please contact support.</p>
                 <?php else: ?>
-                    <?php foreach ($user_accounts as $account): ?>
-                        <?php
-                            // Add a special class for savings accounts to target with CSS
-                            $card_class = 'account-card';
-                            if (strtolower($account['account_type'] ?? '') === 'savings') {
-                                $card_class .= ' savings-account-card';
-                            }
-                        ?>
-                        <div class="<?php echo htmlspecialchars($card_class); ?>">
+                    <?php
+                    // Sort accounts to ensure checking always comes first if present, then savings
+                    usort($user_accounts, function($a, $b) {
+                        $typeA = strtolower($a['account_type'] ?? '');
+                        $typeB = strtolower($b['account_type'] ?? '');
+                        if ($typeA === 'checking' && $typeB !== 'checking') return -1;
+                        if ($typeB === 'checking' && $typeA !== 'checking') return 1;
+                        if ($typeA === 'savings' && $typeB !== 'savings') return -1;
+                        if ($typeB === 'savings' && $typeA !== 'savings') return 1;
+                        return 0; // Maintain original order for other types
+                    });
+
+                    // Collect account types for easy lookup of toggle targets
+                    $account_types_available = array_map(function($acc) {
+                        return strtolower($acc['account_type'] ?? '');
+                    }, $user_accounts);
+                    $account_types_available = array_unique($account_types_available);
+
+                    foreach ($user_accounts as $account):
+                        $account_type_lower = strtolower($account['account_type'] ?? '');
+                        $card_class = 'account-card';
+                        // Determine the target for the toggle button
+                        $toggle_target = '';
+                        if ($account_type_lower === 'checking' && in_array('savings', $account_types_available)) {
+                            $toggle_target = 'savings';
+                        } elseif ($account_type_lower === 'savings' && in_array('checking', $account_types_available)) {
+                            $toggle_target = 'checking';
+                        }
+                    ?>
+                        <div class="<?php echo htmlspecialchars($card_class); ?>" data-account-type="<?php echo htmlspecialchars($account_type_lower); ?>">
                             <div class="account-details">
-                                <p class="account-type"><?php echo htmlspecialchars(strtoupper($account['account_type'] ?? 'N/A')); ?></p>
+                                <p class="account-type"><?php echo htmlspecialchars(ucfirst($account_type_lower)); ?> Account</p>
                                 <p class="account-number">**** **** **** <?php echo htmlspecialchars(substr($account['account_number'] ?? 'N/A', -4)); ?></p>
                             </div>
                             <div class="account-balance">
                                 <p class="balance-amount">
-                                    <?php
-                                    echo get_currency_symbol($account['currency'] ?? 'USD');
-                                    ?> <?php echo number_format($account['balance'] ?? 0, 2); ?>
+                                    <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <?php echo number_format($account['balance'] ?? 0, 2); ?>
                                 </p>
                                 <p class="balance-status">Available</p>
                             </div>
+                            <?php if (!empty($toggle_target)): ?>
+                                <span class="account-toggle-indicator" data-toggle-target="<?php echo htmlspecialchars($toggle_target); ?>">
+                                    <i class="fas fa-exchange-alt"></i>
+                                    <span><?php echo htmlspecialchars(ucfirst($toggle_target)); ?></span>
+                                </span>
+                            <?php endif; ?>
                         </div>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -246,7 +274,7 @@ if (!function_exists('get_currency_symbol')) {
         <section class="bank-cards-section">
             <h2>My Cards</h2>
             <div class="view-all-link">
-        <a href="<?php echo rtrim(BASE_URL, '/'); ?>/bank_cards" id="viewMyCardsButton"> <i class="fas fa-credit-card"></i> View My Card
+                <a href="<?php echo rtrim(BASE_URL, '/'); ?>/bank_cards" id="viewMyCardsButton"> <i class="fas fa-credit-card"></i> View My Card
                 </a>
             </div>
             <div class="card-list-container" id="userCardList" style="display: none;">

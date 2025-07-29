@@ -21,6 +21,12 @@ use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // Check if the user is logged in. If not, redirect to login page.
+// Assuming BASE_URL is defined in Config.php or similar
+if (!defined('BASE_URL')) {
+    // Fallback for BASE_URL if not defined (e.g., when testing standalone)
+    define('BASE_URL', 'http://localhost/hometownbank');
+}
+
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] != true || !isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . '/index.php'); // Or wherever your login page is
     exit;
@@ -118,20 +124,21 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hometown Bank PA - Manage Cards</title>
-        <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
+    <title>Hometown Bank PA - Order Card</title>
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <header class="header">
         <nav class="header-nav">
-        <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="contact-button homepage">
-                <i class="fas fa-home"></i> Back to Dashboard </a>
+            <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="contact-button homepage">
+                <i class="fas fa-home"></i> Back to Dashboard
+            </a>
         </nav>
-        <h1>Manage My Cards</h1>
+        <h1>Order Your Bank Card</h1>
         <div class="logo">
-                <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo">
+            <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo">
         </div>
     </header>
 
@@ -140,18 +147,8 @@ try {
             <p class="message <?php echo $message_type; ?>"><?php echo htmlspecialchars($message); ?></p>
         <?php endif; ?>
 
-        <section class="cards-section">
-            <h2>Your Current Cards</h2>
-            <p id="cardsLoadingMessage" class="loading-message">
-                <i class="fas fa-spinner fa-spin"></i> Loading your cards...
-            </p>
-            <div id="userCardList" class="card-list">
-                <p class="no-data-message" id="noCardsMessage" style="display:none;">No bank cards found. Order a new one below!</p>
-            </div>
-        </section>
-
         <section class="order-card-section">
-            <h2>Order a Card</h2>
+            <h2>Place a New Card Order</h2>
             <form id="orderCardForm">
                 <div class="form-group">
                     <label for="cardHolderName">Card Holder Name:</label>
@@ -205,9 +202,9 @@ try {
         </section>
 
         <section class="manage-pin-section">
-            <h2>Manage Card PIN & Activation</h2>
-        <p>To activate a new card or set/change your existing card's PIN, please visit the <a href="<?php echo rtrim(BASE_URL, '/'); ?>/my_cards">Card Activation & PIN Management page</a>.</p>
-            </section>
+            <h2>Card Activation & PIN Management</h2>
+            <p>Once you receive your ordered card, you can activate it and set/change its PIN on the <a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/manage_card.php">Card Management page</a>.</p>
+        </section>
     </main>
 
     <div class="message-box-overlay" id="messageBoxOverlay">
@@ -218,13 +215,12 @@ try {
     </div>
     <script>
         // These variables must be defined before cards.js is loaded
-        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/'); ?>; // *** ADDED '/' to ensure API calls are correct ***
-        // Assuming 'frontend' is directly under your BASE_URL for frontend assets
+        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/'); ?>;
         const FRONTEND_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/frontend'); ?>;
         const currentUserId = <?php echo json_encode($user_id); ?>;
         const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
         const currentUserEmail = <?php echo json_encode($user_email); ?>;
     </script>
-        <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
 </body>
 </html>

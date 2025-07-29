@@ -89,6 +89,7 @@ $authenticated_routes = [
     'api/get_user_cards',
     'api/get_user_accounts',
     'api/order_card',
+    'api/set_card_pin',
     // ... potentially other API/frontend routes that require authentication
 ];
 // Check authentication for authenticated routes

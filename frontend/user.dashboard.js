@@ -11,27 +11,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Logic for Account Cards Carousel ---
+    const accountCardsWrapper = document.querySelector('.account-cards-wrapper'); // Added wrapper for better targeting
     const accountCardsContainer = document.querySelector('.account-cards-container');
-    // Ensure accountCardsContainer exists before querying its children
     const accountCards = accountCardsContainer ? Array.from(accountCardsContainer.querySelectorAll('.account-card')) : [];
     const accountPagination = document.querySelector('.account-pagination');
+    // Select all toggle indicators
+    const accountToggleIndicators = accountCardsContainer ? Array.from(accountCardsContainer.querySelectorAll('.account-toggle-indicator')) : [];
 
-    let currentAccountIndex = 0;
+
+    let currentAccountIndex = 0; // Index of the currently displayed card
 
     // Helper to get computed styles for card dimensions including margin
     function getCardDimensions() {
         if (accountCards.length === 0) return { cardWidth: 0, cardMarginRight: 0, totalCardWidth: 0 };
         const cardStyle = getComputedStyle(accountCards[0]);
         const cardWidth = accountCards[0].offsetWidth; // Includes padding and border
-        // Assumes gap is applied as margin-right to all but the last card, or uses actual gap property
         const gap = parseFloat(cardStyle.marginRight) || 0; // If using margin for gap
-        // If using CSS gap property on container, you might need to adjust this:
-        // const containerStyle = getComputedStyle(accountCardsContainer);
-        // const gap = parseFloat(containerStyle.gap) || 0; // If CSS `gap` is used
         const totalCardWidth = cardWidth + gap; // Card width + space after it
         return { cardWidth, gap, totalCardWidth };
     }
 
+    /**
+     * Shows a specific account card based on its index.
+     * @param {number} index The index of the card to show.
+     */
     function showAccountCard(index) {
         if (accountCards.length === 0 || !accountCardsContainer) {
             console.warn("No account cards or container found for carousel. Skipping carousel logic.");
@@ -59,6 +62,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     dot.classList.remove('active');
                 }
             });
+        }
+    }
+
+    /**
+     * Shows a specific account card based on its account type.
+     * @param {string} type The data-account-type of the card to show (e.g., 'checking', 'savings').
+     */
+    function showAccountCardByType(type) {
+        const targetCard = accountCards.find(card => card.dataset.accountType === type);
+        if (targetCard) {
+            const index = accountCards.indexOf(targetCard);
+            showAccountCard(index);
+        } else {
+            console.warn(`Account card of type '${type}' not found.`);
         }
     }
 
@@ -111,6 +128,10 @@ document.addEventListener('DOMContentLoaded', () => {
         let isSwiping = false;
 
         accountCardsContainer.addEventListener('touchstart', (e) => {
+            // Only start swipe if not on the toggle indicator
+            if (e.target.closest('.account-toggle-indicator')) {
+                return;
+            }
             touchStartX = e.touches[0].clientX;
             isSwiping = true;
             accountCardsContainer.style.transition = 'none'; // Disable transition during drag
@@ -155,8 +176,10 @@ document.addEventListener('DOMContentLoaded', () => {
         let currentTranslate = 0; // Stores the base translateX value before drag starts
 
         accountCardsContainer.addEventListener('mousedown', (e) => {
-            // Only left click (main button)
-            if (e.button !== 0) return;
+            // Only left click (main button) and not on the toggle indicator
+            if (e.button !== 0 || e.target.closest('.account-toggle-indicator')) {
+                return;
+            }
 
             isDragging = true;
             dragStartX = e.clientX;
@@ -200,6 +223,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     } // End of accountCards.length > 0 check
 
+    // --- Account Toggle Button Logic (New Feature) ---
+    accountToggleIndicators.forEach(indicator => {
+        indicator.addEventListener('click', (e) => {
+            // Prevent carousel swipe if clicking the indicator
+            e.stopPropagation();
+            const targetAccountType = indicator.dataset.toggleTarget; // e.g., 'savings' or 'checking'
+            showAccountCardByType(targetAccountType);
+        });
+    });
+
 
     // --- Transfer Modal Logic ---
     const transferButton = document.getElementById('transferButton');
@@ -221,21 +254,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 transferModalOverlay.classList.remove('active');
             }
         });
-
-        // Note: The `onclick` attributes in dashboard.php HTML for transfer options
-        // are already handling the redirection. If you wanted to manage this purely
-        // in JS, you would remove those `onclick`s and add event listeners here.
-        // For example:
-        /*
-        document.querySelectorAll('.transfer-option').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const transferType = button.dataset.transferType; // Get data-transfer-type
-                // Construct URL based on type, e.g., `${BASE_URL_JS}/transfer?type=${transferType}`
-                // window.location.href = some_url;
-                transferModalOverlay.classList.remove('active'); // Close modal
-            });
-        });
-        */
     }
 
     // --- Sidebar Logic ---
@@ -270,14 +288,14 @@ document.addEventListener('DOMContentLoaded', () => {
         viewMyCardsButton.addEventListener('click', (e) => {
             e.preventDefault(); // Prevent default link behavior
 
-           // Check if BASE_URL_JS is defined (it should be, via the PHP script block)
-        if (typeof BASE_URL_JS !== 'undefined') {
-            window.location.href = `${BASE_URL_JS}/bank_cards`; // Ensure this matches your router
-        } else {
-            console.error("BASE_URL_JS is not defined. Cannot navigate to bank cards.");
-            // Fallback to relative path, though relying on BASE_URL_JS is better
-            window.location.href = './bank_cards';
-        }
-    });
+            // Check if BASE_URL_JS is defined (it should be, via the PHP script block)
+            if (typeof BASE_URL_JS !== 'undefined') {
+                window.location.href = `${BASE_URL_JS}/bank_cards`; // Ensure this matches your router
+            } else {
+                console.error("BASE_URL_JS is not defined. Cannot navigate to bank cards.");
+                // Fallback to relative path, though relying on BASE_URL_JS is better
+                window.location.href = './bank_cards';
+            }
+        });
     }
 });
