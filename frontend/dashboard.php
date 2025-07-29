@@ -1,7 +1,6 @@
 <?php
 // Path: C:\xampp\htdocs\hometownbank\frontend\dashboard.php
 // Assuming dashboard.php is in the 'frontend' folder, so paths to Config and functions need to go up one level.
-session_start(); // Ensure session is started for this specific debug point
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -366,6 +365,6 @@ if (!function_exists('get_currency_symbol')) {
             <i class="fas fa-sign-out-alt"></i> Logout
         </button>
     </div>
-    <script src="<?php echo BASE_URL; ?>/frontend/user.dashboard.js"></script>
+<script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/user.dashboard.js"></script>
 </body>
 </html>
