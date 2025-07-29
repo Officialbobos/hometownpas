@@ -162,15 +162,15 @@ h2 {
     background: linear-gradient(135deg, #f8f8f8, #e0e0e0); /* Default grey gradient */
     border: 1px solid #dcdcdc;
     border-radius: 18px;
-    padding: 25px;
+    padding: 25px; /* Base padding for content inside */
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
     position: relative;
     overflow: hidden; /* Important for absolute positioning */
-    display: flex;
+    display: flex; /* Helps with overall structure, but absolute pos takes precedence */
     flex-direction: column;
     justify-content: flex-start;
     min-height: 200px; /* Base height for larger screens */
-    width: 320px; /* Standard width on desktop */
+    width: 320px; /* Standard width on desktop - matches screenshot width */
     max-width: 100%; /* Allows shrinking on smaller screens */
     box-sizing: border-box; /* Include padding in width calculation */
     transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -185,54 +185,46 @@ h2 {
 .card-item.visa { background: linear-gradient(135deg, #2a4b8d, #3f60a9); color: white;}
 .card-item.mastercard { background: linear-gradient(135deg, #eb001b, #ff5f00); color: white;}
 .card-item.amex { background: linear-gradient(135deg, #0081c7, #26a5d4); color: white;}
-.card-item.verve { background: linear-gradient(135deg, #006633, #009933); color: white;}
+.card-item.verve { background: linear-gradient(135deg, #006633, #009933); color: white;} /* Match screenshot's green */
 
-/* Ensure text is readable on dark backgrounds */
-.card-item.visa h4, .card-item.visa .card-number, .card-item.visa .card-footer .label, .card-item.visa .card-footer .value, .card-item.visa .card-status,
-.card-item.mastercard h4, .card-item.mastercard .card-number, .card-item.mastercard .card-footer .label, .card-item.mastercard .card-footer .value, .card-item.mastercard .card-status,
-.card-item.amex h4, .card-item.amex .card-number, .card-item.amex .card-footer .label, .card-item.amex .card-footer .value, .card-item.amex .card-status,
-.card-item.verve h4, .card-item.verve .card-number, .card-item.verve .card-footer .label, .card-item.verve .card-footer .value, .card-item.verve .card-status {
-    color: white;
+/* Ensure text is readable on dark backgrounds for all elements (refining existing rules) */
+.card-item.visa h4, .card-item.visa .card-number, .card-item.visa .card-footer .label, .card-item.visa .card-footer .value, .card-item.visa .card-status, .card-item.visa p.card-cvv-mock,
+.card-item.mastercard h4, .card-item.mastercard .card-number, .card-item.mastercard .card-footer .label, .card-item.mastercard .card-footer .value, .card-item.mastercard .card-status, .card-item.mastercard p.card-cvv-mock,
+.card-item.amex h4, .card-item.amex .card-number, .card-item.amex .card-footer .label, .card-item.amex .card-footer .value, .card-item.amex .card-status, .card-item.amex p.card-cvv-mock,
+.card-item.verve h4, .card-item.verve .card-number, .card-item.verve .card-footer .label, .card-item.verve .card-footer .value, .card-item.verve .card-status, .card-item.verve p.card-cvv-mock {
+    color: white; /* Default for all text elements on colored cards */
 }
-/* Adjust specific elements to a slightly transparent white for better subtle contrast on dark cards */
-.card-item.visa h4, .card-item.mastercard h4, .card-item.amex h4, .card-item.verve h4 {
-    color: rgba(255,255,255,0.9);
-}
+/* Subtler shades for labels on dark backgrounds */
 .card-item.visa .card-footer .label, .card-item.mastercard .card-footer .label, .card-item.amex .card-footer .label, .card-item.verve .card-footer .label {
     color: rgba(255,255,255,0.7);
 }
 .card-item.visa p.card-cvv-mock, .card-item.mastercard p.card-cvv-mock, .card-item.amex p.card-cvv-mock, .card-item.verve p.card-cvv-mock {
-    color: rgba(255,255,255,0.7);
+    color: rgba(255,255,255,0.8); /* Slightly brighter for CVV */
 }
 
+/* Bank Name Text (e.g., HOMETOWN BANK) - using h4 as per screenshot */
 .card-item h4 {
-    margin-top: 0;
-    font-size: 0.8em;
-    color: #333; /* Default text color for card issuer name */
-    position: absolute; /* Allows precise positioning */
-    top: 25px; /* Adjust as needed */
-    left: 25px; /* Position on the left */
-    z-index: 2;
-}
-
-/* This is the actual network logo image from the backend (Visa, Mastercard, etc.) */
-.card-logo-img {
+    margin: 0; /* Remove default margins */
+    font-size: 1.1em; /* Increased size to match screenshot prominence */
+    font-weight: bold; /* Bold as in screenshot */
+    color: rgba(255,255,255,0.9); /* Slightly off-white for contrast on green */
     position: absolute;
-    bottom: 5px;
-    right: 5px; /* Keeps the network logo on the right */
-    height: 10px; /* Base height */
-    width: auto;
-    max-width: 40px;
+    top: 25px; /* Aligned with top padding */
+    left: 25px; /* Aligned with left padding */
     z-index: 2;
+    white-space: nowrap; /* Prevent wrapping for bank name */
+    letter-spacing: 0.5px; /* Slight letter spacing */
 }
 
 /* NEW: Bank Logo (e.g., HomeTown Bank's logo) on the card itself */
+/* This will only show if card.bank_logo_src is present in your HTML.
+   If 'HOMETOWN BANK' is always text, ensure this is for an actual logo image. */
 .bank-logo-on-card {
     position: absolute;
     top: 25px;
     left: 25px;
     height: 35px; /* Base height */
-    width: auto; /* Allow width to scale with height */
+    width: auto;
     object-fit: contain;
     z-index: 2;
     /* filter: brightness(0) invert(1); */ /* Uncomment if your bank logo is dark and needs to be white on dark card backgrounds */
@@ -240,86 +232,102 @@ h2 {
 
 /* Chip */
 .card-item .chip {
-    width: 40px;
-    height: 30px;
-    background-color: #d4af37;
+    width: 48px; /* Wider to match screenshot */
+    height: 32px; /* Taller to match screenshot */
+    background-color: #d4af37; /* Gold color */
     border-radius: 5px;
-    position: absolute; 
-    top: 90px; /* Adjust vertical position */
-    left: 25px;
+    position: absolute;
+    top: 90px; /* Position below bank name */
+    left: 25px; /* Aligned with left padding */
     z-index: 2;
 }
 
 /* Card Number */
 .card-number {
     font-family: var(--font-family-card-number);
-    font-size: 1.2em; /* Base font size */
-    letter-spacing: 2px;
-    margin-bottom: 20px; /* Not relevant with absolute positioning */
-    color: #444;
-    text-align: center;
-    word-break: break-all;
+    font-size: 1.8em; /* Significantly larger to match screenshot prominence */
+    letter-spacing: 2.5px; /* Increased spacing between numbers */
+    line-height: 1.2em; /* Ensure lines are close for two-line number */
+    color: #fff; /* White for dark card backgrounds */
+    text-align: center; /* Centered horizontally */
+    white-space: pre-wrap; /* Allows line breaks based on content (e.g., if you add \n in PHP) */
+    word-break: break-all; /* Ensures long numbers wrap if needed */
     position: absolute;
-    top: 120px; /* Adjust vertical position, after chip */
+    top: 130px; /* Position below chip */
     left: 50%;
-    transform: translateX(-50%); /* Center horizontally */
-    width: calc(100% - 50px); /* Leave space for padding */
+    transform: translateX(-50%); /* Centering trick */
+    width: calc(100% - 50px); /* Account for 25px padding on each side */
     z-index: 2;
 }
-.card-item.visa .card-number, .card-item.mastercard .card-number, .card-item.amex .card-number, .card-item.verve .card-number {
-    color: #fff;
-}
 
-/* Card Footer */
+
+/* Card Footer (CARD HOLDER / EXPIRES) */
 .card-footer {
     display: flex;
     justify-content: space-between;
-    align-items: flex-end;
+    align-items: flex-end; /* Align labels and values at the bottom of their container */
     font-size: 0.9em;
-    width: calc(100% - 50px);
+    width: calc(100% - 50px); /* Account for 25px padding on each side */
     position: absolute;
-    bottom: 25px;
-    left: 25px;
+    bottom: 30px; /* Position from bottom edge */
+    left: 25px; /* Aligned with left padding */
     z-index: 2;
 }
 
 .card-footer .label {
     font-size: 0.7em;
-    opacity: 0.7;
-    margin-bottom: 3px;
-    color: #666;
+    opacity: 0.8; /* Slightly more visible */
+    margin-bottom: 2px; /* Reduced space between label and value */
+    color: rgba(255,255,255,0.7); /* Match dark card text */
 }
 .card-footer .value {
     font-weight: bold;
-    color: #333;
+    color: #fff; /* Match dark card text */
+    font-size: 1em; /* Ensure value is readable */
+}
+/* Specific adjustment for the expiry date block to align text to the right */
+.card-footer > div:last-child {
+    text-align: right;
 }
 
+/* CVV Mock Text */
 p.card-cvv-mock {
     font-size: 0.8em;
-    text-align: center;
-    margin-top: 10px; /*Replaced by positioning */
-    color: #888;
+    font-weight: bold; /* Looks bold in screenshot */
+    text-align: center; /* Centered horizontally */
+    color: rgba(255,255,255,0.8); /* Slightly brighter white for contrast */
     position: absolute;
-    bottom: 20px; /* Position above footer */
+    bottom: 65px; /* Position above the footer and below card number */
     left: 50%;
-    transform: translateX(-50%);
-    width: calc(100% - 50px); /* Adjust width to fit within card bounds */
+    transform: translateX(-50%); /* Centering trick */
+    width: calc(100% - 50px); /* Account for padding */
+    z-index: 2;
+}
+
+/* Card Network Logo (Verve) */
+.card-network-logo-img {
+    position: absolute;
+    bottom: 15px; /* Position from bottom edge */
+    right: 25px; /* Aligned with right padding */
+    height: 30px; /* Larger to match screenshot prominence */
+    width: auto; /* Maintain aspect ratio */
+    max-width: 60px; /* Limit max width */
+    object-fit: contain; /* Ensure image scales correctly */
     z-index: 2;
 }
 
 /* Card Status */
 .card-status {
     font-size: 0.9em;
-    text-align: right; /* Default alignment */
-    /* margin-top: 10px; Replaced by positioning */
+    text-align: right;
     opacity: 0.9;
     font-weight: bold;
     padding: 5px 10px;
     border-radius: 5px;
     display: inline-block;
     position: absolute;
-    top: 25px; /* Align with top elements */
-    right: 25px; /* Position on the right */
+    top: 25px; /* Align with top bank name/logo */
+    right: 25px; /* Position on the right, aligned with padding */
     z-index: 2;
 }
 .card-status.active { background-color: #d4edda; color: #155724; }
@@ -327,9 +335,9 @@ p.card-cvv-mock {
 .card-status.frozen { background-color: #fff3cd; color: #ffc107; }
 .card-status.lost, .card-status.stolen { background-color: #f8d7da; color: #721c24; }
 
-/* For colored cards, status text should also be white */
+/* For colored cards, status text should also be white-ish with subtle background */
 .card-item.visa .card-status, .card-item.mastercard .card-status, .card-item.amex .card-status, .card-item.verve .card-status {
-    color: white;
+    color: white; /* Text color */
 }
 .card-item.visa .card-status.active, .card-item.mastercard .card-status.active, .card-item.amex .card-status.active, .card-item.verve .card-status.active {
     background-color: rgba(100, 255, 100, 0.3); border: 1px solid rgba(100, 255, 100, 0.5);
@@ -577,6 +585,7 @@ p.card-cvv-mock {
 }
 
 
+/* --- Media Queries for Responsiveness --- */
 
 /* Tablet and Smaller Desktops (Up to 768px) */
 @media (max-width: 768px) {
@@ -620,53 +629,47 @@ p.card-cvv-mock {
 
     /* Bank Card Specific Adjustments for Tablet */
     .card-item {
-        min-height: auto;
-        padding: 20px;
+        min-height: 190px; /* Adjust height based on new desktop size */
+        padding: 20px; /* Reduced padding */
         width: 300px; /* Specific width for tablets, prevents squishing */
         margin: 0 auto; /* Center individual cards when stacked */
     }
-    .bank-logo-on-card {
-        height: 30px; /* Consistent height for logo across similar devices */
+    .bank-logo-on-card { /* If used */
+        height: 30px;
         top: 20px;
         left: 20px;
     }
-    .card-logo-img {
-        height: 40px; /* Slightly smaller network logo */
-        bottom: 15px;
-        right: 15px;
+    .card-item h4 { /* For bank name text */
+        font-size: 1em; /* Adjust from desktop's 1.1em */
+        top: 20px;
+        left: 20px;
     }
     .card-item .chip {
         width: 45px;
         height: 30px;
-        top: 80px; /* Adjust vertical position */
-        left: 20px;
-    }
-    .card-item h4 {
-        font-size: 1em; /* Smaller bank name text */
-        top: 20px;
+        top: 75px; /* Adjusted based on new desktop values */
         left: 20px;
     }
     .card-number {
-        font-size: 1.4rem; /* Reduced font size for card number */
-        letter-spacing: 1.5px;
-        top: 125px; /* Adjust vertical position to align with reduced size */
+        font-size: 1.6rem; /* Adjusted from desktop's 1.8em */
+        letter-spacing: 2px;
+        top: 115px; /* Adjusted based on new desktop values */
         width: calc(100% - 40px); /* Adjust width for reduced padding */
     }
     .card-footer {
         font-size: 0.85em; /* Slightly smaller footer text */
-        bottom: 20px;
+        bottom: 25px; /* Adjusted based on new desktop values */
         left: 20px;
         width: calc(100% - 40px); /* Adjust width for reduced padding */
     }
     p.card-cvv-mock {
         font-size: 0.75em;
-        bottom: 50px; /* Adjusted position */
+        bottom: 55px; /* Adjusted based on new desktop values */
         width: calc(100% - 40px);
     }
-    .card-status {
-        font-size: 0.8em;
-        padding: 4px 8px;
-        top: 20px;
+    .card-network-logo-img {
+        height: 25px; /* Adjusted from desktop's 30px */
+        bottom: 10px; /* Adjusted from desktop's 15px */
         right: 20px;
     }
     .card-actions {
@@ -732,7 +735,7 @@ p.card-cvv-mock {
         width: 280px; height: 175px; padding: 15px;
         margin: 20px auto; /* Adjust margin for tablet */
     }
-    .bank-card-display .card-number { font-size: 1.6em; }
+    .bank-card-display .card-number { font-size: 1em; }
     .bank-card-display .card-details-row { font-size: 0.8em; }
     .bank-card-display .card-cvv-row { font-size: 0.8em; }
     .card-actions-section { padding: 20px; margin: 20px 10px; }
@@ -740,20 +743,19 @@ p.card-cvv-mock {
 }
 
 /* --- Mobile Device Adjustments (Up to 480px) --- */
-/* This new breakpoint specifically targets common phone sizes in portrait mode */
 @media (max-width: 480px) {
     .main-content {
-        margin: 15px 10px; /* Slightly reduced outer margin */
-        padding: 15px; /* Reduced padding inside the main content box */
+        margin: 15px 10px;
+        padding: 15px;
         border-radius: 10px;
-        width: calc(100% - 20px); /* Adjust width based on new outer margin */
+        width: calc(100% - 20px);
     }
     h2 {
-        font-size: 1.7rem; /* Slightly smaller main heading */
+        font-size: 1.7rem;
         margin-bottom: 20px;
     }
     .card-list {
-        gap: 15px; /* Reduce gap between stacked cards */
+        gap: 15px;
         margin-top: 20px;
     }
 
@@ -765,51 +767,51 @@ p.card-cvv-mock {
         margin: 0 auto; /* Keep cards centered */
     }
     .bank-logo-on-card {
-        height: 20px; /* Maintain original "bank size" image height for visibility */
-        top: 10px; /* Adjust position relative to new padding */
-        left: 10px;
-    }
-    .card-logo-img {
-        height: 10x; /* Slightly smaller network logo */
-        bottom: 5px;
-        right: 7px;
-    }
-    .card-item .chip {
-        width: 25px;
-        height: 15px;
-        top: 55px; /* Adjust vertical position to fit content better */
-        left: 15px;
-    }
-    .card-item h4 {
-        font-size: 0.7em; /* Reduced bank name font size */
+        height: 25px; /* Adjust for smaller screens */
         top: 15px;
         left: 15px;
     }
+    .card-item h4 {
+        font-size: 0.9em; /* Reduced bank name font size */
+        top: 15px;
+        left: 15px;
+    }
+    .card-item .chip {
+        width: 40px; /* Smaller chip */
+        height: 25px;
+        top: 65px; /* Adjust vertical position */
+        left: 15px;
+    }
     .card-number {
-        font-size: 1rem; /* Reduced card number font size */
-        letter-spacing: 1px;
-        top: 100px; /* Adjusted vertical position */
+        font-size: 1.4rem; /* Reduced card number font size */
+        letter-spacing: 1.5px;
+        top: 105px; /* Adjusted vertical position */
         width: calc(100% - 30px); /* Adjust width based on new padding */
     }
     .card-footer {
         font-size: 0.8em; /* Reduced footer text size */
-        bottom: 15px;
+        bottom: 20px;
         left: 15px;
         width: calc(100% - 30px);
     }
     p.card-cvv-mock {
         font-size: 0.7em; /* Reduced CVV mock text size */
-        bottom: 10px; /* Adjusted position */
+        bottom: 45px; /* Adjusted position */
         width: calc(100% - 30px);
     }
+    .card-network-logo-img {
+        height: 20px; /* Smaller network logo */
+        bottom: 10px;
+        right: 15px;
+    }
     .card-status {
-        font-size: 0.78em; /* Reduced status font size */
+        font-size: 0.78em;
         padding: 3px 7px;
         top: 15px;
         right: 15px;
     }
     .card-actions button {
-        font-size: 0.78rem; /* Reduced button font size */
+        font-size: 0.78rem;
         padding: 7px 10px;
     }
 
@@ -845,8 +847,8 @@ p.card-cvv-mock {
         font-size: 1.3rem;
     }
     .main-content {
-        margin: 10px 5px; /* Even smaller outer margin */
-        padding: 10px; /* Even smaller padding */
+        margin: 10px 5px;
+        padding: 10px;
         width: calc(100% - 10px);
     }
     h2 {
@@ -859,32 +861,28 @@ p.card-cvv-mock {
         padding: 10px; /* Minimal padding for very small cards */
         width: 100%; /* Allow cards to stretch full width within parent, with its own padding */
         min-height: 160px; /* Ensure a minimum height for all content */
+        margin: 0 auto; /* Keep cards centered */
     }
     .bank-logo-on-card {
-        height: 25px; /* Smallest bank logo */
+        height: 20px; /* Smallest bank logo */
         top: 10px;
-        left: 10px;
-    }
-    .card-logo-img {
-        height: 30px; /* Smallest network logo */
-        bottom: 8px;
-        right: 8px;
-    }
-    .card-item .chip {
-        width: 40px;
-        height: 25px;
-        top: 65px; /* Adjust vertical position */
         left: 10px;
     }
     .card-item h4 {
-        font-size: 0.85em; /* Smallest bank name text */
+        font-size: 0.8em; /* Smallest bank name text */
         top: 10px;
         left: 10px;
     }
+    .card-item .chip {
+        width: 35px; /* Even smaller chip */
+        height: 22px;
+        top: 60px; /* Adjust vertical position */
+        left: 10px;
+    }
     .card-number {
-        font-size: 1.1rem; /* Smallest card number font */
-        letter-spacing: 0.8px;
-        top: 100px; /* Adjust vertical position to align */
+        font-size: 1.2rem; /* Smallest card number font */
+        letter-spacing: 1px;
+        top: 95px; /* Adjusted vertical position to align */
         width: calc(100% - 20px); /* Adjust width for smallest padding */
     }
     .card-footer {
@@ -903,6 +901,11 @@ p.card-cvv-mock {
         bottom: 35px; /* Adjusted position */
         width: calc(100% - 20px);
     }
+    .card-network-logo-img {
+        height: 18px; /* Smallest network logo */
+        bottom: 8px;
+        right: 10px;
+    }
     .card-status {
         font-size: 0.7em;
         top: 10px;
@@ -910,13 +913,14 @@ p.card-cvv-mock {
         padding: 2px 5px; /* Smaller padding */
     }
     .card-actions {
-        gap: 5px; /* Smaller gap between stacked buttons */
+        gap: 5px;
     }
     .card-actions button {
-        font-size: 0.7rem; /* Even smaller button text */
+        font-size: 0.7rem;
         padding: 5px 8px;
     }
 
+    /* Form adjustments */
     .form-group label {
         font-size: 0.8rem;
     }
@@ -929,7 +933,7 @@ p.card-cvv-mock {
     .submit-button {
         padding: 8px 10px;
         font-size: 0.8rem;
-        min-width: 150px; /* Ensure button remains usable */
+        min-width: 150px;
     }
     .message-box-content {
         max-width: 250px;

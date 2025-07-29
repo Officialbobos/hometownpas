@@ -68,14 +68,11 @@ try {
                 '_id' => 0, // Exclude the original MongoDB _id for the card document
                 'id' => [ '$toString' => '$_id' ], // Convert card's _id to string and rename to 'id'
                 'card_holder_name' => '$card_holder_name',
-                'display_card_number' => [
-                    // --- FIX: Use 'card_number' instead of 'card_number_encrypted' ---
-                    // Mask all but the last 4 digits of 'card_number'
-                    '$concat' => [
-                        'XXXX XXXX XXXX ',
-                        [ '$substrCP' => [ '$card_number', [ '$subtract' => [ [ '$strLenCP' => '$card_number' ], 4 ] ], 4 ] ]
-                    ]
-                ],
+                // --- MODIFIED: Display full card number ---
+                // Assuming 'card_number' field in your 'bank_cards' collection holds the unencrypted full number
+                // If it's encrypted, you MUST decrypt it here before sending, and manage decryption keys securely.
+                // For demonstration, directly using '$card_number'.
+                'display_card_number' => '$card_number', // Directly use the stored card number
                 'display_expiry' => [
                     // --- FIX: Combine 'expiry_month' and 'expiry_year' ---
                     '$concat' => [
@@ -85,6 +82,7 @@ try {
                         ['$toString' => ['$mod' => ['$expiry_year', 100]]] // Get last two digits of year
                     ]
                 ],
+                // --- MODIFIED: CVV should never be exposed; KEEP placeholder, remove "(Mock)" ---
                 'display_cvv' => 'XXX', // CVV should never be exposed; use a placeholder
                 'card_network' => '$card_type', // --- POTENTIAL FIX: Assuming card_type is the network, based on sample
                 'is_active' => '$is_active',
@@ -96,14 +94,19 @@ try {
                 'card_logo_src' => [
                     '$switch' => [
                        'branches' => [
-    ['case' => ['$eq' => ['$card_type', 'Visa']], 'then' => 'https://i.imgur.com/Zua60IH.png'],
-    ['case' => ['$eq' => ['$card_type', 'MasterCard']], 'then' => 'https://i.imgur.com/ze6oDQT.png'],
-    ['case' => ['$eq' => ['$card_type', 'Amex']], 'then' => BASE_URL . '/assets/images/amex-logo.png'], // This one might be a local asset
-    ['case' => ['$eq' => ['$card_type', 'Verve']], 'then' => 'https://i.imgur.com/Dqk4qfW.png'],
-],
-'default' => BASE_URL . '/assets/images/default-card-logo.png' // Fallback for local asset
+                            ['case' => ['$eq' => ['$card_type', 'Visa']], 'then' => 'https://i.imgur.com/Zua60IH.png'],
+                            ['case' => ['$eq' => ['$card_type', 'MasterCard']], 'then' => 'https://i.imgur.com/ze6oDQT.png'],
+                            ['case' => ['$eq' => ['$card_type', 'Amex']], 'then' => BASE_URL . '/assets/images/amex-logo.png'], // This one might be a local asset
+                            ['case' => ['$eq' => ['$card_type', 'Verve']], 'then' => 'https://i.imgur.com/Dqk4qfW.png'],
+                        ],
+                        'default' => BASE_URL . '/assets/images/default-card-logo.png' // Fallback for local asset
                     ]
-                ]
+                ],
+                // Add bank_logo_src and bank_name if you have them in the 'cards' or 'accounts' collection
+                // For example, if bank_name is in the accounts collection:
+                'bank_name' => '$accountInfo.bank_name', // Assuming 'bank_name' field exists in 'accounts'
+                // If bank_logo_src is also in 'accounts' or 'cards':
+                'bank_logo_src' => '$accountInfo.bank_logo_src' // Assuming 'bank_logo_src' field exists in 'accounts'
             ]
         ]
     ];
@@ -119,12 +122,15 @@ try {
         $formattedCards[] = [
             'id' => $card['id'],
             'card_holder_name' => $card['card_holder_name'] ?? 'N/A',
-            'display_card_number' => $card['display_card_number'] ?? 'XXXX XXXX XXXX XXXX',
+            // --- UPDATED: No more masking here in PHP, it should come full from MongoDB if desired ---
+            'display_card_number' => $card['display_card_number'] ?? 'ERROR: Card number missing',
             'display_expiry' => $card['display_expiry'] ?? 'MM/YY',
-            'display_cvv' => $card['display_cvv'] ?? 'XXX', // Keep it mocked for security
+            'display_cvv' => $card['display_cvv'] ?? 'XXX', // Still XXX for security
             'card_network' => $card['card_network'] ?? 'Default',
             'is_active' => $card['is_active'] ?? false, // Default to false if not explicitly set
             'card_logo_src' => $card['card_logo_src'] ?? null,
+            'bank_name' => $card['bank_name'] ?? 'HOMETOWN BANK', // Default to 'HOMETOWN BANK' if not from pipeline
+            'bank_logo_src' => $card['bank_logo_src'] ?? null, // Default to null if not from pipeline
             'account_type' => $card['account_type'] ?? 'N/A',
             'display_account_number' => $card['display_account_number'] ?? 'N/A',
             'balance' => $card['balance'] ?? 0.00,
