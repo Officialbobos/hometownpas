@@ -25,7 +25,7 @@ use MongoDB\Driver\Exception\Exception as MongoDBDriverException; // For general
 // If your admin login is through the main index.php router (e.g., 'admin/login'),
 // you might need to use BASE_URL here: header('Location: ' . BASE_URL . '/admin/login');
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: ' . BASE_URL . '/admin/login'); // Redirect to admin login if not authenticated
+    header('Location: ' . rtrim(BASE_URL, '/') . '/admin/login');
     exit;
 }
 
@@ -334,7 +334,7 @@ if (isset($_SESSION['admin_message'])) {
         <div class="dashboard-header">
             <img src="https://i.imgur.com/YmC3kg3.png" alt="Hometown Bank Logo" class="logo">
             <h2>Welcome, <?php echo htmlspecialchars($admin_full_name); ?>!</h2>
-            <a href="<?php echo BASE_URL; ?>/admin/logout" class="logout-button">Logout</a>
+        <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/logout'; ?>" class="logout-button">Logout</a>
         </div>
 
         <div class="dashboard-content">
@@ -368,8 +368,8 @@ if (isset($_SESSION['admin_message'])) {
 
             <nav class="dashboard-nav">
                 <ul>
-                    <li><a href="<?php echo BASE_URL; ?>/admin/users">User Management</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>/admin/transactions">Transaction History</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/users'; ?>">User Management</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/transactions'; ?>">Transaction History</a></li>
                     <li><a href="#">Reports & Analytics</a></li>
                     <li><a href="#">System Settings</a></li>
                     <li><a href="#">Transfer Approvals</a></li>
@@ -379,7 +379,7 @@ if (isset($_SESSION['admin_message'])) {
             </nav>
         </div>
     </div>
-    <script src="<?php echo rtrim(BASE_URL, characters: '/'); ?>/heritagebank_admin/script.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/script.js'; ?>"></script>
     <script>
         // Optional: JavaScript to fade out messages after a few seconds
         document.addEventListener('DOMContentLoaded', function() {
