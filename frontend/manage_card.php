@@ -42,8 +42,11 @@ try {
 
     // Handle form submission for card management
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $card_id_post_str = filter_input(INPUT_POST, 'card_id', FILTER_SANITIZE_STRING); // Get as string
-        $action = filter_input(INPUT_POST, 'action', FILTER_SANITIZE_STRING);
+        // --- FIX START ---
+        // Replace FILTER_SANITIZE_STRING with FILTER_UNSAFE_RAW and flags for better, non-deprecated sanitization
+        $card_id_post_str = filter_input(INPUT_POST, 'card_id', FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_HIGH);
+        $action = filter_input(INPUT_POST, 'action', FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_HIGH);
+        // --- FIX END ---
 
         if ($card_id_post_str && $action) {
             try {
@@ -112,7 +115,10 @@ try {
     }
 
     // Fetch card details for display (after any potential POST updates or on initial GET)
-    $card_id_get_str = filter_input(INPUT_GET, 'card_id', FILTER_SANITIZE_STRING);
+    // --- FIX START ---
+    // Same sanitization for GET parameter
+    $card_id_get_str = filter_input(INPUT_GET, 'card_id', FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_HIGH);
+    // --- FIX END ---
 
     if ($card_id_get_str) {
         try {
@@ -649,7 +655,7 @@ if (isset($_SESSION['first_name']) && isset($_SESSION['last_name'])) {
             <?php if ($card): ?>
                 <div class="bank-card-display">
                     <?php if (isset($card['card_network'])): ?>
-                        <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/<?php echo strtolower(htmlspecialchars($card['card_network'])); ?>_logo.png" alt="<?php echo htmlspecialchars($card['card_network']); ?> Logo" class="card-network-logo" onerror="this.style.display='none'">
+                        <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/<?php echo strtolower(htmlspecialchars($card['card_network'])); ?>_logo.png" alt="<?php echo htmlspecialchars($card['card_network']); ?>" class="card-network-logo" onerror="this.style.display='none'">
                     <?php endif; ?>
 
                     <div class="card-chip"></div>
