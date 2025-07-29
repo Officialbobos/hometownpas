@@ -158,5 +158,7 @@ try {
             <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin" style="display: inline-block; margin-top: 20px; color: #007bff; text-decoration: none;">&larr; Back to Dashboard</a></p>
         </div>
     </div>
+        <script src="<?php echo rtrim(BASE_URL, characters: '/'); ?>/heritagebank_admin/script.js"></script>
+
 </body>
 </html>

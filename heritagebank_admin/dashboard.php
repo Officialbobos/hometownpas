@@ -101,7 +101,7 @@ if (isset($_SESSION['admin_message'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hometown Bank Admin Dashboard</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         /* General Body Styles */
@@ -373,13 +373,13 @@ if (isset($_SESSION['admin_message'])) {
                     <li><a href="#">Reports & Analytics</a></li>
                     <li><a href="#">System Settings</a></li>
                     <li><a href="#">Transfer Approvals</a></li>
-                   <li> <a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/manage_transfer_modal.php">Manage Transfer Modal</a></li>
+                    <li> <a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/manage_transfer_modal">Manage Transfer Modal</a></li>
 
-                 </ul>
+                </ul>
             </nav>
         </div>
     </div>
-    <script src="script.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, characters: '/'); ?>/heritagebank_admin/script.js"></script>
     <script>
         // Optional: JavaScript to fade out messages after a few seconds
         document.addEventListener('DOMContentLoaded', function() {
