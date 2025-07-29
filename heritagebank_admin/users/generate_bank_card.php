@@ -9,8 +9,8 @@ use MongoDB\BSON\ObjectId; // For working with MongoDB's unique IDs
 use MongoDB\BSON\UTCDateTime; // For handling dates
 
 // Check if the admin is NOT logged in, redirect to login page
-if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: ../index.php'); // Corrected logout redirect, assuming ../index.php is your login
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
 

@@ -4,8 +4,8 @@ require_once '../../Config.php'; // Assuming Config.php contains MongoDB connect
 require_once '../../functions.php'; // This is good to have for future database operations
 
 // Check if the admin is NOT logged in, redirect to login page
-if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: ../../index.php');
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
 

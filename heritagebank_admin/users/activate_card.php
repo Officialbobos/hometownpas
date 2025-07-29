@@ -7,11 +7,10 @@ use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Driver\Exception\Exception as MongoDBException; // Alias for MongoDB specific exceptions
 
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
-    header('Location: ../index.php');
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
-
 $user_id_str = $_SESSION['user_id'];
 $user_id_obj = null;
 try {

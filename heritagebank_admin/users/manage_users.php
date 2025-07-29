@@ -4,8 +4,8 @@ require_once '../../Config.php'; // Adjust path
 require_once '../../functions.php'; // This is good to have for future database operations
 
 // Check if admin is logged in
-if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: ../index.php'); // Corrected redirect to admin login page
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
 

@@ -4,8 +4,8 @@ require_once '../../Config.php'; // Adjust path based on your actual file struct
 require_once '../../vendor/autoload.php'; // Include Composer's autoloader for MongoDB
 
 // Check if the user is logged in
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: ../index.php'); // Redirect to login page if not logged in
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
 

@@ -15,10 +15,9 @@ use MongoDB\BSON\UTCDateTime;
 use MongoDB\Driver\Exception\Exception as MongoDBException; // Alias for MongoDB specific exceptions
 
 // Check if the admin is logged in
-if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    // Corrected: Redirect to admin login page using BASE_URL and clean URL
-    header('Location: ' . rtrim(BASE_URL, '/') . '/admin/login');
-    exit; // Stop script execution after redirect
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
+    exit;
 }
 
 $message = '';

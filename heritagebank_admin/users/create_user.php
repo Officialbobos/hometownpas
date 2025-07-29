@@ -15,8 +15,8 @@ use Aws\S3\S3Client; // You use the S3Client class from the AWS SDK
 use Aws\S3\Exception\S3Exception; // And the S3Exception for error handling
 
 // Check if admin is logged in
-if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: ../index.php'); // Correct path from users folder to HERITAGEBANK_ADMIN/index.php
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
 
