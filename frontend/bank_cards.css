@@ -777,7 +777,7 @@ p.card-cvv-mock {
         left: 15px;
     }
     .card-item h4 {
-        font-size: 0.7em; /* Reduced bank name font size */
+        font-size: 0.5em; /* Reduced bank name font size */
         top: 15px;
         left: 15px;
     }
@@ -803,10 +803,10 @@ p.card-cvv-mock {
         width: calc(100% - 30px);
     }
     p.card-cvv-mock {
-        font-size: 0.7em; /* Reduced CVV mock text size */
+        font-size: 0.5em; /* Reduced CVV mock text size */
         width: calc(100% - 30px);
         text-align: center; /* Ensure it stays cnetered down  */
-        bottom: 5px; /* Position above the footer and below card number */
+        bottom: 3px; /* Position above the footer and below card number */
         position: absolute; /* Ensure it stays in the right place */
 
     }
@@ -900,8 +900,8 @@ p.card-cvv-mock {
 
     }
     .card-footer {
-        font-size: 0.75em; /* Smallest footer text */
-        bottom: 10px;
+        font-size: 0.6em; /* Smallest footer text */
+        bottom: 12px;
         left: 10px;
         width: calc(100% - 20px);
         flex-direction: column; /* Stack expiry and holder for very small screens */
