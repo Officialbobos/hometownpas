@@ -11,7 +11,8 @@ use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // Check if the admin is NOT logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: ' . BASE_URL . '/admin/index');
+    // Corrected redirect to admin login page using rtrim for BASE_URL
+    header('Location: ' . rtrim(BASE_URL, '/') . '/admin/login');
     exit;
 }
 
@@ -75,7 +76,7 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Transfer Modal - Admin</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         /* Existing dashboard.php styles should be either in style.css or copied here */
@@ -131,7 +132,7 @@ try {
         <div class="dashboard-header">
             <img src="https://i.imgur.com/YmC3kg3.png" alt="Hometown Bank Logo" class="logo">
             <h2>Manage Transfer Modal Message</h2>
-            <a href="<?php echo BASE_URL; ?>/admin/logout" class="logout-button">Logout</a>
+            <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/logout'; ?>" class="logout-button">Logout</a>
         </div>
 
         <div class="dashboard-content">
@@ -158,7 +159,7 @@ try {
             <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin" style="display: inline-block; margin-top: 20px; color: #007bff; text-decoration: none;">&larr; Back to Dashboard</a></p>
         </div>
     </div>
-        <script src="<?php echo rtrim(BASE_URL, characters: '/'); ?>/heritagebank_admin/script.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/script.js"></script>
 
 </body>
 </html>

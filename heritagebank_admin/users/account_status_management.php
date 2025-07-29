@@ -7,8 +7,8 @@ error_reporting(E_ALL);
 session_start();
 
 // Adjust paths as necessary for your file structure
-require_once '../../Config.php';
-require_once '../../functions.php'; // This file is expected to contain getMongoDBClient() and sendEmail()
+require_once __DIR__ . '/../../Config.php'; // Adjusted path to root Config.php
+require_once __DIR__ . '/../../functions.php'; // Adjusted path to root functions.php
 
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
@@ -16,7 +16,8 @@ use MongoDB\Driver\Exception\Exception as MongoDBException; // Alias for MongoDB
 
 // Check if the admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: ../index.php'); // Redirect to admin login page
+    // Corrected: Redirect to admin login page using BASE_URL and clean URL
+    header('Location: ' . rtrim(BASE_URL, '/') . '/admin/login');
     exit; // Stop script execution after redirect
 }
 
@@ -74,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
     $user_id_str = filter_input(INPUT_POST, 'user_id', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     $new_status = trim(filter_input(INPUT_POST, 'new_status', FILTER_SANITIZE_FULL_SPECIAL_CHARS));
     $reason = trim(filter_input(INPUT_POST, 'reason', FILTER_SANITIZE_FULL_SPECIAL_CHARS));
-    $admin_user_id_str = $_SESSION['admin_user_id'] ?? null; // Get admin ID from session (as string ObjectId) - Corrected $_SESSION key
+    $admin_user_id_str = $_SESSION['admin_user_id'] ?? null; // Get admin ID from session (as string ObjectId)
 
     $custom_change_date_str = trim(filter_input(INPUT_POST, 'change_date', FILTER_SANITIZE_FULL_SPECIAL_CHARS));
 
@@ -123,14 +124,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                 // Fetch the user's *current* status within the transaction
                 $current_user_data = $usersCollection->findOne(
                     ['_id' => $user_id_objectId],
-                    ['projection' => ['status' => 1]], // Corrected: Using 'status' field
+                    ['projection' => ['status' => 1]],
                     ['session' => $session]
                 );
 
-                if (!$current_user_data || !isset($current_user_data['status'])) { // Corrected: Using 'status' field
+                if (!$current_user_data || !isset($current_user_data['status'])) {
                     throw new Exception("User not found or current status unavailable for update (ID: $user_id_str).");
                 }
-                $old_status = $current_user_data['status']; // Corrected: Using 'status' field
+                $old_status = $current_user_data['status'];
 
                 // Check if the new status is different from the old status
                 if (strtolower($old_status) === strtolower($new_status)) {
@@ -141,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                     // 1. Update user's status in the 'users' collection
                     $updateResult = $usersCollection->updateOne(
                         ['_id' => $user_id_objectId],
-                        ['$set' => ['status' => $new_status]], // Corrected: Updating 'status' field
+                        ['$set' => ['status' => $new_status]],
                         ['session' => $session]
                     );
 
@@ -173,7 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                     $message_type = 'success';
 
                     // Update $user_to_manage with new status for immediate display on the page
-                    $user_to_manage['status'] = $new_status; // Corrected: Updating 'status' field in user_to_manage object
+                    $user_to_manage['status'] = $new_status;
 
                     // --- Email Notification to User ---
                     $status_color = '';
@@ -272,7 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Heritage Bank - Manage User Account Status</title>
-    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         /* Your existing CSS styles for status display */
@@ -397,7 +398,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                         // Populate options dynamically from the allowed_statuses array
                         foreach ($allowed_statuses as $status) {
                             // Select the current status by default
-                            // Corrected: Using 'status' field for comparison
                             $selected = (isset($user_to_manage['status']) && strtolower($user_to_manage['status']) === $status) ? 'selected' : '';
                             echo '<option value="' . htmlspecialchars($status) . '" ' . $selected . '>' . htmlspecialchars(ucfirst($status)) . '</option>';
                         }
@@ -420,10 +420,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                     <button type="submit" name="change_status" class="btn-primary">Update Account Status</button>
                 </div>
             </form>
-            <p><a href="manage_users.php" class="back-link">&larr; Back to Manage Users</a></p>
+            <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/manage_users" class="back-link">&larr; Back to Manage Users</a></p>
 
         <?php else: // If no user ID was provided or user not found ?>
-            <p class="message info">Please select a user to manage their account status from the <a href="manage_users.php">User Management</a> page.</p>
+            <p class="message info">Please select a user to manage their account status from the <a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/manage_users">User Management</a> page.</p>
         <?php endif; ?>
     </div>
 

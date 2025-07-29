@@ -1,24 +1,22 @@
 <?php
-// C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\users_management.php
+// C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\users\users_management.php
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 session_start();
 
 // Load Composer's autoloader for MongoDB classes and Dotenv
-require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../../vendor/autoload.php'; // Adjusted path to root vendor folder
 
 // Include necessary files for MongoDB connection and utility functions
 // Config.php should be loaded before functions.php if functions rely on its constants.
-require_once __DIR__ . '/../Config.php'; // This defines APP_DEBUG and error settings
-require_once __DIR__ . '/../functions.php'; // This should contain getMongoDBClient() and getCollection()
+require_once __DIR__ . '/../../Config.php'; // Adjusted path to root Config.php
+require_once __DIR__ . '/../../functions.php'; // Adjusted path to root functions.php
 
 // Check if the admin is NOT logged in, redirect to login page
-// *************************************************************************************
-// *** CRITICAL FIX: Changed redirect to use BASE_URL for consistency with router ***
-// *************************************************************************************
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: ' . BASE_URL . '/admin/login'); // Redirect to admin login page via router
+    // Corrected redirect to admin login page using rtrim for BASE_URL
+    header('Location: ' . rtrim(BASE_URL, '/') . '/admin/login');
     exit;
 }
 
@@ -85,7 +83,7 @@ if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SES
         <div class="dashboard-header">
             <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/logo.png" alt="Heritage Bank Logo" class="logo">
             <h2>User Management</h2>
-            <a href="<?php echo BASE_URL; ?>/admin/logout" class="logout-button">Logout</a>
+            <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/logout'; ?>" class="logout-button">Logout</a>
         </div>
 
         <div class="dashboard-content">
@@ -94,16 +92,16 @@ if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SES
 
             <nav class="user-management-nav">
                 <ul>
-                    <li><a href="<?php echo BASE_URL; ?>/admin/create_user">Create New User</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>/admin/manage_users">Manage Users (Edit/Delete)</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>/admin/manage_user_funds">Manage User Funds (Credit/Debit)</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>/admin/account_status_management">Manage Account Status</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>/admin/transactions_management">Transactions Management</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>/admin/generate_bank_card">Generate Bank Card (Mock)</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>/admin/generate_mock_transaction">Generate Mock Transaction</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/create_user'; ?>">Create New User</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_users'; ?>">Manage Users (Edit/Delete)</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_user_funds'; ?>">Manage User Funds (Credit/Debit)</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/account_status_management'; ?>">Manage Account Status</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/transactions_management'; ?>">Transactions Management</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/generate_bank_card'; ?>">Generate Bank Card (Mock)</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/generate_mock_transaction'; ?>">Generate Mock Transaction</a></li>
                 </ul>
             </nav>
-            <p><a href="<?php echo BASE_URL; ?>/admin" class="back-link">&larr; Back to Dashboard</a></p>
+            <p><a href="<?php echo rtrim(BASE_URL, '/') . '/admin'; ?>" class="back-link">&larr; Back to Dashboard</a></p>
         </div>
     </div>
     <script src="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/script.js"></script>
