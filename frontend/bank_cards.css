@@ -784,7 +784,7 @@ p.card-cvv-mock {
     .card-number {
         font-size: 1.2em; /* Reduced card number font size */
         letter-spacing: 1.5px;
-        top: 150px; /* Adjusted vertical position under the chip */
+        top: 50px; /* Adjusted vertical position under the chip */
         width: calc(100% - 30px); /* Adjust width based on new padding */
         text-align: center; /* Centered horizontally */
         position: absolute; /* Ensure it stays in the right place */
@@ -800,7 +800,7 @@ p.card-cvv-mock {
         font-size: 0.7em; /* Reduced CVV mock text size */
         width: calc(100% - 30px);
         text-align: center; /* Ensure it stays cnetered down  */
-        bottom: 10px; /* Position above the footer and below card number */
+        bottom: 5px; /* Position above the footer and below card number */
         position: absolute; /* Ensure it stays in the right place */
 
     }
