@@ -21,13 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear previous classes ensuring only one type class is active
         messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'info');
 
-        // Apply type-specific classes for styling
+        // Apply type-specific classes for styling (matching your CSS classes for message-box-overlay)
+        // Note: Your CSS has 'message.success', 'message.error', 'message.info' for page messages
+        // and a generic 'info' for the message-box-content-wrapper. Let's align them.
         if (type === 'success') {
             messageBoxContentWrapper.classList.add('message-box-success');
         } else if (type === 'error') {
             messageBoxContentWrapper.classList.add('message-box-error');
         } else {
-            messageBoxContentWrapper.classList.add('info'); // Default info style
+            messageBoxContentWrapper.classList.add('message-box-info'); // Use 'message-box-info' for clarity
         }
 
         messageBoxOverlay.classList.add('show'); // Show the overlay
@@ -51,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (messageBoxButton) {
         messageBoxButton.addEventListener('click', () => {
             messageBoxOverlay.classList.remove('show'); // Hide the overlay
-            messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'info'); // Clear classes
+            messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'message-box-info'); // Clear classes
             messageBoxContentParagraph.textContent = ''; // Clear the message text
         });
     }
@@ -64,12 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         accountIdSelect.innerHTML = '<option value="">-- Loading Accounts --</option>';
         try {
-            // CORRECTED: Added the missing '/' after PHP_BASE_URL and the '.php' extension
-            const response = await fetch(`${PHP_BASE_URL}/api/get_user_accounts.php`);
+            const response = await fetch(`${PHP_BASE_URL}api/get_user_accounts.php`); // PHP_BASE_URL should already have the trailing slash
 
             if (!response.ok) {
                 const errorText = await response.text();
-                // Check for HTML response, indicating a server-side error
                 if (errorText.trim().startsWith('<')) {
                     throw new Error(`Server error or API endpoint not found. Raw response: ${errorText.substring(0, 200)}...`);
                 }
@@ -78,8 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
 
-            // Corrected: Check data.status for consistency, as per your PHP API responses
-            if (data.status === true && data.accounts && data.accounts.length > 0) { // THIS LINE IS ALREADY CORRECTED AND REMAINS AS IS
+            if (data.status === true && data.accounts && data.accounts.length > 0) {
                 accountIdSelect.innerHTML = '<option value="">Select an Account</option>';
                 data.accounts.forEach(account => {
                     const option = document.createElement('option');
@@ -96,12 +95,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             accountIdSelect.innerHTML = '<option value="" disabled>Error Loading Accounts</option>'; // Use disabled
             console.error("Error fetching user accounts:", error);
-            // More specific error messages
             if (error.message.includes("Failed to fetch")) {
                 showMessageBox("Failed to load accounts: Could not connect to the server. Please check your network or server status.", 'error');
             } else if (error.message.includes("Server error or API endpoint not found")) {
                 showMessageBox(`Failed to load accounts: Server returned an unexpected response. This usually means the API endpoint is wrong or there's a PHP error on the server. Details: ${error.message.substring(0, 100)}...`, 'error');
-            } else if (error.message.includes("Unexpected token") || error.message.includes("JSON")) { // Broaden JSON parsing error check
+            } else if (error.message.includes("Unexpected token") || error.message.includes("JSON")) {
                 showMessageBox("Failed to load accounts: The server response was not valid JSON. This often means a PHP error occurred on the API script. Check server logs.", 'error');
             } else {
                 showMessageBox(`Failed to load accounts: ${error.message}. Please try refreshing the page.`, 'error');
@@ -111,35 +109,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to render a single card HTML
     function renderCard(card) {
+        // 1. Determine the bank's main logo/name display (e.g., Hometown Bank)
+        let bankBrandingHtml = '';
+        if (card.bank_logo_src && card.bank_logo_src !== '') { // Check if a bank logo URL is provided and not empty
+            bankBrandingHtml = `<img src="${card.bank_logo_src}" alt="${card.bank_name || 'Bank'} Logo" class="bank-logo-on-card" onerror="this.src='${PHP_BASE_URL}images/default_logo.png'; this.alt='Default Bank Logo';">`;
+        } else if (card.bank_name) { // Fallback to bank name as text if no logo URL
+            bankBrandingHtml = `<h4>${card.bank_name}</h4>`;
+        }
+
+        // 2. Determine the card network logo (Visa, Mastercard, etc.)
         let cardNetworkLogoHtml = '';
-
-        // Prioritize the direct URL if available (new logic)
-        if (card.card_logo_url) {
-            cardNetworkLogoHtml = `<img src="${card.card_logo_url}" alt="${card.card_network || 'Card'} Logo" class="card-network-logo" onerror="this.src='${PHP_BASE_URL}/images/default_logo.png'; this.alt='Default Logo';">`;
-            // The onerror here ensures that if the external URL breaks, it falls back to your local default_logo.png
-        }
-        // Fallback to existing local image logic if no direct URL is provided or if card.card_logo_url is not set
-        else if (card.card_network) {
-            cardNetworkLogoHtml = `<img src="${PHP_BASE_URL}/images/${card.card_network.toLowerCase()}_logo.png" alt="${card.card_network} Logo" class="card-network-logo" onerror="this.src='${PHP_BASE_URL}/images/default_logo.png'; this.alt='Default Logo';">`;
+        // Use card.card_network.toLowerCase() for the image path and the specific class from CSS: .card-network-logo-img
+        if (card.card_network) {
+            cardNetworkLogoHtml = `<img src="${PHP_BASE_URL}images/${card.card_network.toLowerCase()}_logo.png" alt="${card.card_network} Logo" class="card-network-logo-img" onerror="this.src='${PHP_BASE_URL}images/default_logo.png'; this.alt='Default Network Logo';">`;
         }
 
+        // 3. Determine the card network class for background colors
+        const networkClass = card.card_network ? card.card_network.toLowerCase() : '';
+
+        // 4. Return the complete card HTML structure matching bank_cards.css
         return `
-            <a href="${FRONTEND_BASE_URL}/manage_card.php?card_id=${card.id}" class="bank-card-display">
-                ${cardNetworkLogoHtml}
-                <div class="card-chip"></div>
+            <div class="card-item ${networkClass}" data-card-id="${card.id}">
+                ${bankBrandingHtml}
+                <div class="chip"></div>
                 <div class="card-number">${card.card_number_display.replace(/(.{4})/g, '$1 ').trim()}</div>
-                <div class="card-details-bottom">
-                    <div class="card-details-group">
-                        <div class="card-details-label">Card Holder</div>
-                        <div class="card-holder-name">${card.card_holder_name || currentUserFullName}</div>
+                <p class="card-cvv-mock">CVV: ***</p>
+
+                <div class="card-footer">
+                    <div>
+                        <div class="label">Card Holder</div>
+                        <div class="value">${card.card_holder_name || currentUserFullName}</div>
                     </div>
-                    <div class="card-details-group right">
-                        <div class="card-details-label">Expires</div>
-                        <div class="card-expiry">${card.expiry_date_display}</div>
+                    <div>
+                        <div class="label">Expires</div>
+                        <div class="value">${card.expiry_date_display}</div>
                     </div>
                 </div>
+
+                ${cardNetworkLogoHtml}
                 <span class="card-status ${card.status_display_class}">${card.status_display_text}</span>
-            </a>
+
+                <div class="card-actions">
+                    <button class="freeze-btn" data-card-id="${card.id}" data-status="${card.status}"><i class="fas fa-snowflake"></i> ${card.status === 'Frozen' ? 'Unfreeze' : 'Freeze'}</button>
+                    <button class="report-btn" data-card-id="${card.id}"><i class="fas fa-exclamation-triangle"></i> Report</button>
+                    <button class="set-pin-btn" data-card-id="${card.id}"><i class="fas fa-key"></i> Set PIN</button>
+                </div>
+            </div>
         `;
     }
 
@@ -154,8 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         noCardsMessage.style.display = 'none'; // Hide "no cards" message initially
 
         try {
-            // CORRECTED: Added the missing '/' after PHP_BASE_URL and the '.php' extension
-            const response = await fetch(`${PHP_BASE_URL}/api/get_user_cards.php`, {
+            const response = await fetch(`${PHP_BASE_URL}api/get_user_cards.php`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -174,7 +188,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (result.status === 'success' && result.cards && result.cards.length > 0) {
                 result.cards.forEach(card => {
-                    userCardList.innerHTML += renderCard(card);
+                    const cardHtml = renderCard(card);
+                    const tempDiv = document.createElement('div'); // Create a temporary div
+                    tempDiv.innerHTML = cardHtml;
+                    const cardElement = tempDiv.firstElementChild; // Get the actual card item
+
+                    if (cardElement) {
+                        // Add click listener to the cardElement itself (the div with class="card-item")
+                        // This allows clicking anywhere on the card to go to details, unless a button is clicked
+                        cardElement.addEventListener('click', (event) => {
+                            // Prevent navigation if the click originated from within a button or a specific interactive element
+                            if (event.target.closest('.card-actions button')) {
+                                // If a button was clicked, handle its specific action (e.g., freezeCard, reportCard)
+                                const button = event.target.closest('.card-actions button');
+                                const cardId = button.dataset.cardId;
+                                if (button.classList.contains('freeze-btn')) {
+                                    const currentStatus = button.dataset.status;
+                                    toggleCardStatus(cardId, currentStatus); // Call a function to toggle status
+                                } else if (button.classList.contains('report-btn')) {
+                                    reportLostStolen(cardId); // Call a function to report
+                                } else if (button.classList.contains('set-pin-btn')) {
+                                    window.location.href = `${FRONTEND_BASE_URL}/set_card_pin.php?card_id=${cardId}`;
+                                }
+                                event.stopPropagation(); // Stop the event from bubbling up to the cardElement
+                                return;
+                            }
+                            // If it's not a button, navigate to the manage_card page
+                            window.location.href = `${FRONTEND_BASE_URL}/manage_card.php?card_id=${card.id}`;
+                        });
+
+                        userCardList.appendChild(cardElement); // Append the actual element
+                    }
                 });
             } else {
                 noCardsMessage.style.display = 'block'; // Show "no cards" message
@@ -188,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showMessageBox("Failed to load cards: Could not connect to the server. Please check your network or server status.", 'error');
             } else if (error.message.includes("Server error or API endpoint not found")) {
                 showMessageBox(`Failed to load cards: Server returned an unexpected response. This usually means the API endpoint is wrong or there's a PHP error on the server. Details: ${error.message.substring(0, 100)}...`, 'error');
-            } else if (error.message.includes("Unexpected token") || error.message.includes("JSON")) { // Broaden JSON parsing error check
+            } else if (error.message.includes("Unexpected token") || error.message.includes("JSON")) {
                 showMessageBox("Failed to load cards: The server response was not valid JSON. This often means a PHP error occurred on the API script. Check server logs.", 'error');
             } else {
                 showMessageBox(`Failed to load cards: ${error.message}`, 'error');
@@ -197,6 +241,55 @@ document.addEventListener('DOMContentLoaded', () => {
             cardsLoadingMessage.style.display = 'none'; // Hide loading message
         }
     }
+
+    // --- Card Action Functions (Stubs for now) ---
+    // You will need to implement the actual AJAX calls for these
+    async function toggleCardStatus(cardId, currentStatus) {
+        showMessageBox(`Attempting to ${currentStatus === 'Frozen' ? 'unfreeze' : 'freeze'} card ${cardId}...`, 'info');
+        try {
+            const response = await fetch(`${PHP_BASE_URL}api/update_card_status.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ card_id: cardId, action: currentStatus === 'Frozen' ? 'unfreeze' : 'freeze' })
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                showMessageBox(result.message, 'success');
+                fetchUserCards(); // Refresh cards to show updated status
+            } else {
+                showMessageBox(result.message, 'error');
+            }
+        } catch (error) {
+            console.error("Error toggling card status:", error);
+            showMessageBox(`Failed to toggle card status: ${error.message}`, 'error');
+        }
+    }
+
+    async function reportLostStolen(cardId) {
+        const confirmReport = confirm("Are you sure you want to report this card as lost/stolen? This action cannot be undone and a new card will be issued.");
+        if (!confirmReport) {
+            return;
+        }
+        showMessageBox(`Reporting card ${cardId} as lost/stolen...`, 'info');
+        try {
+            const response = await fetch(`${PHP_BASE_URL}api/update_card_status.php`, { // Assuming you use the same API for this
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ card_id: cardId, action: 'report_lost_stolen' })
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                showMessageBox(result.message, 'success');
+                fetchUserCards(); // Refresh cards to show updated status
+            } else {
+                showMessageBox(result.message, 'error');
+            }
+        } catch (error) {
+            console.error("Error reporting card:", error);
+            showMessageBox(`Failed to report card: ${error.message}`, 'error');
+        }
+    }
+
 
     // Call functions on page load
     fetchUserAccounts(); // Populate the account dropdown
@@ -215,12 +308,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData(orderCardForm);
 
             try {
-                // CORRECTED: Added the missing '/' after PHP_BASE_URL and the '.php' extension
-                const response = await fetch(`${PHP_BASE_URL}/api/order_card.php`, {
+                const response = await fetch(`${PHP_BASE_URL}api/order_card.php`, {
                     method: 'POST',
                     body: formData,
-                    // No 'Content-Type': 'application/json' header for FormData,
-                    // browser sets it automatically with boundary.
                 });
 
                 if (!response.ok) {
@@ -239,7 +329,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Re-set readonly card holder name after reset
                     document.getElementById('cardHolderName').value = currentUserFullName;
                     fetchUserCards(); // Refresh the card list to show the new card
-                    // fetchUserAccounts(); // Re-fetch accounts only if card ordering affects account balances, usually not needed.
                 } else {
                     showMessageBox(data.message, 'error'); // Show error message from server
                 }
@@ -249,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showMessageBox("An unexpected error occurred: Could not connect to the server. Please check your network or server status.", 'error');
                 } else if (error.message.includes("Server error or API endpoint not found")) {
                     showMessageBox(`An unexpected error occurred: Server returned an unexpected response. This usually means the API endpoint is wrong or there's a PHP error on the server. Details: ${error.message.substring(0, 100)}...`, 'error');
-                } else if (error.message.includes("Unexpected token") || error.message.includes("JSON")) { // Broaden JSON parsing error check
+                } else if (error.message.includes("Unexpected token") || error.message.includes("JSON")) {
                     showMessageBox("An unexpected error occurred: The server response was not valid JSON. This often means a PHP error occurred on the API script. Check server logs.", 'error');
                 } else {
                     showMessageBox(`An unexpected error occurred while placing your order: ${error.message}. Please try again.`, 'error');

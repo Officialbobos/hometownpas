@@ -14,6 +14,10 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Define userId early for consistent use
+$userId = $_SESSION['user_id'];
+$userObjectId = new ObjectId($userId); // User's ObjectId
+
 // Initialize variables for messages
 $message = '';
 $message_type = '';
@@ -46,7 +50,6 @@ try {
 }
 
 $card = null;
-$userObjectId = new ObjectId($_SESSION['user_id']); // User's ObjectId
 
 try {
     if (!empty($card_id)) {
@@ -78,7 +81,7 @@ try {
     header('Location: my_cards.php');
     exit;
 } catch (Exception $e) {
-    error_log("Error fetching card details in set_card_pin.php: " . $e->getMessage());
+    error_log("Error fetching card details in set_card_pin.php for user " . $userId . ": " . $e->getMessage());
     $_SESSION['message'] = 'Error fetching card details. Please try again.';
     $_SESSION['message_type'] = 'error';
     header('Location: my_cards.php');
@@ -113,8 +116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Update the card document with the hashed PIN
                 $updateResult = $bankCardsCollection->updateOne(
                     // Double-check ownership and ensure PIN is still null before updating
-                    ['_id' => $cardObjectId, 'user_id' => $userObjectId, 'pin' => null],
-            ['$set' => ['pin_hashed' => $hashed_pin, 'updated_at' => new UTCDateTime()]] // Consistent name, and cleaner UTCDateTime usage
+                    ['_id' => $cardObjectId, 'user_id' => $userObjectId, 'pin_hashed' => null], // Corrected to pin_hashed
+                    ['$set' => ['pin_hashed' => $hashed_pin, 'updated_at' => new UTCDateTime()]]
                 );
 
                 if ($updateResult->getModifiedCount() === 1) {
@@ -129,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $message_type = 'error';
                 }
             } catch (Exception $e) {
-                error_log("Error setting card PIN for user " . $userId . ": " . $e->getMessage());
+                error_log("Error setting card PIN for user " . $userId . ": " . $e->getMessage()); // Corrected $userId
                 $message = 'A database error occurred while trying to set the PIN. Please try again later.';
                 $message_type = 'error';
             }
