@@ -782,17 +782,13 @@ p.card-cvv-mock {
         left: 15px;
     }
     .card-number {
-        font-size: 1.5em; /* Significantly larger to match screenshot prominence */
-        letter-spacing: 2.8px; /* Increased spacing between numbers */
-        line-height: 1.4em; /* Ensure lines are close for two-line number */
+        font-size: 1.2em; /* Reduced card number font size */
+        letter-spacing: 1.5px;
+        top: 150px; /* Adjusted vertical position under the chip */
+        width: calc(100% - 30px); /* Adjust width based on new padding */
         text-align: center; /* Centered horizontally */
-        white-space: pre-wrap; /* Allows line breaks based on content (e.g., if you add \n in PHP) */
-        position: absolute;
-        top: 100px; /* Position below chip */
-        left: 50%;
-        transform: translateX(-50%); /* Centering trick */
-        width: calc(100% - 50px); /* Account for 25px padding on each side */
-        z-index: 2;
+        position: absolute; /* Ensure it stays in the right place */
+
     }
     .card-footer {
         font-size: 0.8em; /* Reduced footer text size */
@@ -802,10 +798,10 @@ p.card-cvv-mock {
     }
     p.card-cvv-mock {
         font-size: 0.7em; /* Reduced CVV mock text size */
-        bottom: 50px; /* Adjusted position -KEEPING IT BELOW CARD NUMBER*/
         width: calc(100% - 30px);
         text-align: center; /* Ensure it stays cnetered down  */
         bottom: 10px; /* Position above the footer and below card number */
+        position: absolute; /* Ensure it stays in the right place */
 
     }
     .card-network-logo-img {
