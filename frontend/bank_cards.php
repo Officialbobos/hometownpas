@@ -150,6 +150,22 @@ try {
             </div>
         </section>
 
+        <section class="card-management-actions-section">
+            <h2>Card Actions</h2>
+            <p>Select a card to perform actions like freezing, reporting, or setting its PIN.</p>
+            <div class="form-group">
+                <label for="actionCardSelect">Select Card:</label>
+                <select id="actionCardSelect" name="actionCardSelect">
+                    <option value="">-- Loading Cards --</option>
+                    </select>
+            </div>
+            <div class="action-buttons-group">
+                <button id="freezeActionButton" class="action-button primary-action" disabled><i class="fas fa-snowflake"></i> Freeze/Unfreeze Card</button>
+                <button id="reportActionButton" class="action-button danger-action" disabled><i class="fas fa-exclamation-triangle"></i> Report Card</button>
+                <button id="setPinActionButton" class="action-button secondary-action" disabled><i class="fas fa-key"></i> Set Card PIN</button>
+            </div>
+        </section>
+
         <section class="order-card-section">
             <h2>Order a Card</h2>
             <form id="orderCardForm">

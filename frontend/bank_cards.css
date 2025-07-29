@@ -245,9 +245,9 @@ h2 {
 /* Card Number */
 .card-number {
     font-family: var(--font-family-card-number);
-    font-size: 1.5em; /* Significantly larger to match screenshot prominence */
+    font-size: 1em; /* Significantly larger to match screenshot prominence */
     letter-spacing: 2.8px; /* Increased spacing between numbers */
-    line-height: 1.4em; /* Ensure lines are close for two-line number */
+    line-height: 1.2em; /* Ensure lines are close for two-line number */
     color: #fff; /* White for dark card backgrounds */
     text-align: center; /* Centered horizontally */
     white-space: pre-wrap; /* Allows line breaks based on content (e.g., if you add \n in PHP) */
@@ -499,6 +499,115 @@ p.card-cvv-mock {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/* Basic styling for the new section */
+.card-management-actions-section {
+    background-color: #ffffff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    margin-top: 30px; /* Space from the cards list */
+    margin-bottom: 30px; /* Space before the order form */
+    border: 1px solid #e0e0e0;
+}
+
+.card-management-actions-section h2 {
+    color: #004d40; /* Darker green for headings */
+    margin-bottom: 15px;
+    font-size: 1.8em;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 10px;
+}
+
+.card-management-actions-section p {
+    font-size: 1.1em;
+    color: #555;
+    margin-bottom: 20px;
+}
+
+/* Style for the select dropdown */
+#actionCardSelect {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 1em;
+    margin-bottom: 20px;
+    background-color: #f9f9f9;
+    appearance: none; /* Remove default dropdown arrow */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20256%20512%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M192%20256L64%20128v256l128-128z%22%2F%3E%3C%2Fsvg%3E'); /* Custom arrow */
+    background-repeat: no-repeat;
+    background-position: right 15px center;
+    background-size: 12px;
+}
+
+#actionCardSelect:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+
+/* Action buttons group */
+.action-buttons-group {
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    gap: 15px; /* Space between buttons */
+    justify-content: center; /* Center buttons */
+}
+
+.action-button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Space between icon and text */
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    flex-grow: 1; /* Allow buttons to grow */
+    max-width: 250px; /* Limit max width of each button */
+    justify-content: center;
+}
+
+.action-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+}
+
+.action-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: grayscale(50%); /* Visually indicate disabled */
+}
+
+.primary-action {
+    background-color: #007bff; /* Blue for freeze/unfreeze */
+    color: white;
+}
+
+.primary-action:hover:not(:disabled) {
+    background-color: #0056b3;
+}
+
+.danger-action {
+    background-color: #dc3545; /* Red for report */
+    color: white;
+}
+
+.danger-action:hover:not(:disabled) {
+    background-color: #c82333;
+}
+
+.secondary-action {
+    background-color: #6c757d; /* Gray for set PIN */
+    color: white;
+}
+
+.secondary-action:hover:not(:disabled) {
+    background-color: #5a6268;
 }
 
 .message-box-overlay.show {
@@ -788,7 +897,7 @@ p.card-cvv-mock {
         left: 15px;
     }
     .card-number {
-        font-size: 1.2em; /* Reduced card number font size */
+        font-size: 1em; /* Reduced card number font size */
         letter-spacing: 1.5px;
         top: 80px; /* Adjusted vertical position under the chip */
         width: calc(100% - 30px); /* Adjust width based on new padding */
@@ -891,7 +1000,7 @@ p.card-cvv-mock {
         left: 10px;
     }
     .card-number {
-        font-size: 1.2rem; /* Smallest card number font */
+        font-size: 1rem; /* Smallest card number font */
         letter-spacing: 1px;
         top: 90px; /* Adjusted vertical position to align */
         width: calc(100% - 20px); /* Adjust width for smallest padding */
