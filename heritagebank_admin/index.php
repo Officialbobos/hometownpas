@@ -56,7 +56,7 @@ if (isset($_POST['admin_login'])) {
                     $_SESSION['admin_email'] = $admin_user['email'];
                     // Use first_name and last_name from the admin document
                     $_SESSION['admin_full_name'] = trim(($admin_user['first_name'] ?? '') . ' ' . ($admin_user['last_name'] ?? ''));
-                    $_SESSION['is_admin'] = true; // Explicitly mark as admin in session
+                   $_SESSION['admin_logged_in'] = true; // Explicitly mark as admin in session
 
                     error_log("index.php: Login SUCCESS for user '" . $email . "'. Session set. Redirecting to dashboard.php."); // ADD THIS LINE
                     // Redirect to admin dashboard
