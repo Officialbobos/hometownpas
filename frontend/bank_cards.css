@@ -786,6 +786,9 @@ p.card-cvv-mock {
         letter-spacing: 1.5px;
         top: 105px; /* Adjusted vertical position */
         width: calc(100% - 30px); /* Adjust width based on new padding */
+        text-align: center; /* Centered horizontally */
+        position: absolute; /* Ensure it stays in the right place */
+
     }
     .card-footer {
         font-size: 0.8em; /* Reduced footer text size */
@@ -797,7 +800,9 @@ p.card-cvv-mock {
         font-size: 0.7em; /* Reduced CVV mock text size */
         bottom: 45px; /* Adjusted position -KEEPING IT BELOW CARD NUMBER*/
         width: calc(100% - 30px);
-        text-align: center; /* Ensure it stays cnetered - ADDED/CONFIRMED */
+        text-align: center; /* Ensure it stays cnetered down  */
+        bottom: 10px; /* Position above the footer and below card number */
+
     }
     .card-network-logo-img {
         height: 20px; /* Smaller network logo */
@@ -882,8 +887,11 @@ p.card-cvv-mock {
     .card-number {
         font-size: 1.2rem; /* Smallest card number font */
         letter-spacing: 1px;
-        top: 95px; /* Adjusted vertical position to align */
+        top: 115px; /* Adjusted vertical position to align */
         width: calc(100% - 20px); /* Adjust width for smallest padding */
+        text-align: center; /* Centered horizontally */
+        position: absolute; /* Ensure it stays in the right place */
+
     }
     .card-footer {
         font-size: 0.75em; /* Smallest footer text */
@@ -900,6 +908,8 @@ p.card-cvv-mock {
         font-size: 0.65em;
         bottom: 35px; /* Adjusted position */
         width: calc(100% - 20px);
+        bottom: 10px; /* Position above the footer and below card number */
+
     }
     .card-network-logo-img {
         height: 18px; /* Smallest network logo */
