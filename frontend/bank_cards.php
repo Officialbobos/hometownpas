@@ -1,6 +1,10 @@
 <?php
 // Path: C:\xampp\htdocs\hometownbank\frontend\bank_cards.php
 
+// For development:
+ini_set('display_errors', 1); // Enable error display for debugging
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
 // Ensure session is started and Config/functions are available.
 // In a production setup with index.php as a router, these might be handled globally.
@@ -214,7 +218,7 @@ try {
     </div>
     <script>
         // These variables must be defined before cards.js is loaded
-        const PHP_BASE_URL = <?php echo json_encode(value: rtrim(BASE_URL, '/')); ?>; // Ensure this is also trimmed for consistency, although it wouldn't cause // issues in JS fetch directly
+        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/'); ?>; // *** ADDED '/' to ensure API calls are correct ***
         // Assuming 'frontend' is directly under your BASE_URL for frontend assets
         const FRONTEND_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/frontend'); ?>;
         const currentUserId = <?php echo json_encode($user_id); ?>;
