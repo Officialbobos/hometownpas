@@ -91,14 +91,18 @@ $authenticated_routes = [
     'api/order_card',
     // ... potentially other API/frontend routes that require authentication
 ];
-
 // Check authentication for authenticated routes
 if (in_array($path, $authenticated_routes) && !str_starts_with($path, 'admin/')) {
     // This block handles routes that require a user to be fully logged in (after 2FA)
-    if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
+    if (
+        !isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true ||
+        !isset($_SESSION['user_id']) ||
+        !isset($_SESSION['2fa_verified']) || $_SESSION['2fa_verified'] !== true // <-- ADD THIS LINE
+    ) {
         header('Location: ' . BASE_URL . '/login');
         exit;
     }
+
 } elseif ($path === 'verify_code') {
     // This block specifically handles the 2FA verification page
     // It checks if the user is in the 'awaiting_2fa' state, meaning they passed initial login
