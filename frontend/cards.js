@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
                         <p class="card-cvv-mock">
-                            CVV: ${card.display_cvv_number} 
+                            CVV: ${card.display_cvv} 
                         </p>
                         ${card.is_active == 1 ? '<div class="card-status active">Active</div>' : '<div class="card-status inactive">Inactive</div>'}
                         ${card.card_logo_src ? `<img src="${card.card_logo_src}" alt="${card.card_network} Logo" class="card-network-logo-img">` : ''}

@@ -750,7 +750,7 @@ p.card-cvv-mock {
         width: calc(100% - 20px);
     }
     h2 {
-        font-size: 1.7rem;
+        font-size: 1.3rem;
         margin-bottom: 20px;
     }
     .card-list {
@@ -771,18 +771,18 @@ p.card-cvv-mock {
         left: 15px;
     }
     .card-item h4 {
-        font-size: 0.9em; /* Reduced bank name font size */
+        font-size: 0.7em; /* Reduced bank name font size */
         top: 15px;
         left: 15px;
     }
     .card-item .chip {
-        width: 40px; /* Smaller chip */
-        height: 25px;
-        top: 65px; /* Adjust vertical position */
+        width: 30px; /* Smaller chip */
+        height: 20px;
+        top: 60px; /* Adjust vertical position */
         left: 15px;
     }
     .card-number {
-        font-size: 1.4rem; /* Reduced card number font size */
+        font-size: 1.2em; /* Reduced card number font size */
         letter-spacing: 1.5px;
         top: 105px; /* Adjusted vertical position */
         width: calc(100% - 30px); /* Adjust width based on new padding */
@@ -795,8 +795,9 @@ p.card-cvv-mock {
     }
     p.card-cvv-mock {
         font-size: 0.7em; /* Reduced CVV mock text size */
-        bottom: 45px; /* Adjusted position */
+        bottom: 45px; /* Adjusted position -KEEPING IT BELOW CARD NUMBER*/
         width: calc(100% - 30px);
+        text-align: center; /* Ensure it stays cnetered - ADDED/CONFIRMED */
     }
     .card-network-logo-img {
         height: 20px; /* Smaller network logo */
