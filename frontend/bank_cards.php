@@ -126,7 +126,7 @@ try {
 <body>
     <header class="header">
         <nav class="header-nav">
-            <a href="<?php echo BASE_URL; ?>/dashboard" class="contact-button homepage">
+        <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="contact-button homepage">
                 <i class="fas fa-home"></i> Back to Dashboard </a>
         </nav>
         <h1>Manage My Cards</h1>
@@ -206,7 +206,7 @@ try {
 
         <section class="manage-pin-section">
             <h2>Manage Card PIN & Activation</h2>
-            <p>To activate a new card or set/change your existing card's PIN, please visit the <a href="<?php echo BASE_URL; ?>/my_cards">Card Activation & PIN Management page</a>.</p>
+        <p>To activate a new card or set/change your existing card's PIN, please visit the <a href="<?php echo rtrim(BASE_URL, '/'); ?>/my_cards">Card Activation & PIN Management page</a>.</p>
             </section>
     </main>
 
@@ -218,13 +218,13 @@ try {
     </div>
     <script>
         // These variables must be defined before cards.js is loaded
-        const PHP_BASE_URL = <?php echo json_encode(BASE_URL); ?>;
+        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/')); ?>; // Ensure this is also trimmed for consistency, although it wouldn't cause // issues in JS fetch directly
         // Assuming 'frontend' is directly under your BASE_URL for frontend assets
-        const FRONTEND_BASE_URL = <?php echo json_encode(BASE_URL . '/frontend'); ?>; // Removed trailing slash as you might add it in JS
+        const FRONTEND_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/frontend'); ?>;
         const currentUserId = <?php echo json_encode($user_id); ?>;
         const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
         const currentUserEmail = <?php echo json_encode($user_email); ?>;
     </script>
-    <script src="<?php echo BASE_URL; ?>/frontend/cards.js"></script>
+        <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
 </body>
 </html>
