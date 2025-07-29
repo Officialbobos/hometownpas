@@ -372,9 +372,10 @@ if (isset($_SESSION['admin_message'])) {
                     <li><a href="<?php echo BASE_URL; ?>/admin/transactions">Transaction History</a></li>
                     <li><a href="#">Reports & Analytics</a></li>
                     <li><a href="#">System Settings</a></li>
-                    <li><a href="#">Transfer Approvals</a></li> 
-                  <li><a href="<?php echo BASE_URL; ?>/admin/manage_transfer_modal">Manage Transfer Modal</a></li>
-                </ul>
+                    <li><a href="#">Transfer Approvals</a></li>
+                   <li> <a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/manage_transfer_modal.php">Manage Transfer Modal</a></li>
+
+                 </ul>
             </nav>
         </div>
     </div>

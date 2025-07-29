@@ -209,10 +209,10 @@ switch ($path) {
 
     // --- Admin Panel Routes ---
     case 'admin':
-        require __DIR__ . '/heritagebank_admin/admin_dashboard.php';
+        require __DIR__ . '/heritagebank_admin/dashboard.php';
         break;
     case 'admin/login': // Explicit admin login route if separate
-        require __DIR__ . '/heritagebank_admin/admin_login.php'; // Create this file
+        require __DIR__ . '/heritagebank_admin/index.php'; // Create this file
         break;
     case 'admin/users':
         require __DIR__ . '/heritagebank_admin/manage_users.php';
@@ -280,7 +280,7 @@ switch ($path) {
         require __DIR__ . '/heritagebank_admin/api/delete_transaction.php';
         break;
     case 'admin/manage_transfer_modal':
-        require __DIR__ . '/heritagebank_admin/manage_transfer_modal.php';
+        require __DIR__ . '/heritagebank_admin/api/manage_transfer_modal.php';
         break;
     default:
         http_response_code(404);

@@ -11,7 +11,7 @@ use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // Check if the admin is NOT logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: ' . BASE_URL . '/admin/login');
+    header('Location: ' . BASE_URL . '/admin/index');
     exit;
 }
 
