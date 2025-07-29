@@ -1,27 +1,38 @@
 <?php
 // api/get_user_accounts.php
 
-// Ensure NO spaces, newlines, or other characters before this <?php tag.
-// Also, ensure this file is saved as "UTF-8 without BOM" in your editor.
+// 1. Start the session
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 
 header('Content-Type: application/json');
 
-global $mongoDb;
+// 2. Include configuration and functions to establish MongoDB connection
+require_once __DIR__ . '/../Config.php';      // Assuming Config.php is one level up from 'api'
+require_once __DIR__ . '/../functions.php';   // Assuming functions.php is one level up from 'api'
+
+use MongoDB\BSON\ObjectId;
+use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
+
+// 3. Get MongoDB Client
+$mongoDb = getMongoDBClient(); // This function should be in functions.php and return the MongoDB\Client instance
+
 if (!$mongoDb) {
     error_log("ERROR: MongoDB connection not available in api/get_user_accounts.php.");
-    http_response_code(500); // <-- Set code BEFORE echoing JSON
+    http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database connection error.']);
-    exit; // Crucial to stop execution
+    exit;
 }
 
 if (!isset($_SESSION['user_id'])) {
-    http_response_code(401); // <-- Set code BEFORE echoing JSON
+    http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'User not authenticated.']);
-    exit; // Crucial to stop execution
+    exit;
 }
 
 try {
-    $userId = new MongoDB\BSON\ObjectId($_SESSION['user_id']);
+    $userId = new ObjectId($_SESSION['user_id']);
     $accountsCollection = $mongoDb->selectCollection('accounts');
 
     $cursor = $accountsCollection->find(
@@ -40,18 +51,18 @@ try {
         ];
     }
 
-    http_response_code(200); // <-- MOVED THIS LINE UP
-    echo json_encode(['success' => true, 'accounts' => $accounts]);
-    exit; // <-- ADDED THIS to prevent any further output
+    http_response_code(200);
+    echo json_encode(['status' => true, 'accounts' => $accounts]); // Use 'status' as per cards.js
+    exit;
 
-} catch (MongoDB\Driver\Exception\Exception $e) {
+} catch (MongoDBDriverException $e) {
     error_log("MongoDB EXCEPTION in get_user_accounts.php: " . $e->getMessage());
-    http_response_code(500); // <-- Set code BEFORE echoing JSON
+    http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database error fetching accounts.']);
-    exit; // Crucial to stop execution
+    exit;
 } catch (Exception $e) {
     error_log("GENERIC EXCEPTION in get_user_accounts.php: " . $e->getMessage());
-    http_response_code(500); // <-- Set code BEFORE echoing JSON
+    http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'An unexpected error occurred.']);
-    exit; // Crucial to stop execution
+    exit;
 }
