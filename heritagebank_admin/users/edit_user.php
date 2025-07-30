@@ -1,8 +1,10 @@
 <?php
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// The following lines are for debugging and should not be used on a live production site.
+// Since we are on a live site on Render, I've commented these out for security.
+// ini_set('display_errors', 1);
+// ini_set('display_startup_errors', 1);
+// error_reporting(E_ALL);
 
 require_once __DIR__ . '/../../Config.php'; 
 
@@ -94,6 +96,7 @@ function fetchUserData(
             $userData = $usersCollection->findOne(['_id' => $userId]);
 
             if ($userData) {
+                // Convert BSON document to a PHP array for easier access
                 $userData = (array) $userData;
 
                 // Fetch associated accounts
@@ -654,11 +657,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
             <?php endif; ?>
 
             <?php if ($user_data): ?>
-            <form action="edit_user.php?id=<?php echo htmlspecialchars($user_id); ?>" method="POST" class="form-standard" enctype="multipart/form-data">
+            <form action="edit_user.php?id=<?php echo htmlspecialchars((string) $user_id); ?>" method="POST" class="form-standard" enctype="multipart/form-data">
                 <h3>User Information</h3>
                 <div class="form-group">
                     <label for="id">User ID:</label>
-                    <input type="text" id="id" name="id" value="<?php echo htmlspecialchars($user_id); ?>" readonly>
+                    <input type="text" id="id" name="id" value="<?php echo htmlspecialchars((string) $user_id); ?>" readonly>
                 </div>
                 <div class="form-group">
                     <label for="membership_number">Membership Number:</label>
@@ -749,8 +752,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
                 <?php else: ?>
                     <?php foreach ($accounts_data as $index => $account): ?>
                         <div class="account-section">
-                            <h4>Account #<?php echo $index + 1; ?> (ID: <?php echo htmlspecialchars($account['_id']); ?>) - <?php echo htmlspecialchars($account['account_type'] ?? ''); ?></h4>
-                            <input type="hidden" name="accounts[<?php echo $index; ?>][id]" value="<?php echo htmlspecialchars($account['_id']); ?>">
+                            <h4>Account #<?php echo $index + 1; ?> (ID: <?php echo htmlspecialchars((string) $account['_id']); ?>) - <?php echo htmlspecialchars($account['account_type'] ?? ''); ?></h4>
+                            <input type="hidden" name="accounts[<?php echo $index; ?>][id]" value="<?php echo htmlspecialchars((string) $account['_id']); ?>">
 
                             <div class="form-group">
                                 <label for="account_type_<?php echo $index; ?>">Account Type:</label>
@@ -794,6 +797,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
                             <div class="form-group">
                                 <label for="swift_bic_<?php echo $index; ?>">SWIFT/BIC:</label>
                                 <input type="text" id="swift_bic_<?php echo $index; ?>" name="accounts[<?php echo $index; ?>][swift_bic]" value="<?php echo htmlspecialchars($account['swift_bic'] ?? ''); ?>">
+                                <small>Required for international transfers.</small>
                             </div>
                         </div>
                     <?php endforeach; ?>
