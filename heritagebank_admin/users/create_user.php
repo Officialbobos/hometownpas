@@ -16,9 +16,6 @@ use MongoDB\Driver\Exception\BulkWriteException;
 use Aws\S3\S3Client;
 use Aws\S3\Exception\S3Exception;
 
-// Start the session
-session_start();
-
 // Check if admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     // CORRECTED: Use standard rtrim and routed path

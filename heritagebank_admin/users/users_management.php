@@ -4,10 +4,6 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Start the session to access flash messages
-// --- CORRECTED: Added session_start() here ---
-session_start();
-
 // Load Composer's autoloader for MongoDB classes and Dotenv
 require_once __DIR__ . '/../../vendor/autoload.php'; // Adjusted path to root vendor folder
 
