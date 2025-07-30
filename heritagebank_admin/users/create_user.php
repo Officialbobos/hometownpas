@@ -16,21 +16,35 @@ use MongoDB\Driver\Exception\BulkWriteException;
 use Aws\S3\S3Client;
 use Aws\S3\Exception\S3Exception;
 
+// Start the session
+session_start();
+
 // Check if admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: ' . rtrim(BASE_URL, characters: '/') . '/heritagebank_admin/index.php');
+    // CORRECTED: Use standard rtrim and routed path
+    header('Location: ' . rtrim(BASE_URL, '/') . '/admin/login');
     exit;
 }
 
 $message = '';
 $message_type = ''; // 'success' or 'error'
 
+// Check for flash messages from previous redirects (e.g., from a successful creation)
+if (isset($_SESSION['flash_message'])) {
+    $message = $_SESSION['flash_message'];
+    $message_type = $_SESSION['flash_message_type'];
+    unset($_SESSION['flash_message']);
+    unset($_SESSION['flash_message_type']);
+}
+
 // Define HomeTown Bank's Fixed Identifiers (Fictional)
-define('HOMETOWN_BANK_UK_BIC', 'HOMTGB2LXXX');
+define('HOMETOWN_BANK_UK_BIC', 'HOMTGB2L343');
 define('HOMETOWN_BANK_UK_SORT_CODE_PREFIX', '90');
-define('HOMETOWN_BANK_EUR_BIC', 'HOMTDEFFXXX');
+define('HOMETOWN_BANK_EUR_BIC', 'HOMTDEFF5678');
 define('HOMETOWN_BANK_EUR_BANK_CODE_BBAN', '50070010');
-define('HOMETOWN_BANK_USD_BIC', 'HOMTUS33XXX');
+define('HOMETOWN_BANK_USD_BIC', 'HOMTUS333232');
+
+// ... (All your helper functions like generateUniqueNumericId, etc., remain here) ...
 
 /**
  * Helper function to generate a unique numeric ID of a specific length.
@@ -329,14 +343,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         // --- END B2 PROFILE IMAGE UPLOAD LOGIC ---
     }
-    
+
     // Only proceed with MongoDB if no errors so far
     if ($message_type !== 'error') {
         $mongoClient = null;
         $session = null;
         $transaction_success = false; // Changed to false by default
         $new_user_id = null;
-        
+
         try {
             $mongoClient = new Client(MONGODB_CONNECTION_URI);
             $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME);
@@ -526,9 +540,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $session->commitTransaction();
             $transaction_success = true;
-            $message = "User '{$first_name} {$last_name}' created successfully! <br>Membership Number: **{$membership_number}**<br>Initial Account Details:<br>" . implode("<br>", $accounts_created_messages);
-            $message_type = 'success';
-            $_POST = [];
+            
+            // --- CORRECTION: Add flash message and redirect here ---
+            $_SESSION['flash_message'] = "User '{$first_name} {$last_name}' created successfully! <br>Membership Number: **{$membership_number}**<br>Initial Account Details:<br>" . implode("<br>", $accounts_created_messages);
+            $_SESSION['flash_message_type'] = 'success';
+            header('Location: ' . rtrim(BASE_URL, '/') . '/admin/manage_users');
+            exit;
+            // --- END OF CORRECTION ---
+
         } catch (BulkWriteException $e) {
             $error_code = $e->getCode();
             $message = ($error_code === 11000) ? "Error creating user/account: A unique value already exists." : "Database write error: " . $e->getMessage();
@@ -706,7 +725,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <button type="submit" class="button-primary">Create User</button>
             </form>
 
-            <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/users/users_management.php" class="back-link">&larr; Back to User Management</a></p>
+            <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/users/users_management.php" class="back-link">&larr; Back to User Management</a></p>
         </main>
     </div>
     <style>
