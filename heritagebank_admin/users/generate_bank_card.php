@@ -5,16 +5,17 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-require_once __DIR__ . '/../../Config.php'; 
+// Ensure Config.php and functions.php are correctly located relative to this file
+// This file is in 'heritagebank_admin/users/', so go up two levels for 'Config.php' and 'vendor/'
+require_once __DIR__ . '/../../Config.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
-require_once __DIR__ . '/../../functions.php';
-
+require_once __DIR__ . '/../../functions.php'; // Assuming your functions.php is also at the root
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId; // For working with MongoDB's unique IDs
 use MongoDB\BSON\UTCDateTime; // For handling dates
 
-// Check if the admin is NOT logged in, redirect to login page
+// Admin authentication check
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
@@ -30,11 +31,11 @@ $accounts_for_card_generation = []; // Stores accounts for the selected user
 // Establish MongoDB connection
 $mongoClient = null;
 try {
-   $client = new MongoDB\Client(MONGODB_CONNECTION_URI);
-   $database = $client->selectDatabase(MONGODB_DB_NAME);
-   $usersCollection = $database->selectCollection('users');
-   $accountsCollection = $database->selectCollection('accounts');
-   $bankCardsCollection = $database->selectCollection('bank_cards'); // New collection for cards
+    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);
+    $database = $client->selectDatabase(MONGODB_DB_NAME);
+    $usersCollection = $database->selectCollection('users');
+    $accountsCollection = $database->selectCollection('accounts');
+    $bankCardsCollection = $database->selectCollection('bank_cards'); // New collection for cards
 
 } catch (Exception $e) {
     error_log("ERROR: Could not connect to MongoDB. " . $e->getMessage());
@@ -210,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'card_holder_name' => $card_holder_name,
                             'is_active' => false, // Set to false for pending activation
                             'status' => 'pending_activation', // New field to track status
-                            'pin' => null,
+                            'pin' => null, // PIN will be set by the user during activation
                             'created_at' => $created_at_mongo,
                             'updated_at' => new UTCDateTime(time() * 1000)
                         ];
@@ -227,6 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 'cvv' => 'XXX', // Do not show the real CVV to the admin
                                 'card_type' => $card_type
                             ];
+                            // Clear POST data to prevent re-submission on refresh and reset form state
                             $_POST = array();
                             $display_account_selection = false;
                             $user_for_card_generation = null;
@@ -519,7 +521,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="dashboard-header">
             <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo" class="logo">
             <h2>Generate Bank Card</h2>
-            <a href="../logout.php" class="logout-button">Logout</a>
+            <a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/logout.php'; ?>" class="logout-button">Logout</a>
         </div>
 
         <div class="dashboard-content">
@@ -530,7 +532,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php if (!$display_account_selection): // Step 1: Find User ?>
                 <div class="form-section">
                     <h3>Find User to Generate Card For</h3>
-                    <form action="generate_bank_card.php" method="POST" class="form-standard">
+                    <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/generate_bank_card.php'; ?>" method="POST" class="form-standard">
                         <input type="hidden" name="action" value="find_user">
                         <div class="form-group">
                             <label for="user_identifier">User Email or Membership Number</label>
@@ -549,7 +551,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="user-info-display">
                         Membership No: <?php echo htmlspecialchars($user_for_card_generation['membership_number']); ?>
                     </div>
-                    <form action="generate_bank_card.php" method="POST" class="form-standard">
+                    <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/generate_bank_card.php'; ?>" method="POST" class="form-standard">
                         <input type="hidden" name="action" value="generate_card">
                         <input type="hidden" name="user_id_hidden" value="<?php echo htmlspecialchars((string)$user_for_card_generation['_id']); ?>">
 
@@ -576,7 +578,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         <button type="submit" class="button-primary">Generate Card</button>
                     </form>
-                    <p><a href="generate_bank_card.php" class="back-link">Start a New Card Generation</a></p>
+                    <p><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/generate_bank_card.php'; ?>" class="back-link">Start a New Card Generation</a></p>
                 </div>
             <?php endif; ?>
 
@@ -617,9 +619,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </p>
             <?php endif; ?>
 
-            <p><a href="users_management.php" class="back-link">&larr; Back to User Management</a></p>
+            <p><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/users_management.php'; ?>" class="back-link">&larr; Back to User Management</a></p>
         </div>
     </div>
-    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/script.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/script.js'; ?>"></script>
 </body>
 </html>
