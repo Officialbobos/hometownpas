@@ -1,7 +1,8 @@
 <?php
 session_start();
-require_once '../../Config.php'; // Adjust path based on your actual file structure
-require_once '../../vendor/autoload.php'; // Include Composer's autoloader for MongoDB
+require_once __DIR__ . '/../../Config.php'; 
+require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../functions.php';
 
 // Check if the user is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {

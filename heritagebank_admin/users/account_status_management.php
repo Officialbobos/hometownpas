@@ -5,14 +5,17 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 session_start();
-require_once '/../../Config.php'; 
-require_once '/../../vendor/autoload.php';
-require_once '/../../functions.php';
+
+// CORRECTED: Use __DIR__ to build a reliable absolute path from the current file's location.
+// __DIR__ is '/var/www/html/heritagebank_admin/users'
+// The path '../../' goes up two directories to '/var/www/html/'
+require_once __DIR__ . '/../../Config.php'; 
+require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../functions.php';
 
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
-use MongoDB\Driver\Exception\Exception as MongoDBException; // Alias for MongoDB specific exceptions
-
+use MongoDB\Driver\Exception\Exception as MongoDBException;
 // Check if the admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');

@@ -4,22 +4,22 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-require_once '/../../Config.php';
+require_once __DIR__ . '/../../Config.php'; 
 
 // Use MongoDB PHP Library
-require_once '/../../functions.php';
+require_once __DIR__ . '/../../functions.php';
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
 
 // Include AWS SDK for PHP (for Backblaze B2 S3 Compatible API)
-require '../../vendor/autoload.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
 use Aws\S3\S3Client;
 use Aws\Exception\AwsException;
 
 // Check if admin is logged in
-if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: ../index.php');
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ' . rtrim(BASE_URL, characters: '/') . '/heritagebank_admin/index.php');
     exit;
 }
 

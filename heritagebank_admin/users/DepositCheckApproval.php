@@ -4,7 +4,7 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-require_once __DIR__ . '../../vendor/autoload.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
 
 // Load .env and Config
 $dotenvPath = dirname(__DIR__, 2); 
@@ -12,8 +12,8 @@ if (file_exists($dotenvPath . '/.env')) {
     $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
     $dotenv->load();
 }
-require_once __DIR__ . '../../Config.php';
-require_once __DIR__ . '../../functions.php';
+require_once __DIR__ . '/../../Config.php';
+require_once __DIR__ . '/../../functions.php';
 
 // Define the bank name here for use in transaction descriptions
 const BANK_NAME = 'Heritage Bank';

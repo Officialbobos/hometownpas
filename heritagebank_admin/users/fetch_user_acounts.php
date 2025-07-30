@@ -6,10 +6,11 @@ error_reporting(E_ALL);
 
 // session_start(); // REMOVED - This should be called by the file that includes this one.
 
-require_once '../Config.php'; // Path to Config.php from heritagebank/users/
+require_once __DIR__ . '/../../Config.php'; 
+require_once __DIR__ . '/../../functions.php';
 
 // Use MongoDB PHP Library
-require_once __DIR__ . '/vendor/autoload.php'; // Adjust path if Composer's autoload is elsewhere
+require_once __DIR__ . '/../../vendor/autoload.php';
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId; // For working with MongoDB's unique IDs
 
