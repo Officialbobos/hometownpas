@@ -11,7 +11,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Include your database connection, Composer autoloader, and general config.
 // Make sure this path is correct for your project structure.
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../Config.php';
 
 // Add this line to confirm the includes are successful
 error_log("DEBUG: config.php included successfully.");

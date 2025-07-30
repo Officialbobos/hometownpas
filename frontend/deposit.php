@@ -11,6 +11,8 @@ if (file_exists($dotenvPath . '/.env')) {
 require_once __DIR__ . '/../Config.php';
 require_once __DIR__ . '/../functions.php';
 
+use MongoDB\BSON\ObjectId;
+
 // Check if the user is logged in
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
     header('Location: ' . rtrim(BASE_URL, '/'));
