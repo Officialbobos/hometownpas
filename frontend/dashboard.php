@@ -1,16 +1,15 @@
 <?php
 // C:\xampp_lite_8_4\www\phpfile-main\frontend\dashboard.php
 
-error_log("--- dashboard.php Start ---");
-error_log("Session ID (dashboard.php entry): " . session_id());
-error_log("Session Contents (dashboard.php entry): " . print_r($_SESSION, true));
-
-// Ensure session is started and user is authenticated
-// Assumes a central router or a dedicated auth file handles session_start()
-// and setting $_SESSION['user_id'] and $_SESSION['logged_in']
+// THIS MUST BE THE VERY FIRST EXECUTABLE LINE OF PHP CODE
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
+
+error_log("[". date('D M d H:i:s.u Y') . "] [php:notice] [pid ".getmypid().":tid ".getmypid()."] [client ::1:DASHBOARD_REQUEST] --- dashboard.php Start ---");
+error_log("[". date('D M d H:i:s.u Y') . "] [php:notice] [pid ".getmypid().":tid ".getmypid()."] [client ::1:DASHBOARD_REQUEST] Session ID (dashboard.php entry): " . session_id());
+error_log("[". date('D M d H:i:s.u Y') . "] [php:notice] [pid ".getmypid().":tid ".getmypid()."] [client ::1:DASHBOARD_REQUEST] Session Contents (dashboard.php entry): " . print_r($_SESSION, true));
+
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../Config.php';
@@ -19,9 +18,17 @@ require_once __DIR__ . '/../functions.php'; // For getCollection()
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
+// IMPORTANT: Your previous logs from verify_code.php show 'auth_step' and 'temp_user_id',
+// but dashboard.php is checking for 'user_id' and 'logged_in'.
+// This is the most likely discrepancy causing the redirect.
+// We need to ensure that verify_code.php correctly sets 'user_id' and 'logged_in' upon successful 2FA.
+
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    error_log("[". date('D M d H:i:s.u Y') . "] [php:notice] [pid ".getmypid().":tid ".getmypid()."] [client ::1:DASHBOARD_REQUEST] dashboard.php: User not fully authenticated (user_id or logged_in missing/false). Redirecting to login.");
     header('Location: ' . rtrim(BASE_URL, '/') . '/login');
     exit;
+} else {
+    error_log("[". date('D M d H:i:s.u Y') . "] [php:notice] [pid ".getmypid().":tid ".getmypid()."] [client ::1:DASHBOARD_REQUEST] dashboard.php: User authenticated successfully.");
 }
 
 $usersCollection = getCollection('users');
@@ -46,18 +53,18 @@ try {
         // User data not found, possibly log out or show error
         $message = "User data not found.";
         $message_type = "error";
-        // Recommendation: If user data not found, forcibly log out for security.
+        error_log("[". date('D M d H:i:s.u Y') . "] [php:notice] [pid ".getmypid().":tid ".getmypid()."] [client ::1:DASHBOARD_REQUEST] dashboard.php: User data NOT FOUND in DB for ID: " . $loggedInUserId . ". Forcibly logging out.");
         header('Location: ' . rtrim(BASE_URL, '/') . '/logout'); // Corrected for clean URL
         exit;
     }
 } catch (MongoDBDriverException $e) {
     $message = "Database error: " . $e->getMessage();
     $message_type = "error";
-    error_log("Frontend Dashboard User Data Load Error: " . $e->getMessage());
+    error_log("[". date('D M d H:i:s.u Y') . "] [php:notice] [pid ".getmypid().":tid ".getmypid()."] [client ::1:DASHBOARD_REQUEST] Frontend Dashboard User Data Load Error: " . $e->getMessage());
 } catch (Exception $e) {
     $message = "An unexpected error occurred: " . $e->getMessage();
     $message_type = "error";
-    error_log("Frontend Dashboard General Error: " . $e->getMessage());
+    error_log("[". date('D M d H:i:s.u Y') . "] [php:notice] [pid ".getmypid().":tid ".getmypid()."] [client ::1:DASHBOARD_REQUEST] Frontend Dashboard General Error: " . $e->getMessage());
 }
 
 ?>
