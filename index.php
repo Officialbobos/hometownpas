@@ -95,6 +95,7 @@ $authenticated_routes = [
     'manage_card',
     'my_cards',
     'set_card_pin',
+    'deposit',
     'statements',
     // 'verify_code', // Removed from authenticated_routes as it has its own distinct auth check below
     'api/get_user_cards',

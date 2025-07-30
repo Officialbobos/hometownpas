@@ -2,21 +2,6 @@
 // Path: C:\xampp\htdocs\hometownbank\frontend\dashboard.php
 session_start();
 
-// --- REMOVE TEMPORARY DEBUG CODE FOR INI_SET & ERROR_REPORTING ---
-// These are now handled by Config.php based on APP_DEBUG.
-// ini_set('display_errors', 1);
-// ini_set('display_startup_errors', 1);
-// error_reporting(E_ALL);
-
-// --- REMOVE TEMPORARY DEBUG LOGS ---
-// error_log("--- dashboard.php TOP DEBUG ---");
-// error_log("DEBUG: dashboard.php - SESSION user_logged_in: " . print_r($_SESSION['user_logged_in'] ?? 'NOT SET', true));
-// error_log("DEBUG: dashboard.php - SESSION user_id: " . print_r($_SESSION['user_id'] ?? 'NOT SET', true));
-// error_log("DEBUG: dashboard.php - SESSION 2fa_verified: " . print_r($_SESSION['2fa_verified'] ?? 'NOT SET', true));
-// error_log("DEBUG: dashboard.php - SESSION auth_step: " . print_r($_SESSION['auth_step'] ?? 'NOT SET', true));
-// error_log("DEBUG: dashboard.php - Full SESSION DUMP: " . print_r($_SESSION, true));
-// error_log("--- End TOP DEBUG ---");
-
 // Load Composer's autoloader FIRST.
 // This is crucial because Dotenv and other libraries are loaded through it.
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -285,7 +270,7 @@ try {
                 <i class="fas fa-exchange-alt"></i>
                 <p>Transfer</p>
             </div>
-            <div class="action-button" id="depositButton">
+            <div class="action-button" id="depositButton" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/deposit'">
                 <i class="fas fa-download"></i>
                 <p>Deposit</p>
             </div>

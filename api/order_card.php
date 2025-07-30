@@ -1,6 +1,9 @@
 <?php
 // api/order_card.php
 
+// Add this line to confirm the script starts
+error_log("DEBUG: Starting order_card.php script execution.");
+
 // Start the session at the very beginning of the script.
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -9,6 +12,9 @@ if (session_status() === PHP_SESSION_NONE) {
 // Include your database connection, Composer autoloader, and general config.
 // Make sure this path is correct for your project structure.
 require_once __DIR__ . '/../config/config.php';
+
+// Add this line to confirm the includes are successful
+error_log("DEBUG: config.php included successfully.");
 
 // Import PHPMailer classes into the global namespace
 use PHPMailer\PHPMailer\PHPMailer;
@@ -55,11 +61,9 @@ try {
     // Basic check for recipient email
     if (empty($recipient_email) || !filter_var($recipient_email, FILTER_VALIDATE_EMAIL)) {
         error_log("WARNING: Invalid or missing email for user " . $user_id_string . ". Cannot send order confirmation email.");
-        // We might still proceed with the order, but log a warning.
         // For now, let's make it critical to ensure email setup is verified.
         throw new Exception('User email not available or invalid. Cannot send order confirmation.', 500);
     }
-
 
     // IMPORTANT: Use $_POST as your frontend is sending FormData
     $cardHolderName = $_POST['cardHolderName'] ?? null;
@@ -67,6 +71,9 @@ try {
     $cardNetwork = $_POST['cardNetwork'] ?? null;
     $accountId = $_POST['accountId'] ?? null;
     $shippingAddress = $_POST['shippingAddress'] ?? null;
+
+    // Add this line to confirm POST data is received
+    error_log("DEBUG: Received POST data. Card Holder: $cardHolderName, Card Type: $cardType, Account ID: $accountId");
 
     // Basic validation
     if (empty($cardHolderName) || empty($cardType) || empty($cardNetwork) || empty($accountId) || empty($shippingAddress)) {
@@ -90,16 +97,15 @@ try {
         throw new Exception('Account verification failed. Please try again.', 500);
     }
 
+    // Add this line to confirm validation passed
+    error_log("DEBUG: All input validations passed.");
+
     // --- Card Generation Functions (Assumed to be defined elsewhere or included) ---
-    // Make sure these functions are available. They were in the previous code block.
-    // For brevity, I'm omitting them here, assuming they are defined or included.
+    // Make sure these functions are available.
     function generateCardNumber(string $network): string { /* ... */ return '1234567890123456'; } // Placeholder
     function generateExpiryDate(): string { /* ... */ return '12/28'; } // Placeholder
     function generateCVV(): string { /* ... */ return '123'; } // Placeholder
     function generatePIN(): string { /* ... */ return '4567'; } // Placeholder
-
-    // If you removed them, please put them back or include a file that has them.
-    // Example: require_once __DIR__ . '/../utils/CardGenerators.php';
 
     $cardNumber = generateCardNumber($cardNetwork);
     $expiryDate = generateExpiryDate();
@@ -143,8 +149,12 @@ try {
             'cardId' => $newCardId
         ];
         $statusCode = 200;
+        
+        error_log("DEBUG: Card successfully inserted. PHPMailer section is commented out for testing. Final response is ready.");
 
-        // --- Send Email Notification ---
+        // --- Temporarily Commented Out Email Sending to Isolate Error ---
+        /*
+        error_log("DEBUG: Card successfully inserted. Preparing to send email.");
         $mail = new PHPMailer(true); // true enables exceptions
         try {
             // Server settings
@@ -191,15 +201,13 @@ try {
 
         } catch (PHPMailerException $e) {
             error_log("EMAIL ERROR: Failed to send order confirmation email to {$recipient_email}. Mailer Error: {$mail->ErrorInfo}. Exception: {$e->getMessage()}");
-            // Important: We still want to send a success response to the user
-            // even if the email failed, as the card order itself succeeded.
-            // You might want to queue the email for retry or notify admin.
             $response_data['message'] .= " However, there was an issue sending your confirmation email. Please check your spam folder.";
         }
-        // --- End Send Email Notification ---
+        */
+        // --- End of Commented Section ---
 
     } else {
-        error_log("Failed to insert new card for user " . $userObjectId . ". Insert count: " . $insertResult->getInsertedCount());
+        error_log("ERROR: Failed to insert new card for user " . $userObjectId . ". Insert count: " . $insertResult->getInsertedCount());
         throw new Exception('Failed to place card order. Database insertion issue.', 500);
     }
 
@@ -223,4 +231,4 @@ try {
 // Set the HTTP status code before sending the JSON response
 http_response_code($statusCode);
 echo json_encode($response_data);
-exit; // Ensure nothing else is outputted
+exit; // Ensure nothing else is outputted here is the file
