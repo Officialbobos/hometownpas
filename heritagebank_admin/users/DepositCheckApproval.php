@@ -20,8 +20,8 @@ const BANK_NAME = 'Home Town Bank';
 
 // Check if admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
-    exit;
+header('Location: ' . rtrim(BASE_URL, '/') . '/admin/login');
+exit;
 }
 
 $message = '';

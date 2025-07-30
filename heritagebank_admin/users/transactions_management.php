@@ -1,9 +1,12 @@
 <?php
 // Path: C:\xampp\htdocs\heritagebank\admin\transactions_management.php
 
-session_start();
-require_once '../../Config.php'; 
-require_once '../../functions.php'; 
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+require_once '/../../Config.php'; 
+require_once '/../../functions.php'; 
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
