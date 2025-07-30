@@ -1,5 +1,11 @@
 <?php
+
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 session_start();
+
 require_once '../Config.php'; // Essential for MONGO_URI, MONGO_DB_NAME
 require_once '../vendor/autoload.php'; // Make sure Composer's autoloader is included for MongoDB classes
 require_once '../functions.php'; // Include functions.php if it contains utility functions like getCollection
