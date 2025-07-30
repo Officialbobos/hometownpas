@@ -1,113 +1,65 @@
 <?php
-// Path: C:\xampp\htdocs\hometownbank\frontend\dashboard.php
-// Assuming dashboard.php is in the 'frontend' folder, so paths to Config and functions need to go up one level.
+// C:\xampp_lite_8_4\www\phpfile-main\frontend\dashboard.php
 
-session_start();
+error_log("--- dashboard.php Start ---");
+error_log("Session ID (dashboard.php entry): " . session_id());
+error_log("Session Contents (dashboard.php entry): " . print_r($_SESSION, true));
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// Ensure session is started and user is authenticated
+// Assumes a central router or a dedicated auth file handles session_start()
+// and setting $_SESSION['user_id'] and $_SESSION['logged_in']
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Load Composer's autoloader FIRST.
-// This is crucial because Dotenv and other libraries are loaded through it.
 require_once __DIR__ . '/../vendor/autoload.php';
-
-// Load .env variables. This must happen AFTER autoload.php and BEFORE Config.php if Config.php uses $_ENV.
-$dotenv = Dotenv\Dotenv::createImmutable(dirname(__DIR__)); // Go up two levels from frontend/ to phpfile-main/
-$dotenv->load();
-
-// Now load your Config.php and functions.php files.
-// Config.php can now safely access $_ENV variables if they're defined in your .env file.
 require_once __DIR__ . '/../Config.php';
-require_once __DIR__ . '/../functions.php'; // For sanitize_input, and potentially other utilities
+require_once __DIR__ . '/../functions.php'; // For getCollection()
 
+use MongoDB\BSON\ObjectId;
+use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
-// Check if the user is logged in. If not, redirect to login page.
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: ../indx.php'); // Redirect to the main login page (e.g., indx.php)
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header('Location: ' . rtrim(BASE_URL, '/') . '/login');
     exit;
 }
 
-$user_id = $_SESSION['user_id'];
-// Fetch username, first_name, last_name from session (set during login)
-$username = $_SESSION['username'] ?? 'User'; // Fallback if username not set in session
-$first_name = $_SESSION['first_name'] ?? '';
-$last_name = $_SESSION['last_name'] ?? '';
-$user_email = $_SESSION['temp_user_email'] ?? ''; // Assuming email is stored in session from 2FA flow
+$usersCollection = getCollection('users');
+$loggedInUserId = $_SESSION['user_id'];
+$userData = null;
+$transferModalMessage = '';
+$showTransferModal = false;
+$cardModalMessage = ''; // NEW: For View My Cards Modal
+$showCardModal = false; // NEW: For View My Cards Modal
+$message = '';
+$message_type = '';
 
-// Generate full name for display
-$full_name = trim($first_name . ' ' . $last_name);
-if (empty($full_name)) {
-    $full_name = $username;
-}
-
-// MongoDB Connection
-$mongoClient = null;
 try {
-    // Connect to MongoDB
-    // *** CORRECTED: Use the constant names defined in Config.php ***
-    $mongoClient = new MongoDB\Client(MONGODB_CONNECTION_URI); // Use MONGODB_CONNECTION_URI
-    $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME); // Use MONGODB_DB_NAME
+    $userData = $usersCollection->findOne(['_id' => new ObjectId($loggedInUserId)]);
 
-    $accountsCollection = $mongoDb->accounts;
-    $transactionsCollection = $mongoDb->transactions;
-
-} catch (MongoDB\Driver\Exception\Exception $e) {
-    // Handle MongoDB connection errors
-    die("ERROR: Could not connect to MongoDB. " . $e->getMessage());
+    if ($userData) {
+        $transferModalMessage = $userData['transfer_modal_message'] ?? '';
+        $showTransferModal = $userData['show_transfer_modal'] ?? false;
+        $cardModalMessage = $userData['card_modal_message'] ?? ''; // NEW
+        $showCardModal = $userData['show_card_modal'] ?? false; // NEW
+    } else {
+        // User data not found, possibly log out or show error
+        $message = "User data not found.";
+        $message_type = "error";
+        // Recommendation: If user data not found, forcibly log out for security.
+        header('Location: ' . rtrim(BASE_URL, '/') . '/logout'); // Corrected for clean URL
+        exit;
+    }
+} catch (MongoDBDriverException $e) {
+    $message = "Database error: " . $e->getMessage();
+    $message_type = "error";
+    error_log("Frontend Dashboard User Data Load Error: " . $e->getMessage());
+} catch (Exception $e) {
+    $message = "An unexpected error occurred: " . $e->getMessage();
+    $message_type = "error";
+    error_log("Frontend Dashboard General Error: " . $e->getMessage());
 }
 
-
-$user_accounts = []; // Array to store all accounts for the logged-in user
-$recent_transactions = []; // Array to store recent transactions
-
-// 1. Fetch user's accounts from MongoDB
-if ($mongoClient) {
-    try {
-        // MongoDB stores _id as ObjectId by default. If your user_id is an integer or string, adjust the query.
-        // Assuming user_id in accounts collection matches $_SESSION['user_id'] directly (e.g., an integer or string)
-        // You mentioned the _id was '6881f2fa549401e932055a2d' in the error stack, which is an ObjectId.
-        // So, use new MongoDB\BSON\ObjectId($user_id);
-        $filter = ['user_id' => new MongoDB\BSON\ObjectId($user_id)];
-
-        $accounts_cursor = $accountsCollection->find($filter);
-        foreach ($accounts_cursor as $account_data) {
-            // Convert MongoDB BSON Document to PHP array
-            $user_accounts[] = $account_data->getArrayCopy();
-        }
-    } catch (MongoDB\Driver\Exception\Exception $e) {
-        error_log("Error fetching accounts from MongoDB: " . $e->getMessage());
-        // You might want to display a user-friendly message or redirect
-        // echo "Error fetching accounts: " . $e->getMessage(); // For debugging
-    }
-
-    // 2. Fetch recent transactions for the user from MongoDB
-    try {
-        // Query for transactions where user_id matches
-        // Also use ObjectId for user_id in transactions if consistent with users collection
-        $filter_transactions = ['user_id' => new MongoDB\BSON\ObjectId($user_id)];
-        // Sort by 'initiated_at' in descending order and limit to 10
-        $options_transactions = [
-            'sort' => ['initiated_at' => -1],
-            'limit' => 10,
-        ];
-
-        $transactions_cursor = $transactionsCollection->find($filter_transactions, $options_transactions);
-        foreach ($transactions_cursor as $transaction_data) {
-            // Convert MongoDB BSON Document to PHP array
-            $recent_transactions[] = $transaction_data->getArrayCopy();
-        }
-    } catch (MongoDB\Driver\Exception\Exception $e) {
-        error_log("Error fetching transactions from MongoDB: " . $e->getMessage());
-        // You might want to display a user-friendly message or redirect
-        // echo "Error fetching transactions: " . $e->getMessage(); // For debugging
-    }
-}
-
-// MongoDB connection does not need an explicit close like MySQLi;
-// the client connection is managed by the driver or garbage collection.
-// However, if you explicitly want to unset it:
-// unset($mongoClient);
 ?>
 <!DOCTYPE html>
 <html lang="en">
