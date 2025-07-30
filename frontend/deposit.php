@@ -1,8 +1,10 @@
 <?php
 // The session, autoloader, and core files are already loaded by index.php
 
-// Removed the 'echo "Deposit page is working!"; exit;' block
-// as it was prematurely terminating the script.
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+// session_start(); // If this file uses sessions, add it
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../Config.php';
