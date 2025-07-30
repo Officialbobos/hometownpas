@@ -143,7 +143,7 @@ if (str_starts_with($path, 'admin') || str_starts_with($path, 'api/admin')) {
 
 // --- ALL ROUTER LOGIC IN ONE SWITCH STATEMENT ---
 switch ($path) {
-    // --- Frontend Routes (No changes here, assuming these are correct) ---
+    // --- Frontend Routes ---
     case '': // Default route for the root URL
     case 'login':
         require __DIR__ . '/frontend/login.php';
@@ -190,12 +190,11 @@ switch ($path) {
     case 'verify_code':
         require __DIR__ . '/frontend/verify_code.php';
         break;
-        break;
     case 'deposit':
         require __DIR__ . '/frontend/deposit.php';
         break;
 
-    // --- API Routes (No changes here, assuming these are correct and outside heritagebank_admin) ---
+    // --- API Routes ---
     case 'api/get_user_cards':
         require __DIR__ . '/api/get_user_cards.php';
         break;
@@ -211,44 +210,40 @@ switch ($path) {
     case 'api/register':
         require __DIR__ . '/api/register.php';
         break;
-         case 'api/deposti_check':
+    case 'api/deposit_check':
         require __DIR__ . '/api/deposit_check.php';
         break;
-    // ... potentially other API routes
 
-    // --- ADMIN PANEL ROUTES (UPDATED BASED ON YOUR FOLDER STRUCTURE) ---
-    // Files directly under 'heritagebank_admin/'
-    case 'admin': // Main admin dashboard
+    // --- ADMIN PANEL ROUTES ---
+    case 'admin':
         require __DIR__ . '/heritagebank_admin/dashboard.php';
         break;
-    case 'admin/login': // Admin login page
-        require __DIR__ . '/heritagebank_admin/index.php'; // As per your structure, 'index.php' is the login.
+    case 'admin/login':
+        require __DIR__ . '/heritagebank_admin/index.php';
         break;
-    case 'admin/logout': // Admin logout
+    case 'admin/logout':
         require __DIR__ . '/heritagebank_admin/logout.php';
         break;
-    case 'admin/manage_transfer_modal': // Manage Transfer Modal
+    case 'admin/manage_transfer_modal':
         require __DIR__ . '/heritagebank_admin/manage_transfer_modal.php';
         break;
-    case 'admin/transfer_process': // Transfer Process (if it's a page that needs routing)
+    case 'admin/transfer_process':
         require __DIR__ . '/heritagebank_admin/transfer_process.php';
         break;
-
-    // Files within 'heritagebank_admin/users/' subfolder
-    case 'admin/users': // Main User Management menu page
+    case 'admin/users':
         require __DIR__ . '/heritagebank_admin/users/users_management.php';
         break;
     case 'admin/create_user':
         require __DIR__ . '/heritagebank_admin/users/create_user.php';
         break;
-    case 'admin/manage_users': // Page to list/edit/delete users
+    case 'admin/manage_users':
         require __DIR__ . '/heritagebank_admin/users/manage_users.php';
         break;
     case 'admin/manage_user_funds':
         require __DIR__ . '/heritagebank_admin/users/manage_user_funds.php';
         break;
     case 'admin/account_status_management':
-        require __DIR__ . '/heritagebank_admin/users/account_status_mangement.php'; // Note the spelling: "mangement"
+        require __DIR__ . '/heritagebank_admin/users/account_status_mangement.php';
         break;
     case 'admin/transactions_management':
         require __DIR__ . '/heritagebank_admin/users/transactions_management.php';
@@ -259,46 +254,24 @@ switch ($path) {
     case 'admin/generate_mock_transaction':
         require __DIR__ . '/heritagebank_admin/users/generate_mock_transaction.php';
         break;
-    case 'admin/edit_users': // For editing individual users
+    case 'admin/edit_users':
         require __DIR__ . '/heritagebank_admin/users/edit_users.php';
         break;
-    case 'admin/fetch_user_accounts': // If this is a page route, not an API endpoint
+    case 'admin/fetch_user_accounts':
         require __DIR__ . '/heritagebank_admin/users/fetch_user_accounts.php';
         break;
-    case 'admin/my_cards': // This was listed under 'users' but might be better as 'admin/user_cards' or similar
+    case 'admin/my_cards':
         require __DIR__ . '/heritagebank_admin/users/my_cards.php';
         break;
     case 'admin/activate_card':
         require __DIR__ . '/heritagebank_admin/users/activate_card.php';
         break;
-        break;
-    case 'admin/activate_card':
+    case 'admin/deposit_check_approval':
         require __DIR__ . '/heritagebank_admin/users/DepositCheckApproval.php';
         break;
-    // --- REMOVED/COMMENTED OUT ROUTES (Not found in your provided structure) ---
-    // If these files exist elsewhere or you intend to create them, uncomment and correct paths.
-    // case 'admin/accounts':
-    //     require __DIR__ . '/heritagebank_admin/manage_accounts.php';
-    //     break;
-    // case 'admin/cards':
-    //     require __DIR__ . '/heritagebank_admin/manage_cards.php';
-    //     break;
-    // case 'admin/transactions':
-    //     require __DIR__ . '/heritagebank_admin/manage_transactions.php';
-    //     break;
-    // case 'api/admin/get_users': // Assuming Admin APIs are NOT in heritagebank_admin/api/ based on your list
-    //     require __DIR__ . '/heritagebank_admin/api/get_users.php';
-    //     break;
-    // ... all other 'api/admin/*' routes were removed for consistency with your provided structure.
-    // If you have these API files and they are at the root level (e.g., /api/admin/get_users.php),
-    // you would define routes like: case 'api/admin/get_users': require __DIR__ . '/api/admin/get_users.php'; break;
-
 
     default:
         http_response_code(404);
-        // It's crucial to have an actual 404.php file or a robust error page.
-        // For development, simply echoing "404 Not Found" is fine.
-        // For production, create frontend/404.php for a user-friendly error.
         if (file_exists(__DIR__ . '/frontend/404.php')) {
             require __DIR__ . '/frontend/404.php';
         } else {

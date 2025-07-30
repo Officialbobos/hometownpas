@@ -7,8 +7,8 @@ error_reporting(E_ALL);
 session_start();
 
 // Adjust paths as necessary for your file structure
-require_once __DIR__ . '/../../Config.php'; // Adjusted path to root Config.php
-require_once __DIR__ . '/../../functions.php'; // Adjusted path to root functions.php
+require_once __DIR__ . '/../../Config.php'; // Corrected path to root Config.php
+require_once __DIR__ . '/../../functions.php'; // Corrected path to root functions.php
 
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                         default: $status_color = '#333333'; break; // Default dark grey
                     }
 
-                    $user_subject = "Important: Your HomeTown Bank Pa Account Status Has Been Updated";
+                    $user_subject = "Important: Your Home Town Bank PA Account Status Has Been Updated";
                     $user_email_body = '
                     <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; background-color: #f4f4f4;">
                         <tr>
@@ -194,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                                 <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
                                     <tr>
                                         <td align="center" style="padding: 20px 0; background-color:#E0E6EB;">
-                                            <img src="https://i.imgur.com/UeqGGSn.png" alt="Heritage Bank Logo" style="display: block; max-width: 120px; height: auto; margin: 0 auto; padding: 5px;">
+                                            <img src="https://i.imgur.com/YmC3kg3.png" alt="Heritage Bank Logo" style="display: block; max-width: 120px; height: auto; margin: 0 auto; padding: 5px;">
                                         </td>
                                     </tr>
                                     <tr>
@@ -222,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                                             </table>
 
                                             <p style="margin-top: 20px;">If you have any questions or require further clarification, please do not hesitate to contact our customer support team.</p>
-                                            <p style="margin-top: 20px; font-weight: bold;">Sincerely,<br>HomeTown Bank Pa Management</p>
+                                            <p style="margin-top: 20px; font-weight: bold;">Sincerely,<br>HomeTown Bank Management</p>
 
                                             <p style="font-size: 11px; color: #888888; text-align: center; margin-top: 40px; border-top: 1px solid #eeeeee; padding-top: 20px;">
                                                 This is an automated email, please do not reply.
@@ -231,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                                     </tr>
                                     <tr>
                                         <td align="center" style="padding: 20px; background-color: #004A7F; color: #ffffff; font-size: 12px; border-radius: 0 0 8px 8px;">
-                                            &copy; ' . date("Y") . ' HomeTown Bank Pa. All rights reserved.
+                                            &copy; ' . date("Y") . ' HomeTown Bank PA. All rights reserved.
                                         </td>
                                     </tr>
                                 </table>
