@@ -224,8 +224,8 @@ switch ($path) {
     case 'admin/logout':
         require __DIR__ . '/heritagebank_admin/logout.php';
         break;
-    case 'admin/manage_transfer_modal':
-        require __DIR__ . '/heritagebank_admin/manage_transfer_modal.php';
+    case 'admin/manage_modals':
+        require __DIR__ . '/heritagebank_admin/manage_modals.php';
         break;
     case 'admin/transfer_process':
         require __DIR__ . '/heritagebank_admin/transfer_process.php';

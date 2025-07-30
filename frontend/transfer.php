@@ -28,7 +28,7 @@ use MongoDB\Exception\Exception as MongoDBException;
 // Check login, etc.
 // Use defined BASE_URL constant for redirection
 if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: ' . BASE_URL . '/login');
+    header('Location: ' . BASE_URL . '/login.php'); // Changed /login to /login.php for direct access
     exit;
 }
 
@@ -159,7 +159,7 @@ switch ($active_transfer_method) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeTown Bank Pa - Transfer</title>
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/frontend/transfer.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -179,11 +179,14 @@ switch ($active_transfer_method) {
             height: 100%;
             overflow: auto;
             background-color: rgba(0, 0, 0, 0.6);
+            display: flex; /* Use flexbox for centering */
+            align-items: center; /* Center vertically */
+            justify-content: center; /* Center horizontally */
         }
 
         .custom-modal-content {
             background-color: #ffffff;
-            margin: 15% auto; /* 15% from the top and centered */
+            /* margin: 15% auto; Removed margin for flex centering */
             padding: 30px;
             border: 1px solid #888;
             width: 90%;
@@ -192,6 +195,7 @@ switch ($active_transfer_method) {
             text-align: center;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
             font-family: 'Poppins', sans-serif;
+            position: relative; /* Needed for absolute positioning of close button if added */
         }
 
         .custom-modal-header {
@@ -260,7 +264,7 @@ switch ($active_transfer_method) {
                     <p class="message <?php echo htmlspecialchars($message_type); ?>"><?php echo htmlspecialchars($message); ?></p>
                 <?php endif; ?>
 
-            <form action="<?php echo BASE_URL; ?>/frontend/make_transfer.php" method="POST" id="transferForm">
+            <form action="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/make_transfer.php" method="POST" id="transferForm">
                 <input type="hidden" name="initiate_transfer" value="1">
 
                     <div class="form-group">
@@ -404,7 +408,7 @@ switch ($active_transfer_method) {
                     <button type="submit" class="button-primary">Initiate Transfer</button>
                 </form>
             </div>
-            <p style="text-align: center; margin-top: 20px;"><a href="<?php echo BASE_URL; ?>/dashboard" class="back-link">&larr; Back to Dashboard</a></p>
+            <p style="text-align: center; margin-top: 20px;"><a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/dashboard.php" class="back-link">&larr; Back to Dashboard</a></p>
         </main>
     </div>
 
@@ -415,23 +419,23 @@ switch ($active_transfer_method) {
                 <i class="fas fa-times"></i>
             </button>
             <div class="sidebar-profile">
-                <img src="<?php echo BASE_URL; ?>/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
+                <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
                 <h3><span id="sidebarUserName"><?php echo htmlspecialchars($full_name); ?></span></h3>
                 <p><span id="sidebarUserEmail"><?php echo htmlspecialchars($user_email); ?></span></p>
             </div>
         </div>
         <nav class="sidebar-nav">
             <ul>
-                <li><a href="<?php echo BASE_URL; ?>/dashboard"><i class="fas fa-home"></i> Dashboard</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/accounts"><i class="fas fa-wallet"></i> Accounts</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/transfer" class="active"><i class="fas fa-exchange-alt"></i> Transfers</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/statements"><i class="fas fa-file-invoice"></i> Statements</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/profile"><i class="fas fa-user"></i> Profile</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/settings"><i class="fas fa-cog"></i> Settings</a></li>
-                <li><a href="<?php echo BASE_URL; ?>/bank_cards"><i class="fas fa-credit-card"></i> Bank Cards</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/dashboard.php"><i class="fas fa-home"></i> Dashboard</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/accounts.php"><i class="fas fa-wallet"></i> Accounts</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer.php" class="active"><i class="fas fa-exchange-alt"></i> Transfers</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/statements.php"><i class="fas fa-file-invoice"></i> Statements</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/profile.php"><i class="fas fa-user"></i> Profile</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/settings.php"><i class="fas fa-cog"></i> Settings</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/my_cards.php"><i class="fas fa-credit-card"></i> Bank Cards</a></li>
             </ul>
         </nav>
-        <button class="logout-button" id="logoutButton" onclick="window.location.href='<?php echo BASE_URL; ?>/logout'">
+        <button class="logout-button" id="logoutButton" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/logout.php'">
             <i class="fas fa-sign-out-alt"></i> Logout
         </button>
     </div>
@@ -458,7 +462,7 @@ switch ($active_transfer_method) {
                 <p><?php echo htmlspecialchars($modalMessageContent); ?></p>
             </div>
             <div class="custom-modal-footer">
-                <a href="<?php echo BASE_URL; ?>/dashboard" class="btn-purple">Understood</a>
+                <a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/dashboard.php" class="btn-purple">Understood</a>
             </div>
         </div>
     </div>
@@ -485,7 +489,7 @@ switch ($active_transfer_method) {
             // Check if the custom modal should be displayed
             if (window.APP_DATA.showCustomModal) {
                 // Display the custom modal
-                customModal.style.display = 'block';
+                customModal.style.display = 'flex'; // Changed to 'flex' for better centering
 
                 // Hide the main transfer form so the user can't proceed
                 if (transferFormContainer) {
@@ -499,6 +503,6 @@ switch ($active_transfer_method) {
             }
         });
     </script>
-    <script src="<?php echo BASE_URL; ?>/frontend/transfer.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer.js"></script>
 </body>
 </html>
