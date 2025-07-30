@@ -485,9 +485,9 @@ $profile_image_src = !empty($user_data['profile_image']) ?
                                         echo 'N/A';
                                     }
                                 ?></span>
-                                <?php if (isset($award['value']) && $award['value'] > 0): ?>
-                                    <strong>Value:</strong> <span><?php echo formatCurrency($award['value'], $award['currency'] ?? 'USD'); ?></span>
-                                <?php endif; ?>
+                               <?php if (isset($award['value']) && $award['value'] > 0): ?>
+                        <strong>Value (raw):</strong> <span><?php echo htmlspecialchars($award['value'] ?? 'N/A') . ' ' . htmlspecialchars($award['currency'] ?? 'USD'); ?></span>
+                        <?php endif; ?>
                                 <?php if (!empty($award['description'])): ?>
                                     <strong>Details:</strong> <span><?php echo htmlspecialchars($award['description']); ?></span>
                                 <?php endif; ?>
