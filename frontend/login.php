@@ -229,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                 <div id="login-message" class="message-box" style="display: none;"></div>
             <?php endif; ?>
 
-            <form class="login-form" id="loginForm" action="<?php echo BASE_URL; ?>/login" method="POST">
+            <form class="login-form" id="loginForm" action="<?php echo rtrim(BASE_URL, '/') . '/login'; ?>" method="POST">
                 <div class="form-group username-group">
                     <label for="last_name" class="sr-only">Last Name</label>
                     <p class="input-label">Last Name</p>
