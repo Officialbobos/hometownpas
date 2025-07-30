@@ -2,37 +2,10 @@
 // C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\index.php
 session_start();
 
-// Load Composer's autoloader FIRST.
-// This is crucial because Dotenv and other libraries are loaded through it.
-require_once __DIR__ . '/../vendor/autoload.php';
-
-// --- Start Dotenv loading (conditional for deployment) ---
-// This block attempts to load .env files only if they exist.
-// On Render, environment variables should be set directly in the dashboard,
-// so a physical .env file won't be present.
-$dotenvPath = dirname(__DIR__); // Go up one level from 'heritagebank_admin' to the project root (phpfile-main)
-
-// THIS IS THE CRUCIAL CONDITIONAL CHECK
-if (file_exists($dotenvPath . '/.env')) {
-    $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
-    try {
-        $dotenv->load(); // This will only run if .env file exists
-        error_log("DEBUG: admin/index.php: .env file EXISTS locally. Loaded Dotenv."); // Optional: for debugging local environment
-    } catch (Dotenv\Exception\InvalidPathException $e) {
-        error_log("ERROR: admin/index.php: Dotenv load error locally on path " . $dotenvPath . ": " . $e->getMessage());
-    }
-} else {
-    error_log("DEBUG: admin/index.php: .env file DOES NOT exist. Skipping Dotenv load. (Expected on Render)"); // Optional: for debugging Render environment
-}
-// If .env doesn't exist (like on Render), the variables are assumed to be pre-loaded
-// into the environment by the hosting platform (e.g., Render's Config Vars).
-// --- End Dotenv loading ---
-
-// 1. Load your core configuration now that Dotenv vars might be available.
+// 1. Load your core configuration first.
 require_once __DIR__ . '/../Config.php';
 
 // 2. Load your functions file.
-// This file should contain getCollection()
 require_once __DIR__ . '/../functions.php';
 
 use MongoDB\Client;
@@ -43,8 +16,9 @@ $message = '';
 $message_type = '';
 
 // If admin is already logged in (session is active)
-if (isset($_SESSION['admin_user_id']) && isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
+if (isset($_SESSION['admin_user_id'])) {
     error_log("index.php: Admin already logged in. Redirecting to dashboard.php.");
+    // --- CORRECTED LINE ---
     header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/dashboard.php');
     exit();
 }
@@ -54,19 +28,17 @@ if (isset($_POST['admin_login'])) {
     $email = sanitize_input($_POST['email'] ?? '');
     $password = $_POST['password'] ?? ''; // Passwords are not sanitized with htmlspecialchars
 
-    error_log("index.php: Admin login attempt for email: " . $email);
+    error_log("index.php: Admin login attempt for email: " . $email); // ADD THIS LINE
 
     if (empty($email) || empty($password)) {
         $message = "Please enter both email and password.";
         $message_type = 'error';
-        error_log("index.php: Login failed - Empty email or password.");
+        error_log("index.php: Login failed - Empty email or password."); // ADD THIS LINE
     } else {
         try {
             // Get the 'admin' collection
-            // Ensure getCollection() is properly defined in functions.php
-            // and handles MongoDB connection using MONGODB_CONNECTION_URI and MONGODB_DB_NAME
             $adminCollection = getCollection('admin');
-            error_log("index.php: Attempting to find user '" . $email . "' in admin collection.");
+            error_log("index.php: Attempting to find user '" . $email . "' in admin collection."); // ADD THIS LINE
 
             // Find admin user by email and ensure they are 'active'
             $admin_user = $adminCollection->findOne([
@@ -74,8 +46,9 @@ if (isset($_POST['admin_login'])) {
                 'status' => 'active'
             ]);
 
+
             if ($admin_user) {
-                error_log("index.php: User '" . $email . "' found. Verifying password.");
+                error_log("index.php: User '" . $email . "' found. Verifying password."); // ADD THIS LINE
                 // Verify password
                 if (isset($admin_user['password']) && password_verify($password, $admin_user['password'])) {
                     // Password is correct, admin is authenticated
@@ -83,28 +56,24 @@ if (isset($_POST['admin_login'])) {
                     $_SESSION['admin_email'] = $admin_user['email'];
                     // Use first_name and last_name from the admin document
                     $_SESSION['admin_full_name'] = trim(($admin_user['first_name'] ?? '') . ' ' . ($admin_user['last_name'] ?? ''));
-                    $_SESSION['admin_logged_in'] = true; // Explicitly mark as admin in session
+                   $_SESSION['admin_logged_in'] = true; // Explicitly mark as admin in session
 
-                    error_log("index.php: Login SUCCESS for user '" . $email . "'. Session set. Redirecting to dashboard.php.");
+                    error_log("index.php: Login SUCCESS for user '" . $email . "'. Session set. Redirecting to dashboard.php."); // ADD THIS LINE
                     // Redirect to admin dashboard
-                    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/dashboard.php');
+                header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/dashboard.php');
                     exit();
                 } else {
                     $message = "Invalid email or password.";
                     $message_type = 'error';
-                    error_log("index.php: Login FAILED - Incorrect password for user '" . $email . "'.");
+                    error_log("index.php: Login FAILED - Incorrect password for user '" . $email . "'."); // ADD THIS LINE
                 }
             } else {
                 $message = "Invalid email or password."; // Keep message generic for security
                 $message_type = 'error';
-                error_log("index.php: Login FAILED - User '" . $email . "' not found or not active.");
+                error_log("index.php: Login FAILED - User '" . $email . "' not found or not active."); // ADD THIS LINE
             }
-        } catch (MongoDBDriverException $e) { // Catch MongoDB-specific exceptions
-            error_log("index.php: Admin login MongoDB EXCEPTION: " . $e->getMessage());
-            $message = "A database error occurred during login. Please try again later."; // More specific message
-            $message_type = 'error';
-        } catch (Exception $e) { // Catch other general exceptions
-            error_log("index.php: Admin login GENERAL EXCEPTION: " . $e->getMessage());
+        } catch (Exception $e) {
+            error_log("index.php: Admin login EXCEPTION: " . $e->getMessage()); // ADD THIS LINE
             $message = "An unexpected error occurred during login. Please try again later.";
             $message_type = 'error';
         }
@@ -234,7 +203,7 @@ if (isset($_POST['admin_login'])) {
             <div id="login-message" class="message-box" style="display: none;"></div>
         <?php endif; ?>
 
-        <form class="admin-login-form" id="adminLoginForm" action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php'; ?>" method="POST">
+        <form class="admin-login-form" id="adminLoginForm" action="index.php" method="POST">
             <div class="form-group">
                 <label for="email" class="sr-only">Email</label>
                 <p class="input-label">Email</p>
