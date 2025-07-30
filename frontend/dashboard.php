@@ -1,6 +1,10 @@
 <?php
 // C:\xampp_lite_8_4\www\phpfile-main\frontend\dashboard.php
 
+error_log("--- dashboard.php Start ---");
+error_log("Session ID (dashboard.php entry): " . session_id());
+error_log("Session Contents (dashboard.php entry): " . print_r($_SESSION, true));
+
 // Ensure session is started and user is authenticated
 // Assumes a central router or a dedicated auth file handles session_start()
 // and setting $_SESSION['user_id'] and $_SESSION['logged_in']
