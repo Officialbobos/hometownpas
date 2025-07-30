@@ -243,7 +243,7 @@ switch ($path) {
         require __DIR__ . '/heritagebank_admin/users/manage_user_funds.php';
         break;
     case 'admin/account_status_management':
-        require __DIR__ . '/heritagebank_admin/users/account_status_mangement.php';
+        require __DIR__ . '/heritagebank_admin/users/account_status_management.php';
         break;
     case 'admin/transactions_management':
         require __DIR__ . '/heritagebank_admin/users/transactions_management.php';

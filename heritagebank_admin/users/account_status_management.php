@@ -388,7 +388,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_status'])) {
                 <p><strong>Current Status:</strong> <span class="status-<?php echo strtolower(htmlspecialchars($user_to_manage['status'])); ?>"><?php echo htmlspecialchars(ucfirst($user_to_manage['status'])); ?></span></p>
             </div>
 
-            <form action="account_status_management.php" method="POST">
+            <form action="<?php echo rtrim(BASE_URL, '/') . '/admin/account_status_management'; ?>" method="POST">
                 <input type="hidden" name="user_id" value="<?php echo htmlspecialchars((string)$user_to_manage['_id']); ?>">
 
                 <div class="form-group">

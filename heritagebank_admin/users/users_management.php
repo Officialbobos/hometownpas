@@ -98,7 +98,7 @@ if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) |
                     <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/transactions_management'; ?>">Transactions Management</a></li>
                     <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/generate_bank_card'; ?>">Generate Bank Card (Mock)</a></li>
                     <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/generate_mock_transaction'; ?>">Generate Mock Transaction</a></li>
-                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/DepositCheckApproval.php'; ?>">Check Deposit Approval</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/deposit_check_approval'; ?>">Check Deposit Approval</a></li>
                 
                 </ul>
             </nav>
