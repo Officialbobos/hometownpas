@@ -67,7 +67,8 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeTown Bank Pa - Dashboard</title>
-    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/dashboard.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
