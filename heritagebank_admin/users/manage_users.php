@@ -7,8 +7,9 @@
  * and perform actions like editing or deleting a user and their associated data.
  */
 session_start();
-require_once '../../Config.php'; // Adjust path
-require_once '../../functions.php'; // This is good to have for future database operations
+require_once '../../Config.php'; 
+require_once '../../vendor/autoload.php';
+require_once '../../functions.php'; 
 
 // Check if admin is logged in, if not, redirect to login page
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
