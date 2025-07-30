@@ -56,8 +56,10 @@ try {
         header('Location: ' . rtrim(BASE_URL, '/') . '/login');
         exit; // Ensure immediate exit after redirect
     }
+
     $twoFactorEnabled = $user['two_factor_enabled'] ?? false;
     $twoFactorMethod = $user['two_factor_method'] ?? 'email';
+    $isUserAdmin = $user['is_admin'] ?? false; // Capture admin status here
 
     // IMPORTANT: If 2FA was enabled but somehow became disabled or method changed to 'none'
     // after the user initiated login, log them in directly.
@@ -70,13 +72,14 @@ try {
         // Ensure other relevant user details are in session for full login
         $_SESSION['first_name'] = $user['first_name'] ?? '';
         $_SESSION['email'] = $user['email'] ?? '';
-        $_SESSION['is_admin'] = $user['is_admin'] ?? false; // Only if applicable
+        $_SESSION['is_admin'] = $isUserAdmin; // Use the captured admin status
 
         unset($_SESSION['auth_step']);
         unset($_SESSION['temp_user_id']);
 
-        $redirect_path = ($_SESSION['is_admin'] ?? false) ? '/admin' : '/dashboard';
-        error_log("Verify_code.php: 2FA disabled/none. Redirecting directly to: " . rtrim(BASE_URL, '/') . $redirect_path); // Added debug
+        // IF 2FA IS NOT ENABLED (OR DISABLED), REDIRECT BASED ON ADMIN STATUS
+        $redirect_path = $isUserAdmin ? '/admin' : '/dashboard'; // Redirect admin to /admin, others to /dashboard
+        error_log("Verify_code.php: 2FA disabled/none. Redirecting directly to: " . rtrim(BASE_URL, '/') . $redirect_path);
         header('Location: ' . rtrim(BASE_URL, '/') . $redirect_path);
         exit; // Ensure immediate exit after redirect
     }
@@ -98,10 +101,6 @@ try {
                 $message = "No pending verification code found or it has been cleared. Please try logging in again.";
                 $message_type = "error";
                 error_log("Verify_code.php: No stored 2FA code or expiry for user " . $user_id . ". Forcing re-login.");
-                // If no code is pending in DB, force user to re-initiate login
-                unset($_SESSION['auth_step']);
-                unset($_SESSION['temp_user_id']);
-                // It's crucial to add the message to session BEFORE redirecting if you want it displayed on login.php
                 $_SESSION['message'] = $message;
                 $_SESSION['message_type'] = $message_type;
                 header('Location: ' . rtrim(BASE_URL, '/') . '/login');
@@ -122,7 +121,7 @@ try {
                 $_SESSION['user_id'] = (string)$user['_id']; // Store actual user ID in session for full access
                 $_SESSION['first_name'] = $user['first_name'] ?? ''; // Example of storing more user data
                 $_SESSION['email'] = $user['email'] ?? ''; // Keep actual email if needed for session
-                $_SESSION['is_admin'] = $user['is_admin'] ?? false; // Only if applicable
+                $_SESSION['is_admin'] = $isUserAdmin; // Set admin status based on DB fetch
 
                 unset($_SESSION['auth_step']); // Clear the 2FA state
                 unset($_SESSION['temp_user_id']); // Clear temp user ID
@@ -139,8 +138,9 @@ try {
                 error_log("Verify_code.php: 2FA Verified: " . ($_SESSION['2fa_verified'] ? 'True' : 'False'));
                 error_log("Verify_code.php: Is Admin: " . ($_SESSION['is_admin'] ? 'True' : 'False'));
 
-                $redirect_path = ($_SESSION['is_admin'] ?? false) ? '/admin' : '/dashboard';
-                error_log("Verify_code.php: Final redirect path chosen: " . rtrim(BASE_URL, '/') . $redirect_path); // Added debug
+                // *** MODIFIED REDIRECT LOGIC FOR 2FA VERIFIED USERS ***
+                $redirect_path = $isUserAdmin ? '/admin' : '/dashboard'; // Admins to /admin, others to /dashboard
+                error_log("Verify_code.php: Final redirect path chosen: " . rtrim(BASE_URL, '/') . $redirect_path);
                 header('Location: ' . rtrim(BASE_URL, '/') . $redirect_path);
                 exit; // <-- THIS IS THE CRITICAL ADDITION! Stop script execution immediately.
             } else {
