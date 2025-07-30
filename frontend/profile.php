@@ -8,7 +8,7 @@ use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 
 // Check if the user is logged in. If not, redirect to login page.
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
     header('Location: ../login.php'); // Redirect to login page, assuming login.php is in parent dir
     exit;
 }
@@ -31,8 +31,8 @@ $mongoClient = null; // Initialize to null for finally block
 
 try {
     // Establish MongoDB connection using details from Config.php
-    $mongoClient = new Client(MONGO_URI);
-    $database = $mongoClient->selectDatabase(MONGO_DB_NAME);
+    $mongoClient = new Client(MONGODB_CONNECTION_URI);
+    $database = $mongoClient->selectDatabase(MONGODB_DB_NAME);
     $usersCollection = $database->users; // Assuming your user collection is named 'users'
     $awardsCollection = $database->awards; // Assuming a new 'awards' collection for winner info
 
