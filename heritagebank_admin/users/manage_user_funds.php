@@ -125,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if ($insertTransactionResult->getInsertedId()) {
                                 $message = "Account " . htmlspecialchars($account_number_input) . " (" . htmlspecialchars($user_name) . " - {$user_email}) successfully {$transaction_type_label} with " . number_format($amount, 2) . ". New balance: " . number_format($new_balance, 2);
                                 $message_type = $operation_type;
-                                $_POST = array();
+                                $_POST = array(); // Clear POST data to reset form fields
                             } else {
                                 $message = "Error recording transaction for account " . htmlspecialchars($account_number_input) . ". (Transaction insert failed)";
                                 $message_type = 'error';
@@ -354,8 +354,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </p>
             <?php endif; ?>
 
-        <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/manage_user_funds.php'; ?>" method="POST">
-    </form>                <div class="form-group">
+            <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/manage_user_funds.php'; ?>" method="POST">
+                <div class="form-group">
                     <label for="account_number">User Account Number</label>
                     <input type="text" id="account_number" name="account_number" value="<?php echo htmlspecialchars($_POST['account_number'] ?? ''); ?>" placeholder="e.g., CHK00123456" required>
                     <small>Enter the exact account number to credit or debit.</small>

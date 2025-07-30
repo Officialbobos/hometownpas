@@ -85,6 +85,7 @@ try {
 
     $accountsCollection = $mongoDb->accounts;
     $transactionsCollection = $mongoDb->transactions;
+    $usersCollection = $mongoDb->users; // Added for fetching user data for the modal
 
 } catch (MongoDB\Driver\Exception\Exception $e) {
     // Handle MongoDB connection errors
@@ -137,6 +138,19 @@ if ($mongoClient) {
         // You might want to display a user-friendly message or redirect
         // echo "Error fetching transactions: " . $e->getMessage(); // For debugging
     }
+
+    // Fetch user's transfer_modal_message and show_transfer_modal status
+    $user_modal_message = '';
+    $user_show_modal = false;
+    try {
+        $currentUser = $usersCollection->findOne(['_id' => new MongoDB\BSON\ObjectId($_SESSION['user_id'])]);
+        if ($currentUser) {
+            $user_modal_message = $currentUser['transfer_modal_message'] ?? '';
+            $user_show_modal = $currentUser['show_transfer_modal'] ?? false;
+        }
+    } catch (MongoDB\Driver\Exception\Exception $e) {
+        error_log("Error fetching user modal data from MongoDB: " . $e->getMessage());
+    }
 }
 
 // MongoDB connection does not need an explicit close like MySQLi;
@@ -188,6 +202,82 @@ try {
     <script>
         const BASE_URL_JS = "<?php echo rtrim(BASE_URL, '/'); ?>";
     </script>
+    <style>
+        /* Basic Modal Styles */
+        .modal-overlay {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            position: relative;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .modal-content h3 {
+            color: #004494;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .modal-content p {
+            font-size: 1.1em;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 25px;
+            word-wrap: break-word; /* Ensure long words wrap */
+        }
+
+        .modal-close-button {
+            background-color: #004494;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+
+        .modal-close-button:hover {
+            background-color: #003366;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive adjustments for modal */
+        @media (max-width: 600px) {
+            .modal-content {
+                padding: 20px;
+                width: 95%;
+            }
+            .modal-content h3 {
+                font-size: 1.5em;
+            }
+            .modal-content p {
+                font-size: 1em;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -286,8 +376,9 @@ try {
         <section class="bank-cards-section">
             <h2>My Cards</h2>
             <div class="view-all-link">
-                <a href="<?php echo rtrim(BASE_URL, '/'); ?>/bank_cards" id="viewMyCardsButton"> <i class="fas fa-credit-card"></i> View My Card
-                </a>
+                <button id="viewCardButton" style="background: none; border: none; padding: 0; margin: 0; font: inherit; cursor: pointer; color: inherit; text-decoration: none; display: flex; align-items: center;">
+                    <i class="fas fa-credit-card"></i> View My Card
+                </button>
             </div>
             <div class="card-list-container" id="userCardList" style="display: none;">
                 <p class="loading-message" id="cardsLoadingMessage">No cards found. Go to "Manage All Cards" to add one.</p>
@@ -377,6 +468,13 @@ try {
         </div>
     </div>
 
+    <div id="customMessageModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Important Message</h3>
+            <p id="modalMessageContent"></p>
+            <button class="modal-close-button" onclick="closeModal()">Close</button>
+        </div>
+    </div>
     <?php if ($transferModalActive && !empty($transferModalContent)): ?>
     <div id="transferInfoModal" class="app-modal">
         <div class="app-modal-content">
@@ -632,6 +730,46 @@ try {
         });
     </script>
     <?php endif; ?>
+
+    <script>
+        // Get the elements
+        const viewCardButton = document.getElementById('viewCardButton');
+        const customMessageModal = document.getElementById('customMessageModal');
+        const modalMessageContent = document.getElementById('modalMessageContent');
+
+        // Function to open the modal with dynamic content
+        function openModal(message) {
+            modalMessageContent.innerHTML = message; // Use innerHTML if message might contain HTML, else textContent
+            customMessageModal.style.display = 'flex'; // Use flex to center content
+        }
+
+        // Function to close the modal
+        function closeModal() {
+            customMessageModal.style.display = 'none';
+            modalMessageContent.textContent = ''; // Clear content on close
+        }
+
+        // Pass PHP variables to JavaScript
+        var userModalMessage = <?php echo json_encode($user_modal_message); ?>;
+        var userShowModal = <?php echo json_encode($user_show_modal); ?>;
+
+        // Event listener for the "View My Card" button
+        viewCardButton.addEventListener('click', function() {
+            if (userShowModal && userModalMessage) {
+                openModal(userModalMessage);
+            } else {
+                // If no message or message is turned off, proceed with normal card view logic
+                window.location.href = BASE_URL_JS + '/bank_cards';
+            }
+        });
+
+        // Optional: Close modal if clicked outside content
+        customMessageModal.addEventListener('click', function(event) {
+            if (event.target === customMessageModal) {
+                closeModal();
+            }
+        });
+    </script>
     <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/user.dashboard.js"></script>
 </body>
 </html>
