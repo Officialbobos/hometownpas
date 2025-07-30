@@ -14,6 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const setPinActionButton = document.getElementById('setPinActionButton');
     const activateActionButton = document.getElementById('activateActionButton'); // NEW: Activate button
 
+    // NEW: General Notification Modal elements for "Card Modal Message"
+    const notificationModal = document.getElementById('notificationModal');
+    const notificationModalTitle = document.getElementById('notificationModalTitle');
+    const notificationModalContent = document.getElementById('notificationModalContent');
+    const notificationCloseButton = document.getElementById('notificationCloseButton');
+    const notificationDismissButton = document.getElementById('notificationDismissButton');
+
     // --- Function to show custom message box ---
     function showMessageBox(message, type = 'info') {
         // Ensure elements exist before trying to manipulate them
@@ -566,5 +573,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+    }
+
+    // --- Initial Setup for Admin-Configured Modal Message ---
+    if (window.APP_DATA && notificationModal) { // Check if APP_DATA is available and modal exists
+        if (window.APP_DATA.showNotificationModal && window.APP_DATA.notificationMessage) {
+            notificationModalTitle.textContent = 'Important Card Notice'; // Customize as needed
+            notificationModalContent.innerHTML = window.APP_DATA.notificationMessage;
+            notificationModal.style.display = 'flex'; // Show the modal
+
+            const dismissNotificationModal = async () => {
+                notificationModal.style.display = 'none';
+                // Optionally, if you want to persist the dismissal (e.g., prevent it from showing again
+                // for this user until the admin changes it), you can make an AJAX call here.
+                // This would involve a new API endpoint like `dismiss_modal.php` that updates the user's
+                // record to indicate they've seen this specific message.
+                try {
+                    const response = await fetch(`${PHP_BASE_URL}api/dismiss_modal.php`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ modal_type: 'card_modal' }) // Identifier for the modal
+                    });
+                    const result = await response.json();
+                    if (result.status !== 'success') {
+                        console.error('Failed to dismiss modal on server:', result.message);
+                    }
+                } catch (error) {
+                    console.error('Error dismissing modal on server:', error);
+                }
+            };
+
+            if (notificationCloseButton) {
+                notificationCloseButton.addEventListener('click', dismissNotificationModal);
+            }
+            if (notificationDismissButton) {
+                notificationDismissButton.addEventListener('click', dismissNotificationModal);
+            }
+
+            // Close if clicked outside modal content
+            window.addEventListener('click', function(event) {
+                if (event.target == notificationModal) {
+                    dismissNotificationModal();
+                }
+            });
+        }
     }
 });
