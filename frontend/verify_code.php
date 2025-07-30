@@ -65,7 +65,7 @@ try {
     // after the user initiated login, log them in directly.
     if (!$twoFactorEnabled || $twoFactorMethod === 'none') {
         error_log("Verify_code.php: User " . $user_id . " 2FA status changed or is none. Logging in directly.");
-        $_SESSION['user_logged_in'] = true;
+        $_SESSION['logged_in'] = true;
         $_SESSION['2fa_verified'] = true; // No 2FA, so consider it verified immediately
         // Also set the actual user_id in the session for the now-logged-in state
         $_SESSION['user_id'] = (string)$user['_id'];
@@ -116,7 +116,7 @@ try {
 
             if ($submittedCode === $storedCode && $currentDateTime < $expiryDateTime) {
                 // Code is correct and not expired - SUCCESS!
-                $_SESSION['user_logged_in'] = true;
+                $_SESSION['logged_in'] = true;
                 $_SESSION['2fa_verified'] = true;
                 $_SESSION['user_id'] = (string)$user['_id']; // Store actual user ID in session for full access
                 $_SESSION['first_name'] = $user['first_name'] ?? ''; // Example of storing more user data
@@ -134,7 +134,7 @@ try {
 
                 error_log("Verify_code.php: 2FA code verified successfully for user " . $user_id . ". Session vars set.");
                 error_log("Verify_code.php: User ID: " . ($_SESSION['user_id'] ?? 'N/A'));
-                error_log("Verify_code.php: Logged In: " . ($_SESSION['user_logged_in'] ? 'True' : 'False'));
+                error_log("Verify_code.php: Logged In: " . ($_SESSION['logged_in'] ? 'True' : 'False'));
                 error_log("Verify_code.php: 2FA Verified: " . ($_SESSION['2fa_verified'] ? 'True' : 'False'));
                 error_log("Verify_code.php: Is Admin: " . ($_SESSION['is_admin'] ? 'True' : 'False'));
 
