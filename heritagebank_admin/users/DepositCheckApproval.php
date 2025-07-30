@@ -16,12 +16,12 @@ require_once __DIR__ . '/../../Config.php';
 require_once __DIR__ . '/../../functions.php';
 
 // Define the bank name here for use in transaction descriptions
-const BANK_NAME = 'Heritage Bank';
+const BANK_NAME = 'Home Town Bank';
 
 // Check if admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
-    exit;
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
+    exit;
 }
 
 $message = '';

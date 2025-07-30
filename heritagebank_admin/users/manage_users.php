@@ -418,9 +418,9 @@ try {
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <a href="edit_user.php?id=<?php echo $user['id']; ?>" class="button-small button-edit">Edit</a>
-                                        <a href="account_status_management.php?user_id=<?php echo $user['id']; ?>" class="button-small button-status">Manage Status</a>
-                                        <a href="manage_users.php?action=delete&id=<?php echo $user['id']; ?>" class="button-small button-delete" onclick="return confirm('Are you sure you want to delete this user AND ALL their associated data (accounts, transactions, cards, etc.)? This action cannot be undone.');">Delete</a>
+                                        <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/edit_users?id=' . $user['id']; ?>" class="button-small button-edit">Edit</a>
+                                        <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/account_status_management?user_id=' . $user['id']; ?>" class="button-small button-status">Manage Status</a>
+                                        <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_users?action=delete&id=' . $user['id']; ?>" class="button-small button-delete" ...>Delete</a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

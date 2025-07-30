@@ -1,10 +1,12 @@
 <?php
 // PHP error reporting - MUST be at the very top
+session_start();
+
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-session_start();
+
 
 // CORRECTED: Use __DIR__ to build a reliable absolute path from the current file's location.
 // __DIR__ is '/var/www/html/heritagebank_admin/users'
