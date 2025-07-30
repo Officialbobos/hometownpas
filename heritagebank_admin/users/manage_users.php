@@ -6,7 +6,13 @@
  * Allows administrators to view a list of all users,
  * and perform actions like editing or deleting a user and their associated data.
  */
+
 session_start();
+
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 require_once '../../Config.php'; 
 require_once '../../vendor/autoload.php';
 require_once '../../functions.php'; 
