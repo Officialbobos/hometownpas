@@ -3,7 +3,7 @@
 use MongoDB\BSON\ObjectId;
 
 // Check if the user is logged in
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
     header('Location: ' . rtrim(BASE_URL, '/'));
     exit;
 }
