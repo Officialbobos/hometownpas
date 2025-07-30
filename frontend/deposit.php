@@ -1,15 +1,19 @@
 <?php
 // The session, autoloader, and core files are already loaded by index.php
 
+// Removed the 'echo "Deposit page is working!"; exit;' block
+// as it was prematurely terminating the script.
+
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../Config.php';
-
-echo "Deposit page is working!";
-exit;
+require_once __DIR__ . '/../functions.php'; // Ensure functions.php is included for getCollection()
 
 use MongoDB\BSON\ObjectId;
+use MongoDB\Driver\Exception\Exception as MongoDBDriverException; // Added for specific MongoDB exceptions
 
 // Check if the user is logged in
+// Ensure session_start() is called somewhere BEFORE this check,
+// ideally in your central router file (like the main index.php)
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
     header('Location: ' . rtrim(BASE_URL, '/'));
     exit;
@@ -18,22 +22,37 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset(
 $user_id = $_SESSION['user_id'];
 
 // The global $mongoDb and getCollection() function are available
+$accountsCollection = null; // Initialize to null
 try {
     $accountsCollection = getCollection('accounts');
-} catch (Exception $e) {
+} catch (MongoDBDriverException $e) { // Catch specific MongoDB exceptions
+    error_log("MongoDB connection error in Deposit.php: " . $e->getMessage());
+    die("A critical database error occurred. Please try again later.");
+} catch (Exception $e) { // Catch general exceptions
+    error_log("General database error in Deposit.php: " . $e->getMessage());
     die("A critical database error occurred. Please try again later.");
 }
 
+
 // Fetch user's accounts to populate the dropdown
 $user_accounts = [];
+$error = ''; // Initialize error variable
 try {
-    $accounts_cursor = $accountsCollection->find(['user_id' => new ObjectId($user_id)]);
-    foreach ($accounts_cursor as $account) {
-        $user_accounts[] = $account;
+    // Only proceed if $accountsCollection was successfully initialized
+    if ($accountsCollection) {
+        $accounts_cursor = $accountsCollection->find(['user_id' => new ObjectId($user_id)]);
+        foreach ($accounts_cursor as $account) {
+            $user_accounts[] = $account;
+        }
+    } else {
+        $error = "Accounts collection not initialized due to a previous database error.";
     }
-} catch (Exception $e) {
+} catch (MongoDBDriverException $e) { // Catch specific MongoDB exceptions
     $error = "Error fetching your accounts. Please try again later.";
-    error_log("Error fetching accounts for check deposit: " . $e->getMessage());
+    error_log("MongoDB Error fetching accounts for check deposit: " . $e->getMessage());
+} catch (Exception $e) { // Catch general exceptions
+    $error = "Error fetching your accounts. An unexpected error occurred.";
+    error_log("General Error fetching accounts for check deposit: " . $e->getMessage());
 }
 
 function get_currency_symbol($currency_code) {
@@ -53,8 +72,8 @@ function get_currency_symbol($currency_code) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Deposit Check - Hometown Bank Pa</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="dashboard.css">
-    <style>
+    <link rel="stylesheet" href="dashboard.css"> <style>
+        /* Your existing CSS styles remain here */
         .deposit-form-container {
             max-width: 600px;
             margin: 20px auto;
@@ -124,15 +143,18 @@ function get_currency_symbol($currency_code) {
     <div class="container">
         <header class="header">
             <div class="greeting">
-                <a href="dashboard" style="text-decoration: none; color: inherit;">
-                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                <a href="dashboard.php" style="text-decoration: none; color: inherit;"> <i class="fas fa-arrow-left"></i> Back to Dashboard
                 </a>
             </div>
         </header>
 
         <div class="deposit-form-container">
             <h2>Deposit a Check</h2>
-            <div id="responseMessage"></div>
+            <div id="responseMessage">
+                <?php if (!empty($error)): ?>
+                    <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+                <?php endif; ?>
+            </div>
             
             <form id="depositForm" action="/api/deposit_check.php" method="post" enctype="multipart/form-data">
                 <div class="form-group">
@@ -140,8 +162,8 @@ function get_currency_symbol($currency_code) {
                     <select class="form-select" id="account_id" name="account_id" required>
                         <option value="">Select an account...</option>
                         <?php foreach ($user_accounts as $account): ?>
-                            <option value="<?= htmlspecialchars($account['_id']) ?>">
-                                <?= htmlspecialchars($account['account_type']) ?> (<?= htmlspecialchars($account['account_number']) ?>) - Balance (raw): <?= htmlspecialchars($account['balance'] ?? 'N/A') ?> (Type: <?= gettype($account['balance']) ?>)
+                            <option value="<?= htmlspecialchars((string)$account['_id']) ?>">
+                                <?= htmlspecialchars($account['account_type']) ?> (<?= htmlspecialchars($account['account_number']) ?>) - Balance: <?= get_currency_symbol($account['currency']) . number_format($account['balance'] ?? 0, 2) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -181,18 +203,31 @@ function get_currency_symbol($currency_code) {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                // Check if response is JSON, if not, parse as text and log
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    return response.json();
+                } else {
+                    return response.text().then(text => {
+                        console.error("Server did not return JSON. Response was:", text);
+                        throw new Error("Server response was not valid JSON. Check backend script for errors.");
+                    });
+                }
+            })
             .then(data => {
                 if (data.success) {
                     responseDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
                     form.reset(); // Clear form on success
                 } else {
-                    responseDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                    // Check if data.message exists, otherwise provide a generic error
+                    const errorMessage = data.message || "An unknown error occurred on the server.";
+                    responseDiv.innerHTML = `<div class="alert alert-danger">${errorMessage}</div>`;
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                responseDiv.innerHTML = `<div class="alert alert-danger">An unexpected error occurred. Please try again.</div>`;
+                console.error('Fetch Error:', error);
+                responseDiv.innerHTML = `<div class="alert alert-danger">An unexpected error occurred: ${error.message}. Please try again.</div>`;
             });
         });
     </script>
