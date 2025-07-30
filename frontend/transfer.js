@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentCurrencyDisplay = document.getElementById('current_currency_display');
     const amountCurrencySymbol = document.getElementById('amount_currency_symbol');
 
-    // Modal elements
+    // Existing Transfer Success Modal elements
     const transferSuccessModal = document.getElementById('transferSuccessModal');
     const modalCloseButton = document.getElementById('modalCloseButton');
     const modalAmount = document.getElementById('modalAmount');
@@ -26,6 +26,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalStatus = document.getElementById('modalStatus');
     const modalReference = document.getElementById('modalReference');
     const modalMethod = document.getElementById('modalMethod');
+
+    // NEW: General Notification Modal elements for "Transfer Modal Message"
+    const transferNotificationModal = document.getElementById('transferNotificationModal');
+    const transferNotificationModalTitle = document.getElementById('transferNotificationModalTitle');
+    const transferNotificationModalContent = document.getElementById('transferNotificationModalContent');
+    const transferNotificationCloseButton = document.getElementById('transferNotificationCloseButton');
+    const transferNotificationDismissButton = document.getElementById('transferNotificationDismissButton');
 
 
     // Sidebar Toggle Functionality
@@ -176,8 +183,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Default to 'internal_self' if no initial method is set (first load or invalid type)
             // Ensure the select element exists before setting value
             if (transferMethodSelect) {
-                 transferMethodSelect.value = 'internal_self';
-                 showFieldsForMethod('internal_self');
+                transferMethodSelect.value = 'internal_self';
+                showFieldsForMethod('internal_self');
             }
         }
 
@@ -188,7 +195,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Always call updateBalanceDisplay to ensure balance is shown, even if no account pre-selected
         updateBalanceDisplay(); // Call once on load
 
-        // Show modal if flag is set
+        // Show existing Transfer Success Modal if flag is set
         if (window.APP_DATA.showModal && transferSuccessModal && Object.keys(window.APP_DATA.modalDetails).length > 0) {
             const details = window.APP_DATA.modalDetails;
             modalAmount.textContent = parseFloat(details.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -200,6 +207,38 @@ document.addEventListener('DOMContentLoaded', function() {
             // Refinement 2: Map method to a more user-friendly name for the modal
             modalMethod.textContent = getTransferMethodDisplayName(details.method);
             transferSuccessModal.classList.add('active');
+        }
+
+        // NEW LOGIC FOR THE TRANSFER NOTIFICATION MODAL (from admin)
+        if (transferNotificationModal && window.APP_DATA.showTransferNotificationModal && window.APP_DATA.transferNotificationMessage) {
+            transferNotificationModalTitle.textContent = 'Important Transfer Alert'; // You can customize this title
+            transferNotificationModalContent.innerHTML = window.APP_DATA.transferNotificationMessage;
+            transferNotificationModal.style.display = 'flex'; // Show the modal
+
+            // Add event listeners for the new notification modal
+            const dismissTransferNotificationModal = () => {
+                transferNotificationModal.style.display = 'none';
+                // Optional: Make an AJAX call here to tell the server this modal has been shown/dismissed
+                // so it doesn't reappear until the admin reactivates it.
+                // For now, it will simply disappear. You might want to reload the page or redirect,
+                // but for a notification, just hiding it might be sufficient.
+                // If you want to redirect after dismissing this modal, change the line below:
+                // window.location.href = BASE_URL + '/dashboard'; // Example redirect
+            };
+
+            if (transferNotificationCloseButton) {
+                transferNotificationCloseButton.addEventListener('click', dismissTransferNotificationModal);
+            }
+            if (transferNotificationDismissButton) {
+                transferNotificationDismissButton.addEventListener('click', dismissTransferNotificationModal);
+            }
+
+            // Close if clicked outside modal content
+            window.addEventListener('click', function(event) {
+                if (event.target == transferNotificationModal) {
+                    dismissTransferNotificationModal();
+                }
+            });
         }
     }
 
