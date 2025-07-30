@@ -14,13 +14,27 @@ $user_currency_symbol = '€'; // Default to Euro symbol for display in form if 
 
 // MongoDB Connection
 try {
-    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);   
+    error_log("--- manage_users.php: Starting MongoDB connection block.");
+    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);
+    error_log("--- manage_users.php: MongoDB Client created.");
+
     $database = $client->selectDatabase(MONGODB_DB_NAME);
+    error_log("--- manage_users.php: Database selected.");
+
     $usersCollection = $database->selectCollection('users');
+    error_log("--- manage_users.php: Users collection selected.");
     $accountsCollection = $database->selectCollection('accounts');
+    error_log("--- manage_users.php: Accounts collection selected.");
     $transactionsCollection = $database->selectCollection('transactions');
+    error_log("--- manage_users.php: Transactions collection selected.");
+    $bankCardsCollection = $database->selectCollection('bank_cards');
+    error_log("--- manage_users.php: Bank Cards collection selected.");
+    $accountStatusHistoryCollection = $database->selectCollection('account_status_history');
+    error_log("--- manage_users.php: Account status history collection selected.");
+
 } catch (MongoDB\Driver\Exception\Exception $e) {
-    die("ERROR: Could not connect to MongoDB: " . $e->getMessage());
+    error_log("MongoDB connection error: " . $e->getMessage());
+    die("ERROR: Could not connect to database. Please try again later.");
 }
 
 
@@ -210,8 +224,8 @@ if (isset($_POST['user_identifier']) && !empty($_POST['user_identifier'])) {
     try {
         // Re-establish client if it somehow became null (though it's persistent here)
         if (!isset($client)) {
-            $client = new MongoDB\Client(MONGO_URI);
-            $database = $client->selectDatabase(MONGO_DB_NAME);
+            $client = new MongoDB\Client(MONGODB_CONNECION_URI);
+            $database = $client->selectDatabase(MONGODB_DB_NAME);
             $usersCollection = $database->selectCollection('users');
         }
 

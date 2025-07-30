@@ -19,16 +19,26 @@ if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) |
 $message = '';
 $message_type = '';
 
-// --- MongoDB Connection ---
+// MongoDB Connection
 try {
-    // MONGO_URI and MONGO_DB_NAME should be defined in Config.php
-    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);  
+    error_log("--- manage_users.php: Starting MongoDB connection block.");
+    $client = new MongoDB\Client(MONGODB_CONNECTION_URI);
+    error_log("--- manage_users.php: MongoDB Client created.");
+
     $database = $client->selectDatabase(MONGODB_DB_NAME);
+    error_log("--- manage_users.php: Database selected.");
+
     $usersCollection = $database->selectCollection('users');
+    error_log("--- manage_users.php: Users collection selected.");
     $accountsCollection = $database->selectCollection('accounts');
+    error_log("--- manage_users.php: Accounts collection selected.");
     $transactionsCollection = $database->selectCollection('transactions');
+    error_log("--- manage_users.php: Transactions collection selected.");
     $bankCardsCollection = $database->selectCollection('bank_cards');
+    error_log("--- manage_users.php: Bank Cards collection selected.");
     $accountStatusHistoryCollection = $database->selectCollection('account_status_history');
+    error_log("--- manage_users.php: Account status history collection selected.");
+
 } catch (MongoDB\Driver\Exception\Exception $e) {
     error_log("MongoDB connection error: " . $e->getMessage());
     die("ERROR: Could not connect to database. Please try again later.");
