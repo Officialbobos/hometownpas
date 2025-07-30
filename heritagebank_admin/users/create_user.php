@@ -1,6 +1,8 @@
 <?php
 // C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\users\create_user.php
 
+session_start();
+
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -18,7 +20,6 @@ use Aws\S3\Exception\S3Exception;
 
 // Check if admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    // CORRECTED: Use standard rtrim and routed path
     header('Location: ' . rtrim(BASE_URL, '/') . '/admin/login');
     exit;
 }
@@ -40,8 +41,6 @@ define('HOMETOWN_BANK_UK_SORT_CODE_PREFIX', '90');
 define('HOMETOWN_BANK_EUR_BIC', 'HOMTDEFF5678');
 define('HOMETOWN_BANK_EUR_BANK_CODE_BBAN', '50070010');
 define('HOMETOWN_BANK_USD_BIC', 'HOMTUS333232');
-
-// ... (All your helper functions like generateUniqueNumericId, etc., remain here) ...
 
 /**
  * Helper function to generate a unique numeric ID of a specific length.
@@ -207,7 +206,7 @@ function generateUniqueUsdIban($accountsCollection, string $internalAccountNumbe
     return false;
 }
 
-// --- NEW HELPER FUNCTION FOR GENERATING PRESIGNED B2 URLS ---
+// NEW HELPER FUNCTION FOR GENERATING PRESIGNED B2 URLS
 function getPresignedB2Url(string $objectKey, S3Client $b2Client, string $b2BucketName): string {
     if (empty($objectKey)) {
         return '';
@@ -288,7 +287,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Only proceed with database operations if no validation errors
     if ($message_type !== 'error') {
-        // --- START B2 PROFILE IMAGE UPLOAD LOGIC ---
+        // START B2 PROFILE IMAGE UPLOAD LOGIC
         if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK) {
             $file_tmp_path = $_FILES['profile_image']['tmp_name'];
             $file_name = $_FILES['profile_image']['name'];
@@ -338,14 +337,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-        // --- END B2 PROFILE IMAGE UPLOAD LOGIC ---
+        // END B2 PROFILE IMAGE UPLOAD LOGIC
     }
 
     // Only proceed with MongoDB if no errors so far
     if ($message_type !== 'error') {
         $mongoClient = null;
         $session = null;
-        $transaction_success = false; // Changed to false by default
+        $transaction_success = false;
         $new_user_id = null;
 
         try {
@@ -538,12 +537,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $session->commitTransaction();
             $transaction_success = true;
             
-            // --- CORRECTION: Add flash message and redirect here ---
             $_SESSION['flash_message'] = "User '{$first_name} {$last_name}' created successfully! <br>Membership Number: **{$membership_number}**<br>Initial Account Details:<br>" . implode("<br>", $accounts_created_messages);
             $_SESSION['flash_message_type'] = 'success';
             header('Location: ' . rtrim(BASE_URL, '/') . '/admin/manage_users');
             exit;
-            // --- END OF CORRECTION ---
 
         } catch (BulkWriteException $e) {
             $error_code = $e->getCode();
@@ -593,6 +590,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .readonly-field { background-color: #e9e9e9; cursor: not-allowed; }
         .required-asterisk { color: red; font-weight: bold; margin-left: 5px; }
         .dashboard-container { display: flex; flex-direction: column; min-height: 100vh; background-color: #fff; margin: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); overflow: hidden; }
+        .dashboard-header { background-color: #007bff; color: white; padding: 20px 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0056b3; }
         .dashboard-header .logo { max-height: 50px; width: auto; margin-right: 20px; }
         .dashboard-header h2 { margin: 0; font-size: 1.8em; flex-grow: 1; }
         .logout-button { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; }
@@ -626,10 +624,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <main class="dashboard-content">
             <?php if (!empty($message)): ?>
-                <p class="message <?php echo $message_type; ?>"><?php echo $message; ?></p>
+                <p class="message <?php echo htmlspecialchars($message_type); ?>"><?php echo nl2br(htmlspecialchars($message)); ?></p>
             <?php endif; ?>
 
-            <form action="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/users/create_user.php" method="POST" class="form-standard" enctype="multipart/form-data">
+            <form action="<?php echo htmlspecialchars(rtrim(BASE_URL, '/')); ?>/heritagebank_admin/users/create_user.php" method="POST" class="form-standard" enctype="multipart/form-data">
+                <h3 class="full-width">Personal Information</h3>
                 <div class="form-group">
                     <label for="first_name">First Name <span class="required-asterisk">*</span></label>
                     <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($_POST['first_name'] ?? ''); ?>" required>
@@ -683,6 +682,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <small>Optional: You can upload a profile picture for the user.</small>
                 </div>
 
+                <h3 class="full-width">Account Details</h3>
+
                 <div class="form-group">
                     <label for="routing_number_display">Routing Number</label>
                     <input type="text" id="routing_number_display" name="routing_number_display" value="Auto-generated upon creation" readonly class="readonly-field">
@@ -719,38 +720,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <small>Set the exact date and time the account was (or should be) created.</small>
                 </div>
 
-                <button type="submit" class="button-primary">Create User</button>
+                <div class="full-width">
+                    <button type="submit" class="button-primary">Create User</button>
+                </div>
             </form>
 
             <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/users/users_management.php" class="back-link">&larr; Back to User Management</a></p>
         </main>
     </div>
-    <style>
-        .readonly-field { background-color: #e9e9e9; cursor: not-allowed; }
-        .required-asterisk { color: red; font-weight: bold; margin-left: 5px; }
-        .dashboard-container { display: flex; flex-direction: column; min-height: 100vh; background-color: #fff; margin: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); overflow: hidden; }
-        .dashboard-header { background-color: #007bff; color: white; padding: 20px 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0056b3; }
-        .dashboard-header .logo { max-height: 50px; width: auto; margin-right: 20px; }
-        .dashboard-header h2 { margin: 0; font-size: 1.8em; flex-grow: 1; }
-        .logout-button { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; }
-        .logout-button:hover { background-color: #c82333; }
-        .dashboard-content { padding: 30px; flex-grow: 1; }
-        .dashboard-content h3 { color: #007bff; font-size: 1.6em; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
-        .form-standard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .form-standard .full-width { grid-column: 1 / -1; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            box-sizing: border-box;
-            font-size: 1em;
-        }
-        .form-group .button-primary { background-color: #28a745; color: white; padding: 12px 25px; border: none; border-radius: 6px; font-size: 1.1em; cursor: pointer; transition: background-color 0.3s ease; grid-column: 1 / -1; }
-        .form-group .button-primary:hover { background-color: #218838; }
-        .message.success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-        .message.error { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-    </style>
 </body>
 </html>
