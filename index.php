@@ -5,9 +5,9 @@ session_start(); // Start the session at the very beginning of the script.
 
 // --- REMOVE TEMPORARY DEBUG CODE FOR INI_SET & ERROR_REPORTING ---
 // These are now handled by Config.php based on APP_DEBUG.
-// ini_set('display_errors', 1);
-// ini_set('display_startup_errors', 1);
-// error_reporting(E_ALL);
+// ini_set('display_errors', 1); // <--- Make sure this is commented out or removed
+// ini_set('display_startup_errors', 1); // <--- Make sure this is commented out or removed
+// error_reporting(E_ALL); // <--- Make sure this is commented out or removed
 
 error_log("--- SCRIPT START (index.php) ---");
 
@@ -15,8 +15,34 @@ error_log("--- SCRIPT START (index.php) ---");
 // This is essential as Config.php and potentially functions.php depend on it (e.g., for Dotenv and MongoDB classes).
 require __DIR__ . '/vendor/autoload.php';
 
+// --- CONDITIONAL DOTENV LOADING ---
+// This block ensures that .env variables are loaded ONLY if not on Render.com.
+// Render provides environment variables directly, so dotenv is not needed there.
+$isRender = (getenv('RENDER') === 'true' || (isset($_SERVER['RENDER']) && $_SERVER['RENDER'] === 'true'));
+
+if (!$isRender) {
+    // We are NOT on Render (likely local development), so load .env file
+    try {
+        // Create an immutable Dotenv instance, pointing to the root of your project
+        // (where your .env file should be, typically the same directory as index.php)
+        $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+        $dotenv->load();
+        error_log("index.php: .env file loaded successfully locally.");
+    } catch (Dotenv\Exception\InvalidPathException $e) {
+        // This means the .env file wasn't found locally.
+        // It's a notice, not a fatal error, because we're handling it.
+        error_log("index.php: NOTICE: .env file not found at " . __DIR__ . ". Assuming environment variables are pre-loaded or not needed for this environment. Error: " . $e->getMessage());
+    }
+} else {
+    // We are on Render, so environment variables are pre-loaded by the system.
+    // No need to load a .env file.
+    error_log("index.php: Running on Render.com, environment variables are pre-loaded by the system. Skipping .env file load.");
+}
+// --- END CONDITIONAL DOTENV LOADING ---
+
 // 2. Load Config.php. This will define all global constants (like BASE_URL, MONGODB_CONNECTION_URI)
 // and set up error reporting based on APP_DEBUG from your .env.
+// This must be AFTER the dotenv loading, so Config.php can read the variables.
 require_once __DIR__ . '/Config.php';
 
 // 3. Load functions.php. This should come after Config.php if functions rely on Config.php constants.
@@ -110,17 +136,17 @@ $authenticated_routes = [
 if (in_array($path, $authenticated_routes) && !str_starts_with($path, 'admin/')) {
     // This block handles routes that require a user to be fully logged in (after 2FA)
     if (
-        !isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true || // Changed !== to !=
+        !isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true || // CORRECT: Checking 'logged_in'
         !isset($_SESSION['user_id']) ||
-        !isset($_SESSION['2fa_verified']) || $_SESSION['2fa_verified'] != true // Changed !== to !=
+        !isset($_SESSION['2fa_verified']) || $_SESSION['2fa_verified'] != true
     ) {
         // Log the redirection for debugging
         error_log("Authentication failed for path: " . $path . ". Redirecting to login.");
         // Add more specific session state logging here to confirm the exact values at this point
         error_log("DEBUG SESSION STATE for auth fail (index.php): ");
-        error_log("  logged_in: " . (isset($_SESSION['logged_in']) ? var_export($_SESSION['logged_in'], true) : 'NOT SET'));
-        error_log("  user_id: " . (isset($_SESSION['user_id']) ? var_export($_SESSION['user_id'], true) : 'NOT SET'));
-        error_log("  2fa_verified: " . (isset($_SESSION['2fa_verified']) ? var_export($_SESSION['2fa_verified'], true) : 'NOT SET'));
+        error_log("  logged_in: " . (isset($_SESSION['logged_in']) ? var_export($_SESSION['logged_in'], true) : 'NOT SET')); // CORRECT: Logging 'logged_in'
+        error_log("  user_id: " . (isset($_SESSION['user_id']) ? var_export($_SESSION['user_id'], true) : 'NOT SET'));
+        error_log("  2fa_verified: " . (isset($_SESSION['2fa_verified']) ? var_export($_SESSION['2fa_verified'], true) : 'NOT SET'));
 
 
         header('Location: ' . BASE_URL . '/login');
