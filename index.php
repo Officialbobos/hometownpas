@@ -110,12 +110,19 @@ $authenticated_routes = [
 if (in_array($path, $authenticated_routes) && !str_starts_with($path, 'admin/')) {
     // This block handles routes that require a user to be fully logged in (after 2FA)
     if (
-        !isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true ||
+        !isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] != true || // Changed !== to !=
         !isset($_SESSION['user_id']) ||
-        !isset($_SESSION['2fa_verified']) || $_SESSION['2fa_verified'] !== true
+        !isset($_SESSION['2fa_verified']) || $_SESSION['2fa_verified'] != true // Changed !== to !=
     ) {
         // Log the redirection for debugging
         error_log("Authentication failed for path: " . $path . ". Redirecting to login.");
+        // Add more specific session state logging here to confirm the exact values at this point
+        error_log("DEBUG SESSION STATE for auth fail (index.php): ");
+        error_log("  user_logged_in: " . (isset($_SESSION['user_logged_in']) ? var_export($_SESSION['user_logged_in'], true) : 'NOT SET'));
+        error_log("  user_id: " . (isset($_SESSION['user_id']) ? var_export($_SESSION['user_id'], true) : 'NOT SET'));
+        error_log("  2fa_verified: " . (isset($_SESSION['2fa_verified']) ? var_export($_SESSION['2fa_verified'], true) : 'NOT SET'));
+
+
         header('Location: ' . BASE_URL . '/login');
         exit;
     }
