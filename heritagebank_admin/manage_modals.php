@@ -1,169 +1,97 @@
 <?php
-// C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\manage_modals.php
+// C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\dashboard.php
+session_start(); // Start the session
 
-// Removed session_start() as it should be handled by a central router file.
+// --- REMOVE TEMPORARY DEBUG CODE FOR INI_SET & ERROR_REPORTING ---
+// These are now handled by Config.php based on APP_DEBUG.
+// ini_set('display_errors', 1); // For development: Display all errors
+// ini_set('display_startup_errors', 1); // For development: Display startup errors
+// error_reporting(E_ALL); // For development: Report all errors
 
+// Load Composer's autoloader for MongoDB classes and Dotenv
 require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/../Config.php';
-require_once __DIR__ . '/../functions.php'; // For getCollection()
 
-use MongoDB\BSON\UTCDateTime;
-use MongoDB\BSON\ObjectId;
-use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
+// Include necessary files for MongoDB connection and utility functions
+// Config.php should be loaded before functions.php if functions rely on its constants.
+require_once __DIR__ . '/../Config.php'; // This defines APP_DEBUG and error settings
+require_once __DIR__ . '/../functions.php'; // This should contain getMongoDBClient() and getCollection()
 
-// Corrected authentication check to look for 'admin_logged_in'
+use MongoDB\BSON\UTCDateTime; // Ensure UTCDateTime is used for date handling
+use MongoDB\Driver\Exception\Exception as MongoDBDriverException; // For general MongoDB driver exceptions
+
+// Check if the admin is NOT logged in, redirect to login page
+// Using $_SESSION['admin_user_id'] as the primary indicator for admin login
+// Assuming 'index.php' in the current directory is your admin login page.
+// If your admin login is through the main index.php router (e.g., 'admin/login'),
+// you might need to use BASE_URL here: header('Location: ' . BASE_URL . '/admin/login');
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
 
-$usersCollection = getCollection('users');
-$modalMessage = ''; // For Transfer Modal
-$isActive = false;  // For Transfer Modal
-$cardModalMessage = ''; // For View My Cards Modal (NEW)
-$showCardModal = false; // For View My Cards Modal (NEW)
-$message = '';
-$message_type = '';
+// Get logged-in admin's full name for display
+$admin_full_name = $_SESSION['admin_full_name'] ?? 'Admin User';
 
-// Fetch all users for the dropdown
-$allUsers = [];
+// Initialize statistics variables
+$totalUsers = 'N/A';
+$pendingApprovals = 'N/A';
+$dailyTransactions = 'N/A';
+$systemHealth = 'Optimal'; // This is static; implement deeper checks if dynamic status is needed
+
 try {
-    $allUsers = $usersCollection->find(['status' => 'active'], ['sort' => ['first_name' => 1]]);
-    $allUsers = iterator_to_array($allUsers);
-} catch (MongoDBDriverException $e) {
-    $message = "Could not load the list of users.";
-    $message_type = "error";
+    // Get MongoDB collections using the streamlined getCollection() function
+    $usersCollection = getCollection('users');
+    $transactionsCollection = getCollection('transactions');
+
+    // Fetch Total Users (excluding admin users if desired, but general count is fine for dashboard)
+    $totalUsers = $usersCollection->countDocuments([]); // Counts all users
+    // If you want to exclude admins: $totalUsers = $usersCollection->countDocuments(['is_admin' => ['$ne' => true]]);
+
+    // Fetch Pending Approvals (e.g., transactions with 'pending' status)
+    $pendingApprovals = $transactionsCollection->countDocuments(['status' => 'pending']);
+
+    // Fetch Daily Transactions
+    // Get the start and end of the current day in UTC for comparison with MongoDB's UTCDateTime
+    // The server's timezone might affect strtotime, but MongoDB's UTCDateTime handles conversion.
+    // For consistency, consider storing local time and UTC time or just UTC.
+    $startOfDay = new UTCDateTime(strtotime('today midnight', time()) * 1000); // Current day, 00:00:00 UTC
+    $endOfDay = new UTCDateTime(strtotime('tomorrow midnight', time()) * 1000);   // Next day, 00:00:00 UTC (exclusive)
+
+    $dailyTransactions = $transactionsCollection->countDocuments([
+        'initiated_at' => [ // Assuming 'initiated_at' field stores UTCDateTime for transactions
+            '$gte' => $startOfDay,
+            '$lt' => $endOfDay
+        ]
+    ]);
+
+} catch (MongoDBDriverException $e) { // Catch specific MongoDB driver exceptions
+    // Log the error for debugging purposes
+    error_log("MongoDB Dashboard Statistics Error: " . $e->getMessage());
+    // Fallback values and set a user-friendly error message
+    $totalUsers = 'Error';
+    $pendingApprovals = 'Error';
+    $dailyTransactions = 'Error';
+    $systemHealth = 'Degraded (DB Error)';
+    $_SESSION['admin_message'] = "Could not fetch dashboard statistics due to a database error.";
+    $_SESSION['admin_message_type'] = "error";
+} catch (Exception $e) { // Catch any other general exceptions
+    error_log("General Dashboard Statistics Error: " . $e->getMessage());
+    $totalUsers = 'Error';
+    $pendingApprovals = 'Error';
+    $dailyTransactions = 'Error';
+    $systemHealth = 'Degraded (Application Error)'; // More descriptive error for app issues
+    $_SESSION['admin_message'] = "An unexpected error occurred while fetching dashboard statistics.";
+    $_SESSION['admin_message_type'] = "error";
 }
 
-$selectedUserId = $_GET['user_id'] ?? null; // Get the user ID from the URL
-
-// Handle form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $userId = $_POST['user_id'] ?? null;
-
-    if (!empty($userId)) {
-        try {
-            // --- Logic for Transfer Modal Message ---
-            if (isset($_POST['remove_transfer_message'])) {
-                $updateResult = $usersCollection->updateOne(
-                    ['_id' => new ObjectId($userId)],
-                    ['$unset' => [
-                        'transfer_modal_message' => '',
-                        'show_transfer_modal' => ''
-                    ]]
-                );
-
-                if ($updateResult->getModifiedCount() > 0) {
-                    $message = "Transfer modal message removed successfully.";
-                    $message_type = "success";
-                    $modalMessage = ''; // Reset variables to clear the form
-                    $isActive = false;
-                } else {
-                    $message = "No custom transfer message found for this user.";
-                    $message_type = "info";
-                }
-            } elseif (isset($_POST['save_transfer_message'])) {
-                $modalMessage = trim($_POST['modal_message'] ?? '');
-                $isActive = isset($_POST['is_active']) && $_POST['is_active'] === 'on';
-
-                $updateResult = $usersCollection->updateOne(
-                    ['_id' => new ObjectId($userId)],
-                    ['$set' => [
-                        'transfer_modal_message' => $modalMessage,
-                        'show_transfer_modal' => $isActive
-                    ]]
-                );
-
-                if ($updateResult->getModifiedCount() > 0) {
-                    $message = "Transfer modal message for user updated successfully.";
-                    $message_type = "success";
-                } else {
-                    $message = "No changes were made for this user's transfer message.";
-                    $message_type = "info";
-                }
-            }
-            // --- NEW Logic for View My Cards Modal Message ---
-            elseif (isset($_POST['remove_card_message'])) {
-                $updateResult = $usersCollection->updateOne(
-                    ['_id' => new ObjectId($userId)],
-                    ['$unset' => [
-                        'card_modal_message' => '',
-                        'show_card_modal' => ''
-                    ]]
-                );
-
-                if ($updateResult->getModifiedCount() > 0) {
-                    $message = "View My Cards modal message removed successfully.";
-                    $message_type = "success";
-                    $cardModalMessage = ''; // Reset variables
-                    $showCardModal = false;
-                } else {
-                    $message = "No custom 'View My Cards' message found for this user.";
-                    $message_type = "info";
-                }
-            } elseif (isset($_POST['save_card_message'])) {
-                $cardModalMessage = trim($_POST['card_modal_message'] ?? '');
-                $showCardModal = isset($_POST['is_card_active']) && $_POST['is_card_active'] === 'on';
-
-                $updateResult = $usersCollection->updateOne(
-                    ['_id' => new ObjectId($userId)],
-                    ['$set' => [
-                        'card_modal_message' => $cardModalMessage,
-                        'show_card_modal' => $showCardModal
-                    ]]
-                );
-
-                if ($updateResult->getModifiedCount() > 0) {
-                    $message = "View My Cards modal message for user updated successfully.";
-                    $message_type = "success";
-                } else {
-                    $message = "No changes were made for this user's 'View My Cards' message.";
-                    $message_type = "info";
-                }
-            }
-
-            $selectedUserId = $userId; // Keep the selected user in the dropdown
-
-            // Re-fetch user data to reflect changes immediately after update, in case multiple forms are on one page
-            $selectedUser = $usersCollection->findOne(['_id' => new ObjectId($selectedUserId)]);
-            if ($selectedUser) {
-                $modalMessage = $selectedUser['transfer_modal_message'] ?? '';
-                $isActive = $selectedUser['show_transfer_modal'] ?? false;
-                $cardModalMessage = $selectedUser['card_modal_message'] ?? '';
-                $showCardModal = $selectedUser['show_card_modal'] ?? false;
-            }
-
-
-        } catch (MongoDBDriverException $e) {
-            $message = "Database error: " . $e->getMessage();
-            $message_type = "error";
-            error_log("Admin Manage Modals Update Error: " . $e->getMessage());
-        } catch (Exception $e) {
-            $message = "An unexpected error occurred: " . $e->getMessage();
-            $message_type = "error";
-            error_log("Admin Manage Modals Update General Error: " . $e->getMessage());
-        }
-    } else {
-        $message = "Please select a user to update.";
-        $message_type = "error";
-    }
-}
-
-// Fetch current settings for the selected user to populate the form(s)
-if (!empty($selectedUserId)) {
-    try {
-        $selectedUser = $usersCollection->findOne(['_id' => new ObjectId($selectedUserId)]);
-        if ($selectedUser) {
-            $modalMessage = $selectedUser['transfer_modal_message'] ?? '';
-            $isActive = $selectedUser['show_transfer_modal'] ?? false;
-            $cardModalMessage = $selectedUser['card_modal_message'] ?? ''; // NEW
-            $showCardModal = $selectedUser['show_card_modal'] ?? false; // NEW
-        }
-    } catch (MongoDBDriverException $e) {
-        $message = "Could not load current settings for the selected user.";
-        $message_type = "error";
-        error_log("Admin Manage Modals Load Error: " . $e->getMessage());
-    }
+// Check for and display one-time admin messages (e.g., from transfer_process.php or other admin actions)
+$admin_message = '';
+$admin_message_type = '';
+if (isset($_SESSION['admin_message'])) {
+    $admin_message = $_SESSION['admin_message'];
+    $admin_message_type = $_SESSION['admin_message_type'];
+    unset($_SESSION['admin_message']); // Clear the message after displaying it
+    unset($_SESSION['admin_message_type']); // Clear the message type
 }
 
 ?>
@@ -172,142 +100,302 @@ if (!empty($selectedUserId)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Modals - Admin</title>
+    <title>Hometown Bank Admin Dashboard</title>
     <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-        /* ... (Your existing CSS styles remain the same) ... */
-        .dashboard-container { display: flex; flex-direction: column; min-height: 100vh; background-color: #fff; margin: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); overflow: hidden; }
-        .dashboard-header { background-color: #007bff; color: white; padding: 20px 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0056b3; }
-        .dashboard-header .logo { max-height: 50px; width: auto; margin-right: 20px; }
-        .dashboard-header h2 { margin: 0; font-size: 1.8em; flex-grow: 1; }
-        .logout-button { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; }
-        .logout-button:hover { background-color: #c82333; }
-        .dashboard-content { padding: 30px; flex-grow: 1; }
-        .dashboard-content h3 { color: #007bff; font-size: 1.6em; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
-        .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            box-sizing: border-box;
-            font-size: 1em;
-            resize: vertical;
+        /* General Body Styles */
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f6;
+            color: #333;
         }
-        .form-group textarea { min-height: 100px; }
-        .form-group input[type="checkbox"] { margin-right: 10px; }
-        /* Add a style for the new button */
-        .form-group .btn-secondary {
-            background-color: #6c757d; /* Gray for secondary action */
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 6px;
-            font-size: 1.1em;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-            margin-left: 10px;
-        }
-        .form-group .btn-secondary:hover { background-color: #5a6268; }
-        
-        .form-group .btn-primary {
-            background-color: #28a745; /* Green for submit */
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 6px;
-            font-size: 1.1em;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        .form-group .btn-primary:hover { background-color: #218838; }
 
-        .message-box { padding: 12px 20px; margin-bottom: 20px; border-radius: 6px; text-align: center; font-size: 0.95em; }
-        .message-box.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .message-box.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .message-box.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        /* Dashboard Container */
+        .dashboard-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #fff;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden; /* Clear floats */
+        }
+
+        /* Dashboard Header */
+        .dashboard-header {
+            background-color: #007bff; /* Primary blue for header */
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #0056b3;
+        }
+
+        .dashboard-header .logo {
+            max-height: 50px; /* Adjust logo size */
+            width: auto;
+            margin-right: 20px;
+        }
+
+        .dashboard-header h2 {
+            margin: 0;
+            font-size: 1.8em;
+            flex-grow: 1; /* Allows h2 to take available space */
+        }
+
+        .logout-button {
+            background-color: #dc3545; /* Red for logout */
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        .logout-button:hover {
+            background-color: #c82333;
+        }
+
+        /* Dashboard Content */
+        .dashboard-content {
+            padding: 30px;
+            flex-grow: 1; /* Allows content to expand */
+        }
+
+        .dashboard-content h3 {
+            color: #007bff;
+            font-size: 1.6em;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+
+        .dashboard-content p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        /* Message Box Styling */
+        .message-box {
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 0.95em;
+            transition: opacity 0.5s ease-out; /* For JS fade out */
+        }
+        .message-box.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message-box.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .message-box.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background-color: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h4 {
+            color: #0056b3;
+            font-size: 1.2em;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+
+        .stat-card p {
+            font-size: 2em;
+            font-weight: 700;
+            color: #333;
+            margin: 0;
+        }
+
+        /* Dashboard Navigation */
+        .dashboard-nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .dashboard-nav li {
+            background-color: #e9ecef;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+
+        .dashboard-nav li:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            background-color: #dee2e6;
+        }
+
+        .dashboard-nav a {
+            display: block;
+            padding: 20px;
+            text-align: center;
+            text-decoration: none;
+            color: #007bff;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .dashboard-nav a:hover {
+            color: #0056b3;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            .dashboard-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            .dashboard-header .logo {
+                margin-bottom: 15px;
+                margin-right: 0;
+            }
+            .dashboard-header h2 {
+                margin-bottom: 15px;
+            }
+            .stats-grid, .dashboard-nav ul {
+                grid-template-columns: 1fr; /* Stack columns on smaller screens */
+            }
+        }
+
+        @media (max-width: 480px) {
+            .dashboard-container {
+                margin: 10px;
+                padding: 15px;
+            }
+            .dashboard-header {
+                padding: 15px;
+            }
+            .dashboard-content {
+                padding: 20px;
+            }
+            .dashboard-header h2 {
+                font-size: 1.5em;
+            }
+            .stat-card h4 {
+                font-size: 1em;
+            }
+            .stat-card p {
+                font-size: 1.8em;
+            }
+            .dashboard-nav a {
+                font-size: 1em;
+                padding: 15px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="dashboard-container">
         <div class="dashboard-header">
             <img src="https://i.imgur.com/YmC3kg3.png" alt="Hometown Bank Logo" class="logo">
-            <h2>Manage User Modals</h2>
-            <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/logout'; ?>" class="logout-button">Logout</a>
+            <h2>Welcome, <?php echo htmlspecialchars($admin_full_name); ?>!</h2>
+        <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/logout'; ?>" class="logout-button">Logout</a>
         </div>
 
         <div class="dashboard-content">
-            <?php if ($message): ?>
-                <div class="message-box <?php echo htmlspecialchars($message_type); ?>">
-                    <?php echo htmlspecialchars($message); ?>
+            <?php if (!empty($admin_message)): ?>
+                <div class="message-box <?php echo htmlspecialchars($admin_message_type); ?>">
+                    <?php echo htmlspecialchars($admin_message); ?>
                 </div>
             <?php endif; ?>
 
-            <form action="manage_modals.php" method="GET" style="margin-bottom: 20px;">
-                <div class="form-group">
-                    <label for="user_id">Select User to Manage:</label>
-                    <select id="user_id" name="user_id" onchange="this.form.submit()">
-                        <option value="">-- Select a User --</option>
-                        <?php foreach ($allUsers as $user): ?>
-                            <option value="<?php echo htmlspecialchars((string)$user['_id']); ?>"
-                                <?php echo ($selectedUserId === (string)$user['_id']) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name'] . ' (' . $user['email'] . ')'); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+            <h3>Admin Overview</h3>
+            <p>This is your secure admin dashboard. Here you can manage users, transactions, reports, and more.</p>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h4>Total Users</h4>
+                    <p><?php echo htmlspecialchars($totalUsers); ?></p>
                 </div>
-            </form>
+                <div class="stat-card">
+                    <h4>Pending Approvals</h4>
+                    <p><?php echo htmlspecialchars($pendingApprovals); ?></p>
+                </div>
+                <div class="stat-card">
+                    <h4>Daily Transactions</h4>
+                    <p><?php echo htmlspecialchars($dailyTransactions); ?></p>
+                </div>
+                <div class="stat-card">
+                    <h4>System Health</h4>
+                    <p><?php echo htmlspecialchars($systemHealth); ?></p>
+                <button onclick="alert('System Health check not yet implemented.');" style="background-color: #007bff; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; margin-top: 10px;">Details</button>
+                </div>
+            </div>
 
-            <hr style="border-top: 1px solid #ddd; margin: 30px 0;">
+            <nav class="dashboard-nav">
+                <ul>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/users'; ?>">User Management</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/transactions'; ?>">Transaction History</a></li>
+                    <li><a href="#">Reports & Analytics</a></li>
+                    <li><a href="#">System Settings</a></li>
+                    <li><a href="#">Transfer Approvals</a></li>
+                    <li> <a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/manage_modals.php">Manage Modal Message</a></li>
 
-            <?php if (!empty($selectedUserId)): ?>
-                <h3>Manage Transfer Modal Message for Selected User</h3>
-                <form action="" method="POST">
-                    <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($selectedUserId); ?>">
-                    
-                    <div class="form-group">
-                        <label for="modal_message">Transfer Modal Message Content:</label>
-                        <textarea id="modal_message" name="modal_message" rows="5" placeholder="Enter the message to display for transfers."><?php echo htmlspecialchars($modalMessage); ?></textarea>
-                    </div>
-                    <div class="form-group">
-                        <input type="checkbox" id="is_active" name="is_active" <?php echo $isActive ? 'checked' : ''; ?>>
-                        <label for="is_active" style="display: inline-block;">Display Transfer Message to this User</label>
-                    </div>
-                    <div class="form-group">
-                        <button type="submit" name="save_transfer_message" class="btn-primary">Save Transfer Settings</button>
-                        <button type="submit" name="remove_transfer_message" class="btn-secondary">Remove Transfer Message</button>
-                    </div>
-                </form>
-
-                <hr style="border-top: 1px solid #ddd; margin: 30px 0;">
-
-                <h3>Manage View My Cards Modal Message for Selected User</h3>
-                <form action="" method="POST">
-                    <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($selectedUserId); ?>">
-                    
-                    <div class="form-group">
-                        <label for="card_modal_message">View My Cards Modal Message Content:</label>
-                        <textarea id="card_modal_message" name="card_modal_message" rows="5" placeholder="Enter the message to display for 'View My Cards'."><?php echo htmlspecialchars($cardModalMessage); ?></textarea>
-                    </div>
-                    <div class="form-group">
-                        <input type="checkbox" id="is_card_active" name="is_card_active" <?php echo $showCardModal ? 'checked' : ''; ?>>
-                        <label for="is_card_active" style="display: inline-block;">Display Message for 'View My Cards'</label>
-                    </div>
-                    <div class="form-group">
-                        <button type="submit" name="save_card_message" class="btn-primary">Save Card Message</button>
-                        <button type="submit" name="remove_card_message" class="btn-secondary">Remove Card Message</button>
-                    </div>
-                </form>
-
-            <?php else: ?>
-                <p>Please select a user from the dropdown above to manage their modal messages.</p>
-            <?php endif; ?>
-
-            <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin" style="display: inline-block; margin-top: 20px; color: #007bff; text-decoration: none;">&larr; Back to Dashboard</a></p>
+                </ul>
+            </nav>
         </div>
     </div>
-    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/script.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/script.js'; ?>"></script>
+    <script>
+        // Optional: JavaScript to fade out messages after a few seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            const messageBox = document.querySelector('.message-box');
+            if (messageBox && messageBox.textContent.trim() !== '') {
+                // Only fade out success and warning messages
+                if (messageBox.classList.contains('success') || messageBox.classList.contains('warning')) {
+                    setTimeout(() => {
+                        messageBox.style.opacity = '0';
+                        setTimeout(() => {
+                            messageBox.style.display = 'none';
+                        }, 500); // Wait for fade-out transition
+                    }, 5000); // Hide after 5 seconds
+                }
+            }
+        });
+    </script>
 </body>
 </html>
