@@ -2,14 +2,16 @@
 session_start();
 require_once '../Config.php'; // Essential for MONGO_URI, MONGO_DB_NAME
 require_once '../vendor/autoload.php'; // Make sure Composer's autoloader is included for MongoDB classes
-require_once '../functions.php'; // Include functions.php if it contains utility functions like formatCurrency
+require_once '../functions.php'; // Include functions.php if it contains utility functions like getCollection
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
+use MongoDB\Driver\Exception\Exception as MongoDBDriverException; // Specific MongoDB exception
 
 // Check if the user is logged in. If not, redirect to login page.
+// Using BASE_URL for redirection for robustness.
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: ../login.php'); // Redirect to login page, assuming login.php is in parent dir
+    header('Location: ' . rtrim(BASE_URL, '/') . '/login.php'); // Redirect to login page
     exit;
 }
 
@@ -18,15 +20,16 @@ try {
     $user_id_obj = new ObjectId($_SESSION['user_id']);
 } catch (Exception $e) {
     // Log the error for debugging purposes
-    error_log("Invalid user ID in session: " . $_SESSION['user_id'] . " - " . $e->getMessage());
+    error_log("Invalid user ID in session: " . ($_SESSION['user_id'] ?? 'N/A') . " - " . $e->getMessage());
     $_SESSION['message'] = "Your session is invalid. Please log in again.";
     $_SESSION['message_type'] = "error";
-    header('Location: ../login.php');
+    header('Location: ' . rtrim(BASE_URL, '/') . '/login.php');
     exit;
 }
 
 $user_data = [];
-$mongoClient = null; // Initialize to null for finally block
+$mongoClient = null; // Initialize to null for finally block to ensure cleanup
+$errorMessage = ''; // To store user-friendly error messages
 
 try {
     // Establish MongoDB connection using details from Config.php
@@ -37,16 +40,33 @@ try {
     // Fetch user data from the 'users' collection by _id
     $user_data = (array) $usersCollection->findOne(['_id' => $user_id_obj]);
 
-} catch (Exception $e) {
-    // Catch any exceptions that occur during MongoDB operations
+    if (!$user_data) {
+        // This case indicates user_id from session didn't find a matching user
+        $errorMessage = "User profile data could not be found. Please log in again.";
+        error_log("User data not found for ID: " . $_SESSION['user_id']);
+        // Consider redirecting to logout/login if user data is unexpectedly missing
+        // header('Location: ' . rtrim(BASE_URL, '/') . '/logout.php');
+        // exit;
+    }
+
+} catch (MongoDBDriverException $e) {
+    // Catch specific MongoDB driver exceptions
+    $errorMessage = "A database error occurred while fetching your profile. Please try again later.";
     error_log("MongoDB Error in profile.php: " . $e->getMessage());
-    // You might want to display a user-friendly error message or redirect
+    $user_data = []; // Ensure user_data is empty on error
+} catch (Exception $e) {
+    // Catch any other general exceptions
+    $errorMessage = "An unexpected error occurred while loading your profile. Please try again later.";
+    error_log("General Error in profile.php: " . $e->getMessage());
     $user_data = []; // Ensure user_data is empty on error
 } finally {
-    $mongoClient = null; // Clean up the client reference
+    // It's good practice to close the MongoDB client connection if it was opened
+    // In PHP, MongoDB connections are persistent by default, but explicitly nulling
+    // the client can help with resource management if you're not using a global client.
+    $mongoClient = null;
 }
 
-// Fallback for display if data not found (though should ideally exist if logged in)
+// Fallback for display if data not found or on error
 $display_username = $user_data['email'] ?? 'N/A'; // Using 'email' as the display username
 $display_first_name = $user_data['first_name'] ?? 'N/A';
 $display_last_name = $user_data['last_name'] ?? 'N/A';
@@ -66,7 +86,7 @@ $display_gender = $user_data['gender'] ?? 'N/A';
 $display_occupation = $user_data['occupation'] ?? 'N/A';
 $display_membership_number = $user_data['membership_number'] ?? 'N/A';
 
-// --- PROFILE IMAGE PATH LOGIC (ADJUSTED) ---
+// --- PROFILE IMAGE PATH LOGIC ---
 // Define the path to the default profile image relative to the project root.
 // Assuming 'images' folder is also at the project root, similar to 'uploads'.
 $default_profile_image_path = 'images/default_profile.png';
@@ -75,9 +95,10 @@ $default_profile_image_path = 'images/default_profile.png';
 // The path stored in the database is 'uploads/profile_images/filename.ext'.
 // Since profile.php is in 'frontend/', and 'uploads/' is in root, we go up one level (..)
 // before concatenating the stored path.
+// Using BASE_URL for robustness as well.
 $profile_image_src = !empty($user_data['profile_image']) ?
-                     '../' . htmlspecialchars($user_data['profile_image']) :
-                     '../' . $default_profile_image_path;
+                     rtrim(BASE_URL, '/') . '/' . htmlspecialchars($user_data['profile_image']) :
+                     rtrim(BASE_URL, '/') . '/' . $default_profile_image_path;
 // --- END PROFILE IMAGE PATH LOGIC ---
 
 ?>
@@ -87,7 +108,7 @@ $profile_image_src = !empty($user_data['profile_image']) ?
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Heritage Bank - User Profile</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
@@ -346,28 +367,34 @@ $profile_image_src = !empty($user_data['profile_image']) ?
         <div class="user-info">
             <i class="fas fa-user-circle profile-icon"></i>
             <span>Welcome, <?php echo htmlspecialchars($_SESSION['first_name'] ?? 'User'); ?></span>
-            <a href="logout.php">Logout</a>
+            <a href="<?php echo rtrim(BASE_URL, '/') . '/logout.php'; ?>">Logout</a>
         </div>
     </header>
 
     <div class="dashboard-container">
         <nav class="sidebar">
             <ul>
-                <li><a href="dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
-                <li><a href="accounts.php"><i class="fas fa-wallet"></i> <span>Accounts</span></a></li>
-                <li><a href="transfer.php"><i class="fas fa-exchange-alt"></i> <span>Transfers</span></a></li>
-                <li><a href="transactions.php"><i class="fas fa-history"></i> <span>Transaction History</span></a></li>
-                <li><a href="statements.php"><i class="fas fa-file-invoice"></i> <span>Statements</span></a></li>
-                <li><a href="profile.php" class="active"><i class="fas fa-user"></i> <span>Profile</span></a></li>
-                <li><a href="bank_cards.php"><i class="fas fa-credit-card"></i> <span>Bank Cards</span></a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/dashboard.php'; ?>"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/accounts.php'; ?>"><i class="fas fa-wallet"></i> <span>Accounts</span></a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/transfer.php'; ?>"><i class="fas fa-exchange-alt"></i> <span>Transfers</span></a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/transactions.php'; ?>"><i class="fas fa-history"></i> <span>Transaction History</span></a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/statements.php'; ?>"><i class="fas fa-file-invoice"></i> <span>Statements</span></a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/profile.php'; ?>" class="active"><i class="fas fa-user"></i> <span>Profile</span></a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/bank_cards.php'; ?>"><i class="fas fa-credit-card"></i> <span>Bank Cards</span></a></li>
                 <li><a href="#"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
-                <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/logout.php'; ?>"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
             </ul>
         </nav>
 
         <main class="profile-container">
             <section class="profile-card">
                 <h2>User Profile</h2>
+                <?php if (!empty($errorMessage)): ?>
+                    <div style="padding: 15px; margin-bottom: 20px; border-radius: 4px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;">
+                        <?php echo htmlspecialchars($errorMessage); ?>
+                    </div>
+                <?php endif; ?>
+
                 <?php if (!empty($user_data)): ?>
                     <div class="profile-image-container">
                         <img src="<?php echo $profile_image_src; ?>" alt="Profile Image">
@@ -386,14 +413,14 @@ $profile_image_src = !empty($user_data['profile_image']) ?
                         <p><strong>Membership No.:</strong> <?php echo $display_membership_number; ?></p>
                     </div>
                 <?php else: ?>
-                    <p>User data not found.</p>
+                    <p>User data not found or could not be loaded.</p>
                 <?php endif; ?>
             </section>
         </main>
     </div>
 
     <footer class="dashboard-footer">
-        <p>&copy; <?php echo date('Y'); ?> HomeTown Bank profile-image-container. All rights reserved.</p>
+        <p>&copy; <?php echo date('Y'); ?> HomeTown Bank. All rights reserved.</p>
     </footer>
 
 </body>
