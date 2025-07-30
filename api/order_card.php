@@ -1,39 +1,40 @@
 <?php
 // api/order_card.php
+session_start();
+header('Content-Type: application/json');
+
+// Include your database connection, Composer autoloader, and general config.
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// Load .env and Config
+$dotenvPath = dirname(__DIR__);
+if (file_exists($dotenvPath . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
+    $dotenv->load();
+}
+
+require_once __DIR__ . '/../Config.php';
+require_once __DIR__ . '/../functions.php';
+
+// Add the necessary 'use' statements for MongoDB classes
+use MongoDB\BSON\ObjectId;
+use MongoDB\Driver\Exception\Exception as MongoDBException;
 
 // Add this line to confirm the script starts
 error_log("DEBUG: Starting order_card.php script execution.");
-
-// Start the session at the very beginning of the script.
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// Include your database connection, Composer autoloader, and general config.
-// Make sure this path is correct for your project structure.
-require_once __DIR__ . '/../Config.php';
-
-// Add this line to confirm the includes are successful
-error_log("DEBUG: config.php included successfully.");
 
 // Import PHPMailer classes into the global namespace
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception as PHPMailerException; // Use a specific alias to avoid conflict with general Exception
 
-// ALWAYS set content type first
-header('Content-Type: application/json');
-
 // Initialize a variable to hold the response data
 $response_data = [];
 $statusCode = 200; // Default success status code
 
-try {
-    // Ensure $mongoDb is available and connected
-    if (!isset($mongoDb) || !is_object($mongoDb)) {
-        error_log("CRITICAL ERROR: MongoDB connection object (\$mongoDb) is not available in order_card.php.");
-        throw new Exception('Database connection not established.', 500);
-    }
+// The MongoDB connection object will be created by the getCollection() function from functions.php
+// which is now included.
 
+try {
     // Ensure user is logged in
     if (!isset($_SESSION['user_id'])) {
         throw new Exception('User not authenticated. Please log in.', 401);
@@ -41,14 +42,17 @@ try {
 
     $user_id_string = $_SESSION['user_id'];
     try {
-        $userObjectId = new MongoDB\BSON\ObjectId($user_id_string);
-    } catch (Exception $e) {
+        $userObjectId = new ObjectId($user_id_string);
+    } catch (MongoDB\Driver\Exception\InvalidArgumentException $e) {
         error_log("ERROR: Invalid user ID format from session ('$user_id_string') in order_card.php: " . $e->getMessage());
         throw new Exception('Invalid user session data. Please try logging in again.', 400);
     }
 
+    // Add this line to confirm the includes are successful and DB is connected
+    error_log("DEBUG: config.php and functions.php included successfully. MongoDB connection ready.");
+
     // Fetch user details for email notification (recipient name and email)
-    $usersCollection = $mongoDb->selectCollection('users');
+    $usersCollection = getCollection('users');
     $user_doc = $usersCollection->findOne(['_id' => $userObjectId]);
     if (!$user_doc) {
         // User not found in DB, which is a critical issue if they are logged in.
@@ -82,8 +86,8 @@ try {
 
     // Validate account ID format and existence
     try {
-        $accountObjectId = new MongoDB\BSON\ObjectId($accountId);
-        $accountsCollection = $mongoDb->selectCollection('accounts');
+        $accountObjectId = new ObjectId($accountId);
+        $accountsCollection = getCollection('accounts');
         $account = $accountsCollection->findOne(['_id' => $accountObjectId, 'user_id' => $userObjectId]);
 
         if (!$account) {
@@ -112,7 +116,7 @@ try {
     $cvv = generateCVV();
     $pin = generatePIN();
 
-    $bankCardsCollection = $mongoDb->selectCollection('bank_cards');
+    $bankCardsCollection = getCollection('bank_cards');
 
     // Calculate delivery date estimate: current time + 7 calendar days
     $deliveryDate = new DateTime();
@@ -159,12 +163,12 @@ try {
         try {
             // Server settings
             $mail->isSMTP();
-            $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.gmail.com'; // Your SMTP server
-            $mail->SMTPAuth   = true;
-            $mail->Username   = getenv('SMTP_USERNAME') ?: 'hometownbankpa@gmail.com'; // SMTP username
-            $mail->Password   = getenv('SMTP_PASSWORD'); // SMTP password
+            $mail->Host      = getenv('SMTP_HOST') ?: 'smtp.gmail.com'; // Your SMTP server
+            $mail->SMTPAuth  = true;
+            $mail->Username  = getenv('SMTP_USERNAME') ?: 'hometownbankpa@gmail.com'; // SMTP username
+            $mail->Password  = getenv('SMTP_PASSWORD'); // SMTP password
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // Use SMTPS (465) or STARTTLS (587)
-            $mail->Port       = 465; // TCP port to connect to; use 587 if you set `SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS`
+            $mail->Port      = 465; // TCP port to connect to; use 587 if you set `SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS`
 
             // Recipients
             $sender_email = getenv('ADMIN_EMAIL') ?: 'hometownbankpa@gmail.com';
@@ -231,4 +235,4 @@ try {
 // Set the HTTP status code before sending the JSON response
 http_response_code($statusCode);
 echo json_encode($response_data);
-exit; // Ensure nothing else is outputted here is the file
+exit; // Ensure nothing else is outputted

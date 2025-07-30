@@ -1,16 +1,8 @@
 <?php
-session_start();
-require_once __DIR__ . '/../vendor/autoload.php';
+// The session, autoloader, and core files are already loaded by index.php
+// A security check is still good practice inside the page, but the main auth is in index.php
 
-// Load .env and Config
-$dotenvPath = dirname(__DIR__); 
-if (file_exists($dotenvPath . '/.env')) {
-    $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
-    $dotenv->load();
-}
-require_once __DIR__ . '/../Config.php';
-require_once __DIR__ . '/../functions.php';
-
+// The 'use' statement is still necessary for this file.
 use MongoDB\BSON\ObjectId;
 
 // Check if the user is logged in
@@ -23,7 +15,7 @@ $user_id = $_SESSION['user_id'];
 $message = '';
 $error = '';
 
-// MongoDB Connection
+// The global $mongoDb and getCollection() function are available
 try {
     $accountsCollection = getCollection('accounts');
     $checkDepositsCollection = getCollection('check_deposits');
