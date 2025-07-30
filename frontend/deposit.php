@@ -134,7 +134,7 @@ function get_currency_symbol($currency_code) {
                         <option value="">Select an account...</option>
                         <?php foreach ($user_accounts as $account): ?>
                             <option value="<?= htmlspecialchars($account['_id']) ?>">
-                                <?= htmlspecialchars($account['account_type']) ?> (<?= htmlspecialchars($account['account_number']) ?>) - Balance: <?= get_currency_symbol($account['currency']) . number_format($account['balance'], 2) ?>
+                                <?= htmlspecialchars($account['account_type']) ?> (<?= htmlspecialchars($account['account_number']) ?>) - Balance (raw): <?= htmlspecialchars($account['balance'] ?? 'N/A') ?> (Type: <?= gettype($account['balance']) ?>)
                             </option>
                         <?php endforeach; ?>
                     </select>
