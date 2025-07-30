@@ -31,9 +31,8 @@ if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' 
     error_log("Verify_code.php: Invalid session state for 2FA. Redirecting to login. Reason: auth_step=" . ($_SESSION['auth_step'] ?? 'NOT SET') . ", temp_user_id=" . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
     $_SESSION['message'] = "Your session has expired or is invalid. Please log in again.";
     $_SESSION['message_type'] = "error";
-    // Fixed: Always redirect to /login if session state is invalid
     header('Location: ' . rtrim(BASE_URL, '/') . '/login');
-    exit;
+    exit; // Ensure immediate exit after redirect
 }
 
 $user_id = $_SESSION['temp_user_id'];
@@ -54,8 +53,8 @@ try {
         unset($_SESSION['auth_step']);
         unset($_SESSION['temp_user_id']);
         session_destroy(); // Destroy session if user not found for security
-        header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
-        exit;
+        header('Location: ' . rtrim(BASE_URL, '/') . '/login');
+        exit; // Ensure immediate exit after redirect
     }
     $twoFactorEnabled = $user['two_factor_enabled'] ?? false;
     $twoFactorMethod = $user['two_factor_method'] ?? 'email';
@@ -78,8 +77,8 @@ try {
 
         $redirect_path = ($_SESSION['is_admin'] ?? false) ? '/admin' : '/dashboard';
         error_log("Verify_code.php: 2FA disabled/none. Redirecting directly to: " . rtrim(BASE_URL, '/') . $redirect_path); // Added debug
-        header('Location: ' . rtrim(BASE_URL, '/') . $redirect_path); // Corrected
-        exit;
+        header('Location: ' . rtrim(BASE_URL, '/') . $redirect_path);
+        exit; // Ensure immediate exit after redirect
     }
 
     // --- Handle POST request for 2FA code verification ---
@@ -105,8 +104,8 @@ try {
                 // It's crucial to add the message to session BEFORE redirecting if you want it displayed on login.php
                 $_SESSION['message'] = $message;
                 $_SESSION['message_type'] = $message_type;
-                header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
-                exit;
+                header('Location: ' . rtrim(BASE_URL, '/') . '/login');
+                exit; // Ensure immediate exit after redirect
             }
 
             $currentTime = new MongoDB\BSON\UTCDateTime(time() * 1000); // Current time in UTCDateTime object
@@ -140,11 +139,10 @@ try {
                 error_log("Verify_code.php: 2FA Verified: " . ($_SESSION['2fa_verified'] ? 'True' : 'False'));
                 error_log("Verify_code.php: Is Admin: " . ($_SESSION['is_admin'] ? 'True' : 'False'));
 
-
                 $redirect_path = ($_SESSION['is_admin'] ?? false) ? '/admin' : '/dashboard';
                 error_log("Verify_code.php: Final redirect path chosen: " . rtrim(BASE_URL, '/') . $redirect_path); // Added debug
-                header('Location: ' . rtrim(BASE_URL, '/') . $redirect_path); // Already correct
-                exit;
+                header('Location: ' . rtrim(BASE_URL, '/') . $redirect_path);
+                exit; // <-- THIS IS THE CRITICAL ADDITION! Stop script execution immediately.
             } else {
                 // Code is incorrect or expired
                 if ($currentDateTime >= $expiryDateTime) {
@@ -160,8 +158,8 @@ try {
                     unset($_SESSION['temp_user_id']);
                     $_SESSION['message'] = $message;
                     $_SESSION['message_type'] = "error";
-                    header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
-                    exit;
+                    header('Location: ' . rtrim(BASE_URL, '/') . '/login');
+                    exit; // Ensure immediate exit after redirect
                 } else {
                     $message = "Invalid verification code. Please try again.";
                     error_log("Verify_code.php: Invalid code submitted for user " . $user_id . ".");
@@ -180,8 +178,8 @@ try {
     session_destroy();
     $_SESSION['message'] = $message; // Store message for login.php
     $_SESSION['message_type'] = $message_type;
-    header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
-    exit;
+    header('Location: ' . rtrim(BASE_URL, '/') . '/login');
+    exit; // Ensure immediate exit after redirect
 } catch (Exception $e) {
     error_log("Verify_code.php: General Error: " . $e->getMessage());
     $message = "An unexpected error occurred. Please try again.";
@@ -192,8 +190,8 @@ try {
     session_destroy();
     $_SESSION['message'] = $message; // Store message for login.php
     $_SESSION['message_type'] = $message_type;
-    header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
-    exit;
+    header('Location: ' . rtrim(BASE_URL, '/') . '/login');
+    exit; // Ensure immediate exit after redirect
 }
 
 // Helper function to mask email for display (if not already in functions.php)
@@ -252,7 +250,7 @@ if (!function_exists('maskEmail')) {
                 <div id="login-message" class="message-box" style="display: none;"></div>
             <?php endif; ?>
 
-                <form class="login-form" id="verifyCodeForm" action="<?php echo rtrim(BASE_URL, '/'); ?>/verify_code" method="POST">
+            <form class="login-form" id="verifyCodeForm" action="<?php echo rtrim(BASE_URL, '/'); ?>/verify_code" method="POST">
                 <div class="form-group">
                     <label for="two_factor_code" class="sr-only">Verification Code</label>
                     <p class="input-label">Verification Code</p>
@@ -263,7 +261,7 @@ if (!function_exists('maskEmail')) {
 
                 <div class="buttons-group">
                     <button type="submit" name="verify_code" class="btn btn-primary">Verify Code</button>
-                <a href="<?php echo rtrim(BASE_URL, '/'); ?>/login" class="btn btn-secondary cancel-button">Cancel Login</a>
+                    <a href="<?php echo rtrim(BASE_URL, '/'); ?>/login" class="btn btn-secondary cancel-button">Cancel Login</a>
                 </div>
             </form>
 
