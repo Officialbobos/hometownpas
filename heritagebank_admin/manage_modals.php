@@ -1,7 +1,9 @@
 <?php
 // C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\manage_modals.php
 
-// Removed session_start() as it should be handled by a central router file.
+session_start(); // ADD THIS LINE HERE!
+
+// Removed session_start() as it should be handled by a central router file. (You can remove this comment too)
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../Config.php';
