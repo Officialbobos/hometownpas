@@ -256,7 +256,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeTown Bank - Generate Bank Card</title>
-    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/style.css'; ?>">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -620,6 +620,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p><a href="users_management.php" class="back-link">&larr; Back to User Management</a></p>
         </div>
     </div>
-    <script src="../script.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/script.js"></script>
 </body>
 </html>

@@ -16,8 +16,8 @@ use MongoDB\Driver\Exception\Exception as MongoDBException;
 
 // Admin authentication check
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
-    exit;
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
+    exit;
 }
 
 // --- MongoDB Connection ---
@@ -199,8 +199,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - Transaction Management</title>
-    <link rel="stylesheet" href="admin_style.css">
-    <link rel="stylesheet" href="transaction.css"> 
+    <link rel="stylesheet" href="admin_style.css"> 
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/') . '/transaction.css'; ?>">
+
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
@@ -214,16 +215,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
 
     <div class="admin-container">
         <nav class="admin-sidebar">
-            <ul>
-                <li><a href="create_user.php">Create New User</a></li>
-                <li><a href="manage_users.php">Manage Users (Edit/Delete)</a></li>
-                <li><a href="manage_user_funds.php">Manage User Funds (Credit/Debit)</a></li>
-                <li><a href="account_status_management.php">Manage Account Status</a></li>
-                <li><a href="transactions_management.php" class="active">Transactions Management</a></li>
-                <li><a href="generate_bank_card.php">Generate Bank Card (Mock)</a></li>
-                <li><a href="generate_mock_transaction.php">Generate Mock Transaction</a></li>
-            </ul>
-        </nav>
+    <ul>
+        <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/create_user.php'; ?>">Create New User</a></li>
+        <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/manage_users.php'; ?>">Manage Users (Edit/Delete)</a></li>
+        <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/manage_user_funds.php'; ?>">Manage User Funds (Credit/Debit)</a></li>
+        <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/account_status_management.php'; ?>">Manage Account Status</a></li>
+        <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/transactions_management.php'; ?>" class="active">Transactions Management</a></li>
+        <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/generate_bank_card.php'; ?>">Generate Bank Card (Mock)</a></li>
+        <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/generate_mock_transaction.php'; ?>">Generate Mock Transaction</a></li>
+    </ul>
+</nav>
 
         <main class="admin-main-content">
             <h1 class="section-header">Transaction Management</h1>

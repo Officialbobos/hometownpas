@@ -270,7 +270,7 @@ if (isset($_POST['user_identifier']) && !empty($_POST['user_identifier'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Heritage Bank - Generate Mock Transaction</title>
-    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/style.css'; ?>">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         /* Additional styling for messages */
@@ -407,6 +407,6 @@ if (isset($_POST['user_identifier']) && !empty($_POST['user_identifier'])) {
             <p><a href="users_management.php" class="back-link">&larr; Back to User Management</a></p>
         </div>
     </div>
-    <script src="../script.js"></script>
+<script src="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/script.js'; ?>"></script>
 </body>
 </html>

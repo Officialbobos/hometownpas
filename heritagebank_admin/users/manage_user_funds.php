@@ -155,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Heritage Bank - Manage User Funds</title>
-    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/style.css'; ?>">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         /* General Body and Container Styling */
@@ -354,7 +354,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </p>
             <?php endif; ?>
 
-            <form action="manage_user_funds.php" method="POST" class="form-standard">
+            <form action="/admin/manage_user_funds.php" method="POST" class="form-standard">
                 <div class="form-group">
                     <label for="account_number">User Account Number</label>
                     <input type="text" id="account_number" name="account_number" value="<?php echo htmlspecialchars($_POST['account_number'] ?? ''); ?>" placeholder="e.g., CHK00123456" required>
@@ -383,6 +383,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p><a href="manage_users.php" class="back-link">&larr; Back to Manage Users</a></p>
         </div>
     </div>
-    <script src="../script.js"></script>
+<script src="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/script.js'; ?>"></script>
 </body>
 </html>
