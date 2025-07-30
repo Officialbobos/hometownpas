@@ -79,10 +79,6 @@ try {
             </div>
             <div class="greeting">
                 <h1 data-user-first-name="<?php echo htmlspecialchars($first_name); ?>">Hi, </h1>
-            </div>
-            <div class="profile-pic">
-                <img src="/heritagebank/images/default-profile.png" alt="Profile Picture" id="headerProfilePic">
-            </div>
         </header>
 
         <section class="accounts-section">
@@ -259,6 +255,6 @@ try {
         </button>
     </div>
 
-    <script src="user.dashboard.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/') . '/frontend/user.dashboard.js'; ?>"></script>
 </body>
 </html>
