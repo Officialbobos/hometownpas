@@ -1,5 +1,12 @@
 <?php
 // The session, autoloader, and core files are already loaded by index.php
+
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../Config.php';
+
+echo "Deposit page is working!";
+exit;
+
 use MongoDB\BSON\ObjectId;
 
 // Check if the user is logged in
