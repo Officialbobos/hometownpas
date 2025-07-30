@@ -4,10 +4,10 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-require_once '../../Config.php';
+require_once '/../../Config.php';
 
 // Use MongoDB PHP Library
-require_once '../../functions.php';
+require_once '/../../functions.php';
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
