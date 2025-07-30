@@ -4,6 +4,9 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+// Start the session to access flash messages
+// --- CORRECTED: Added session_start() here ---
+session_start();
 
 // Load Composer's autoloader for MongoDB classes and Dotenv
 require_once __DIR__ . '/../../vendor/autoload.php'; // Adjusted path to root vendor folder
@@ -86,6 +89,18 @@ if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) |
         </div>
 
         <div class="dashboard-content">
+            <?php
+            // --- CORRECTED: Flash message display code added here ---
+            if (isset($_SESSION['flash_message'])) {
+                $message = $_SESSION['flash_message'];
+                $message_type = $_SESSION['flash_message_type'] ?? 'info';
+                echo '<div class="message ' . $message_type . '">' . $message . '</div>';
+
+                // Clear the flash message so it only shows once
+                unset($_SESSION['flash_message']);
+                unset($_SESSION['flash_message_type']);
+            }
+            ?>
             <h3>User Management Options</h3>
             <p>Select an action related to user administration:</p>
 
