@@ -26,7 +26,6 @@ try {
 }
 
 $user_data = [];
-$user_awards = []; // Initialize array to store user's awards/winner info
 $mongoClient = null; // Initialize to null for finally block
 
 try {
@@ -34,24 +33,15 @@ try {
     $mongoClient = new Client(MONGODB_CONNECTION_URI);
     $database = $mongoClient->selectDatabase(MONGODB_DB_NAME);
     $usersCollection = $database->users; // Assuming your user collection is named 'users'
-    $awardsCollection = $database->awards; // Assuming a new 'awards' collection for winner info
 
     // Fetch user data from the 'users' collection by _id
     $user_data = (array) $usersCollection->findOne(['_id' => $user_id_obj]);
-
-    // Fetch awards/winner information for the logged-in user
-    // Sort by award_date descending to show most recent awards first
-    $user_awards = $awardsCollection->find(
-        ['user_id' => $user_id_obj],
-        ['sort' => ['award_date' => -1]]
-    )->toArray();
 
 } catch (Exception $e) {
     // Catch any exceptions that occur during MongoDB operations
     error_log("MongoDB Error in profile.php: " . $e->getMessage());
     // You might want to display a user-friendly error message or redirect
     $user_data = []; // Ensure user_data is empty on error
-    $user_awards = []; // Ensure awards data is empty on error
 } finally {
     $mongoClient = null; // Clean up the client reference
 }
@@ -270,70 +260,6 @@ $profile_image_src = !empty($user_data['profile_image']) ?
             font-weight: bold; /* Explicitly bold the labels */
         }
 
-        .profile-actions {
-            margin-top: 30px;
-            text-align: center;
-        }
-
-        /* NEW: Styling for Winners Information Section */
-        .winners-info-card {
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-            max-width: 600px;
-            margin: 30px auto; /* Centers the card horizontally */
-            text-align: center;
-        }
-
-        .winners-info-card h2 {
-            color: #0056b3;
-            margin-top: 0;
-            margin-bottom: 25px;
-            font-size: 1.8em;
-        }
-
-        .winners-info-list {
-            list-style: none;
-            padding: 0;
-            text-align: left; /* Align list items to the left */
-        }
-
-        .winners-info-list li {
-            background-color: #f9f9f9;
-            border: 1px solid #eee;
-            border-radius: 5px;
-            padding: 15px;
-            margin-bottom: 10px;
-            display: flex;
-            flex-wrap: wrap; /* Allow items to wrap on smaller screens */
-            justify-content: space-between;
-            align-items: center;
-            font-size: 1em;
-        }
-
-        .winners-info-list li:last-child {
-            margin-bottom: 0;
-        }
-
-        .winners-info-list li strong {
-            color: #0056b3;
-            flex-basis: 30%; /* Give labels some width */
-            min-width: 120px; /* Ensure minimum width for labels */
-        }
-
-        .winners-info-list li span {
-            flex-basis: 65%; /* Give values remaining width */
-            text-align: right;
-        }
-        
-        .winners-info-list p { /* For message when no awards */
-            color: #666;
-            font-style: italic;
-            text-align: center;
-            margin-top: 15px;
-        }
-
         /* Responsive Adjustments for Profile Page */
         @media (max-width: 768px) {
             .dashboard-container {
@@ -366,7 +292,7 @@ $profile_image_src = !empty($user_data['profile_image']) ?
             .profile-container {
                 padding: 20px;
             }
-            .profile-card, .winners-info-card { /* Apply to both cards */
+            .profile-card { /* Apply to both cards */
                 margin: 20px auto;
                 padding: 20px;
             }
@@ -375,13 +301,6 @@ $profile_image_src = !empty($user_data['profile_image']) ?
             }
             .profile-details p strong {
                 width: 100px; /* Adjust label width for smaller screens */
-            }
-            .winners-info-list li strong, .winners-info-list li span {
-                flex-basis: 100%; /* Stack label and value on small screens */
-                text-align: left;
-            }
-            .winners-info-list li strong {
-                margin-bottom: 5px; /* Add space between stacked label and value */
             }
         }
 
@@ -398,7 +317,7 @@ $profile_image_src = !empty($user_data['profile_image']) ?
             .sidebar ul li a {
                 padding: 10px 5px;
             }
-            .profile-card h2, .winners-info-card h2 {
+            .profile-card h2 {
                 font-size: 1.5em;
             }
 
@@ -470,39 +389,11 @@ $profile_image_src = !empty($user_data['profile_image']) ?
                     <p>User data not found.</p>
                 <?php endif; ?>
             </section>
-
-            <section class="winners-info-card">
-                <h2>Your Awards & Recognitions</h2>
-                <?php if (!empty($user_awards)): ?>
-                    <ul class="winners-info-list">
-                        <?php foreach ($user_awards as $award): ?>
-                            <li>
-                                <strong>Award:</strong> <span><?php echo htmlspecialchars($award['award_name'] ?? 'N/A'); ?></span>
-                                <strong>Date:</strong> <span><?php
-                                    if (isset($award['award_date']) && $award['award_date'] instanceof MongoDB\BSON\UTCDateTime) {
-                                        echo $award['award_date']->toDateTime()->format('Y-m-d');
-                                    } else {
-                                        echo 'N/A';
-                                    }
-                                ?></span>
-                               <?php if (isset($award['value']) && $award['value'] > 0): ?>
-                        <strong>Value (raw):</strong> <span><?php echo htmlspecialchars($award['value'] ?? 'N/A') . ' ' . htmlspecialchars($award['currency'] ?? 'USD'); ?></span>
-                        <?php endif; ?>
-                                <?php if (!empty($award['description'])): ?>
-                                    <strong>Details:</strong> <span><?php echo htmlspecialchars($award['description']); ?></span>
-                                <?php endif; ?>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php else: ?>
-                    <p>No awards or special recognitions found for your account at this time.</p>
-                <?php endif; ?>
-            </section>
-            </main>
+        </main>
     </div>
 
     <footer class="dashboard-footer">
-        <p>&copy; <?php echo date('Y'); ?> Heritage Bank. All rights reserved.</p>
+        <p>&copy; <?php echo date('Y'); ?> HomeTown Bank profile-image-container. All rights reserved.</p>
     </footer>
 
 </body>
