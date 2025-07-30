@@ -1,178 +1,114 @@
 <?php
-// Path: C:\xampp\htdocs\hometownbank\frontend\my_cards.php (or manage_cards.php)
+// Path: C:\xampp\htdocs\hometownbank\frontend\bank_cards.php
 
 // For development:
 ini_set('display_errors', 1); // Enable error display for debugging
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Ensure session is started.
+// Ensure session is started and Config/functions are available.
+// In a production setup with index.php as a router, these might be handled globally.
+// We'll keep them here for standalone testing flexibility, but comment out if index.php handles them.
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-
-// Include Config.php and autoload for MongoDB classes
-require_once __DIR__ . '/../Config.php';
-require_once __DIR__ . '/../vendor/autoload.php';
-// Include functions.php if you have shared functions (e.g., for password_hash)
-// require_once __DIR__ . '/../functions.php';
+// These might be handled by your main index.php router already
+//require_once __DIR__ . '/../Config.php';
+//require_once __DIR__ . '/../functions.php'; // For getMongoDBClient() or similar
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
-use MongoDB\BSON\UTCDateTime;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // Check if the user is logged in. If not, redirect to login page.
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true || !isset($_SESSION['user_id'])) {
-    header('Location: ' . rtrim(BASE_URL, '/') . '/index.php');
+    header('Location: ' . BASE_URL . '/index.php'); // Or wherever your login page is
     exit;
 }
 
-$user_id = $_SESSION['user_id']; // This is the string representation of ObjectId
-$user_full_name = $_SESSION['user_full_name'] ?? 'Bank Customer'; // Fallback
-$user_email = $_SESSION['user_email'] ?? 'user@example.com'; // Fallback
+$user_id = $_SESSION['user_id']; // This should be a string representation of ObjectId from login
+$user_full_name = $_SESSION['user_full_name'] ?? '';
+$user_email = $_SESSION['user_email'] ?? '';
 
 $message = '';
 $message_type = '';
 
-$mongoClient = null;
-$mongoDb = null;
-$usersCollection = null;
-$bankCardsCollection = null;
+// Assuming $mongoDb object is available from index.php's scope
+// If not, uncomment and initialize here:
+// $mongoDb = getMongoDBClient(); // Assuming getMongoDBClient() is in functions.php
+global $mongoDb; // Access the global variable set in index.php
 
-try {
-    // Establish MongoDB connection
-    $mongoClient = new Client(MONGODB_CONNECTION_URI);
-    $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME);
-
-    // Get collections
-    $usersCollection = $mongoDb->selectCollection('users');
-    $bankCardsCollection = $mongoDb->selectCollection('bank_cards');
-
-} catch (MongoDBDriverException $e) {
-    error_log("CRITICAL ERROR: MongoDB connection failed in my_cards.php: " . $e->getMessage());
+if (!$mongoDb) {
+    error_log("CRITICAL ERROR: MongoDB connection not available in bank_cards.php. Check index.php or getMongoDBClient().");
     die("<h1>Database connection error. Please try again later.</h1>");
-} catch (Exception $e) {
-    error_log("CRITICAL ERROR: General error during MongoDB setup in my_cards.php: " . $e->getMessage());
-    die("<h1>An unexpected error occurred. Please try again later.</h1>");
 }
 
-$userObjectId = null;
+$usersCollection = $mongoDb->selectCollection('users');
+$accountsCollection = $mongoDb->selectCollection('accounts');
+$bankCardsCollection = $mongoDb->selectCollection('bank_cards');
+
 try {
+    // Convert user_id from session string to MongoDB ObjectId
     $userObjectId = new ObjectId($user_id);
-} catch (MongoDB\Driver\Exception\InvalidArgumentException $e) {
-    error_log("Invalid user ID format in session for my_cards.php: " . $e->getMessage());
-    header('Location: ' . rtrim(BASE_URL, '/') . '/index.php?error=invalid_session_id');
+
+    // Fetch user's full name and email from the database if not already in session
+    // This provides a fallback if session data is somehow lost or incomplete.
+    if (empty($user_full_name) || empty($user_email)) {
+        $user_doc = $usersCollection->findOne(['_id' => $userObjectId]);
+        if ($user_doc) {
+            $user_full_name = trim(($user_doc['first_name'] ?? '') . ' ' . ($user_doc['last_name'] ?? ''));
+            $user_email = $user_doc['email'] ?? '';
+            // Update session with fetched data for future requests
+            $_SESSION['user_full_name'] = $user_full_name;
+            $_SESSION['user_email'] = $user_email;
+        } else {
+            error_log("User with ID " . $user_id . " not found in database for bank_cards.php.");
+            $user_full_name = 'Bank Customer'; // Fallback if DB lookup fails
+            $user_email = 'default@example.com';
+        }
+    }
+} catch (MongoDBDriverException $e) {
+    error_log("MongoDB operation error in bank_cards.php (user data fetch): " . $e->getMessage());
+    $message = "Database error fetching user details. Please try again later.";
+    $message_type = 'error';
+} catch (Exception $e) { // Catch for ObjectId conversion or other general errors
+    error_log("General error during initial setup in bank_cards.php: " . $e->getMessage());
+    $message = "An unexpected error occurred during page setup. Please try again later.";
+    $message_type = 'error';
+    // If user_id is invalid, it's safer to redirect to login
+    header('Location: ' . BASE_URL . '/index.php?error=invalid_user_session'); // Redirect with an error indicator
     exit;
 }
 
-// Fetch user's pending card(s)
-$pending_card = null;
+// Ensure full name and email are set for display, even if database lookup failed
+$user_full_name = $user_full_name ?: 'Bank Customer';
+$user_email = $user_email ?: 'default@example.com';
+
+// --- Non-AJAX request, render the HTML page ---
+// We need to fetch the accounts for the dropdown in the form
+$user_accounts_for_dropdown = [];
 try {
-    $pending_card = $bankCardsCollection->findOne([
-        'user_id' => $userObjectId,
-        'status' => 'pending_activation',
-        'is_active' => false
-    ]);
+    // Re-use $userObjectId from the initial connection block
+    $cursor = $accountsCollection->find(
+        ['user_id' => $userObjectId],
+        ['projection' => ['account_number' => 1, 'account_type' => 1, 'balance' => 1, 'currency' => 1]]
+    );
+    foreach ($cursor as $accountDoc) {
+        $user_accounts_for_dropdown[] = [
+            'id' => (string) $accountDoc['_id'], // Convert ObjectId to string for HTML value
+            'account_type' => $accountDoc['account_type'] ?? 'Account',
+            'display_account_number' => '****' . substr($accountDoc['account_number'] ?? '', -4),
+            'balance' => $accountDoc['balance'] ?? 0.00,
+            'currency' => $accountDoc['currency'] ?? 'USD'
+        ];
+    }
 } catch (MongoDBDriverException $e) {
-    error_log("Error fetching pending card for user " . $user_id . ": " . $e->getMessage());
-    $message = "Database error fetching card details. Please try again.";
+    error_log("Error fetching accounts for dropdown (MongoDB): " . $e->getMessage());
+    $message = "Could not load accounts for linking cards.";
     $message_type = 'error';
-}
-
-// Handle card activation/PIN setup form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'activate_card') {
-    $card_id_str = trim($_POST['card_id'] ?? '');
-    $pin = trim($_POST['pin'] ?? '');
-    $confirm_pin = trim($_POST['confirm_pin'] ?? '');
-
-    try {
-        if (empty($card_id_str) || !($card_id_obj = new ObjectId($card_id_str))) {
-            throw new Exception('Invalid card ID provided.');
-        }
-
-        // Verify that the card being activated belongs to the current user and is pending
-        $card_to_activate = $bankCardsCollection->findOne([
-            '_id' => $card_id_obj,
-            'user_id' => $userObjectId,
-            'status' => 'pending_activation',
-            'is_active' => false
-        ]);
-
-        if (!$card_to_activate) {
-            throw new Exception('Card not found or not eligible for activation. It might already be active.');
-        }
-
-        if (empty($pin) || empty($confirm_pin)) {
-            throw new Exception('PIN and Confirm PIN are required.');
-        }
-        if ($pin !== $confirm_pin) {
-            throw new Exception('PINs do not match.');
-        }
-        // Basic PIN validation (e.g., 4-digit number)
-        if (strlen($pin) !== 4 || !ctype_digit($pin)) {
-            throw new Exception('PIN must be a 4-digit number.');
-        }
-
-        $hashed_pin = password_hash($pin, PASSWORD_DEFAULT); // Hash the PIN for security
-
-        $updateResult = $bankCardsCollection->updateOne(
-            ['_id' => $card_id_obj],
-            ['$set' => [
-                'pin' => $hashed_pin, // Store the hashed PIN
-                'is_active' => true,
-                'status' => 'active', // Update status to 'active'
-                'activated_at' => new UTCDateTime(time() * 1000), // Record activation time
-                'updated_at' => new UTCDateTime(time() * 1000)
-            ]]
-        );
-
-        if ($updateResult->getModifiedCount() === 1) {
-            $message = 'Your bank card has been successfully activated and PIN set!';
-            $message_type = 'success';
-            // Clear the pending card variable as it's now active
-            $pending_card = null;
-        } else {
-            $message = 'Failed to activate card. It might already be active or an internal error occurred.';
-            $message_type = 'error';
-        }
-
-    } catch (MongoDBDriverException $e) {
-        error_log("MongoDB operation error during card activation: " . $e->getMessage());
-        $message = 'Database error during card activation. Please try again later.';
-        $message_type = 'error';
-    } catch (Exception $e) {
-        $message = 'Error: ' . $e->getMessage();
-        $message_type = 'error';
-    }
-    // After processing, re-fetch pending card status in case activation failed or for display update
-    if (!$pending_card) { // Only re-fetch if it's already null (i.e., successfully activated or was null to begin with)
-        try {
-            $pending_card = $bankCardsCollection->findOne([
-                'user_id' => $userObjectId,
-                'status' => 'pending_activation',
-                'is_active' => false
-            ]);
-        } catch (MongoDBDriverException $e) {
-            error_log("Error re-fetching pending card after activation attempt: " . $e->getMessage());
-            // No need to set $message here, original one might be more relevant
-        }
-    }
-}
-
-// Fetch all cards for the user to display below the activation form
-$user_cards = [];
-try {
-    $cursor = $bankCardsCollection->find(['user_id' => $userObjectId]);
-    foreach ($cursor as $cardDoc) {
-        $card = (array) $cardDoc;
-        $card['card_number_display'] = '**** **** **** ' . substr($card['card_number'], -4);
-        $card['expiry_date_display'] = str_pad($card['expiry_month'], 2, '0', STR_PAD_LEFT) . '/' . substr($card['expiry_year'], -2);
-        $user_cards[] = $card;
-    }
-} catch (MongoDBDriverException $e) {
-    error_log("Error fetching all cards for user " . $user_id . ": " . $e->getMessage());
-    $message = "Database error fetching your cards for display.";
+} catch (Exception $e) {
+    error_log("Error processing user ID for accounts dropdown (General): " . $e->getMessage());
+    $message = "Error loading user data.";
     $message_type = 'error';
 }
 
@@ -182,245 +118,20 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hometown Bank PA - Card Activation & PIN</title>
-    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
+    <title>Hometown Bank PA - Manage Cards</title>
+        <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        /* General Layout */
-        body {
-            font-family: 'Roboto', sans-serif; /* Assuming Roboto for general text */
-            background-color: #f4f7f6;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-        .header {
-            background-color: #004494; /* Dark blue */
-            color: white;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .header .logo img {
-            height: 40px;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 1.8em;
-        }
-        .header-nav .homepage {
-            background-color: #ffcc29; /* Heritage accent */
-            color: #004494;
-            padding: 8px 15px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: background-color 0.3s ease;
-        }
-        .header-nav .homepage:hover {
-            background-color: #e0b821;
-        }
-
-        .main-content {
-            padding: 30px;
-            width: 100%;
-            max-width: 900px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-            box-sizing: border-box;
-        }
-
-        /* Messages */
-        .message {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            font-weight: bold;
-            text-align: center;
-            border: 1px solid transparent;
-        }
-        .message.success { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
-        .message.error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
-
-        /* Card Activation Section */
-        .activation-section, .all-cards-section {
-            margin-bottom: 40px;
-            padding: 20px;
-            background-color: #f9f9f9;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        .activation-section h2, .all-cards-section h2 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 25px;
-            font-size: 2em;
-        }
-        .activation-section .form-group {
-            margin-bottom: 15px;
-        }
-        .activation-section label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #333;
-        }
-        .activation-section input[type="password"],
-        .activation-section input[type="text"] {
-            width: calc(100% - 20px);
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-            font-size: 1em;
-        }
-        .activation-section .button-primary {
-            background-color: #007bff;
-            color: white;
-            padding: 12px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1.1em;
-            font-weight: bold;
-            transition: background-color 0.3s ease;
-            width: 100%;
-        }
-        .activation-section .button-primary:hover {
-            background-color: #0056b3;
-        }
-        .no-pending-message {
-            text-align: center;
-            padding: 20px;
-            color: #555;
-            font-size: 1.1em;
-        }
-
-        /* Card Display (reusing styles from bank_cards.php for consistency) */
-        .card-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 30px;
-            justify-content: center;
-            padding: 20px;
-        }
-        .bank-card-display {
-            position: relative;
-            background: linear-gradient(135deg, #004494, #0056b3);
-            border-radius: 15px;
-            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
-            color: #fff;
-            padding: 20px 25px;
-            aspect-ratio: 1.585 / 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            font-family: 'Space Mono', monospace;
-            overflow: hidden;
-            box-sizing: border-box;
-        }
-        .bank-card-display.visa { background: linear-gradient(135deg, #1A3B6F, #2A569E); }
-        .bank-card-display.mastercard { background: linear-gradient(135deg, #EB001B, #F79E1B); }
-        .bank-card-display.verve { background: linear-gradient(135deg, #009245, #8BC34A); }
-        .bank-card-display.amex { background: linear-gradient(135deg, #2E7D32, #66BB6A); } /* Example for Amex */
-
-        .card-header-logo {
-            font-size: 1.2rem;
-            font-weight: 700;
-            text-align: right;
-            margin-bottom: 10px;
-        }
-        .card-network-logo {
-            position: absolute;
-            top: 20px;
-            left: 25px;
-            width: 70px;
-            height: auto;
-            object-fit: contain;
-            filter: drop-shadow(0 0 5px rgba(0,0,0,0.3));
-        }
-        .card-chip {
-            width: 50px;
-            height: 40px;
-            background-color: #d4af37;
-            border-radius: 6px;
-            position: absolute;
-            top: 90px;
-            left: 25px;
-            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3);
-        }
-        .card-number {
-            font-size: 1.8em;
-            letter-spacing: 0.15em;
-            text-align: center;
-            margin-top: auto;
-            margin-bottom: 15px;
-            word-break: break-all;
-        }
-        .card-details-bottom {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            width: 100%;
-            font-size: 0.85em;
-        }
-        .card-details-group {
-            display: flex;
-            flex-direction: column;
-            text-align: left;
-        }
-        .card-details-group.right {
-            text-align: right;
-        }
-        .card-details-label {
-            font-size: 0.7em;
-            opacity: 0.8;
-            margin-bottom: 2px;
-        }
-        .card-status {
-            position: absolute;
-            bottom: 20px;
-            right: 25px;
-            font-size: 0.9em;
-            font-weight: bold;
-            text-transform: uppercase;
-            padding: 5px 10px;
-            border-radius: 5px;
-            z-index: 2;
-        }
-        .card-status.active { background-color: rgba(60, 179, 113, 0.8); color: white; }
-        .card-status.pending_activation { background-color: rgba(255, 165, 0, 0.8); color: white; } /* Orange for pending */
-        .card-status.inactive { background-color: rgba(255, 99, 71, 0.8); color: white; }
-        .card-status.lost-stolen { background-color: rgba(220, 20, 60, 0.8); color: white; }
-
-        @media (max-width: 768px) {
-            .card-list {
-                grid-template-columns: 1fr;
-            }
-            .bank-card-display {
-                max-width: 350px;
-                margin: 0 auto;
-            }
-        }
-    </style>
 </head>
 <body>
     <header class="header">
         <nav class="header-nav">
-            <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="homepage">
-                <i class="fas fa-home"></i> Back to Dashboard
-            </a>
+        <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="contact-button homepage">
+                <i class="fas fa-home"></i> Back to Dashboard </a>
         </nav>
-        <h1>Card Activation & PIN Management</h1>
+        <h1>Manage My Cards</h1>
         <div class="logo">
-            <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo">
+                <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo">
         </div>
     </header>
 
@@ -429,80 +140,107 @@ try {
             <p class="message <?php echo $message_type; ?>"><?php echo htmlspecialchars($message); ?></p>
         <?php endif; ?>
 
-        <section class="activation-section">
-            <h2>Activate Your Card / Set PIN</h2>
-            <?php if ($pending_card): ?>
-                <p>A new card ending in ****<?php echo substr($pending_card['card_number'], -4); ?> (Type: <?php echo htmlspecialchars($pending_card['card_type']); ?>) has been issued and is awaiting your activation.</p>
-                <form action="<?php echo rtrim(BASE_URL, '/') . '/frontend/my_cards.php'; ?>" method="POST">
-                    <input type="hidden" name="action" value="activate_card">
-                    <input type="hidden" name="card_id" value="<?php echo htmlspecialchars((string)$pending_card['_id']); ?>">
-
-                    <div class="form-group">
-                        <label for="new_pin">Set 4-Digit PIN</label>
-                        <input type="password" id="new_pin" name="pin" maxlength="4" pattern="\d{4}" title="Please enter a 4-digit number" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="confirm_pin">Confirm PIN</label>
-                        <input type="password" id="confirm_pin" name="confirm_pin" maxlength="4" pattern="\d{4}" title="Please confirm your 4-digit PIN" required>
-                    </div>
-                    <button type="submit" class="button-primary">Activate Card & Set PIN</button>
-                </form>
-            <?php else: ?>
-                <p class="no-pending-message">You currently have no bank cards awaiting activation.</p>
-            <?php endif; ?>
+        <section class="cards-section">
+            <h2>Your Current Cards</h2>
+            <p id="cardsLoadingMessage" class="loading-message">
+                <i class="fas fa-spinner fa-spin"></i> Loading your cards...
+            </p>
+            <div id="userCardList" class="card-list">
+                <p class="no-data-message" id="noCardsMessage" style="display:none;">No bank cards found. Order a new one below!</p>
+            </div>
         </section>
 
-        <hr style="margin: 50px 0; border: 0; border-top: 1px solid #eee;">
+        <section class="card-management-actions-section">
+            <h2>Card Actions</h2>
+            <p>Select a card to perform actions like freezing, reporting, or setting its PIN.</p>
+            <div class="form-group">
+                <label for="actionCardSelect">Select Card:</label>
+                <select id="actionCardSelect" name="actionCardSelect">
+                    <option value="">-- Loading Cards --</option>
+                    </select>
+            </div>
+            <div class="action-buttons-group">
+                <button id="freezeActionButton" class="action-button primary-action" disabled><i class="fas fa-snowflake"></i> Freeze/Unfreeze Card</button>
+                <button id="reportActionButton" class="action-button danger-action" disabled><i class="fas fa-exclamation-triangle"></i> Report Card</button>
+                <button id="setPinActionButton" class="action-button secondary-action" disabled><i class="fas fa-key"></i> Set Card PIN</button>
+            </div>
+        </section>
 
-        <section class="all-cards-section">
-            <h2>All Your Bank Cards</h2>
-            <?php if (!empty($user_cards)): ?>
-                <div class="card-list">
-                    <?php foreach ($user_cards as $card): ?>
-                        <div class="bank-card-display <?php echo strtolower($card['card_type']); ?>">
-                            <?php
-                                $network_logo_path = '';
-                                if (strtolower($card['card_type']) === 'visa') {
-                                    $network_logo_path = 'https://i.imgur.com/x69sY3k.png'; // Visa Logo
-                                } elseif (strtolower($card['card_type']) === 'mastercard') {
-                                    $network_logo_path = 'https://i.imgur.com/139Suh3.png'; // MasterCard Logo
-                                } elseif (strtolower($card['card_type']) === 'verve') {
-                                    $network_logo_path = 'https://i.imgur.com/dhW5pdv.png'; // Verve Logo
-                                }
-                                // Add more conditions for other networks like Amex if you support them
-                                elseif (strtolower($card['card_type']) === 'amex') {
-                                    $network_logo_path = 'https://i.imgur.com/YourAmexLogo.png'; // Placeholder for Amex
-                                }
-                            ?>
-                            <?php if ($network_logo_path): ?>
-                                <img src="<?php echo htmlspecialchars($network_logo_path); ?>" alt="<?php echo htmlspecialchars($card['card_type']); ?> Logo" class="card-network-logo">
-                            <?php endif; ?>
-
-                            <div class="card-chip"></div>
-                            <div class="card-header-logo">HOMETOWN BANK</div>
-
-                            <div class="card-number"><?php echo htmlspecialchars($card['card_number_display']); ?></div>
-
-                            <div class="card-details-bottom">
-                                <div class="card-details-group">
-                                    <div class="card-details-label">CARD HOLDER</div>
-                                    <div class="card-details-value"><?php echo htmlspecialchars($card['card_holder_name']); ?></div>
-                                </div>
-                                <div class="card-details-group right">
-                                    <div class="card-details-label">EXPIRES</div>
-                                    <div class="card-details-value"><?php echo htmlspecialchars($card['expiry_date_display']); ?></div>
-                                </div>
-                            </div>
-                             <div class="card-status <?php echo str_replace(' ', '_', strtolower($card['status'])); ?>">
-                                <?php echo htmlspecialchars(str_replace('_', ' ', $card['status'])); ?>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+        <section class="order-card-section">
+            <h2>Order a Card</h2>
+            <form id="orderCardForm">
+                <div class="form-group">
+                    <label for="cardHolderName">Card Holder Name:</label>
+                    <input type="text" id="cardHolderName" name="cardHolderName" value="<?= htmlspecialchars($user_full_name) ?>" required readonly>
                 </div>
-            <?php else: ?>
-                <p class="no-pending-message">You do not have any bank cards registered with us yet.</p>
-            <?php endif; ?>
+
+                <div class="form-group">
+                    <label for="cardType">Card Type:</label>
+                    <select id="cardType" name="cardType" required>
+                        <option value="">Select Card Type</option>
+                        <option value="Debit">Debit Card</option>
+                        <option value="Credit">Credit Card</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="cardNetwork">Card Network:</label>
+                    <select id="cardNetwork" name="cardNetwork" required>
+                        <option value="">Select Card Network</option>
+                        <option value="Visa">Visa</option>
+                        <option value="Mastercard">Mastercard</option>
+                        <option value="Amex">American Express</option>
+                        <option value="Verve">Verve</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="accountId">Link to Account:</label>
+                    <select id="accountId" name="accountId" required>
+                        <option value="">-- Select an Account --</option>
+                        <?php foreach ($user_accounts_for_dropdown as $account): ?>
+                            <option value="<?php echo htmlspecialchars($account['id']); ?>">
+                                <?php echo htmlspecialchars($account['account_type'] . ' (' . $account['display_account_number'] . ') - ' . $account['currency'] . sprintf('%.2f', $account['balance'])); ?>
+                            </option>
+                        <?php endforeach; ?>
+                        <?php if (empty($user_accounts_for_dropdown)): ?>
+                            <option value="" disabled>No accounts available to link</option>
+                        <?php endif; ?>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="shippingAddress">Shipping Address:</label>
+                    <textarea id="shippingAddress" name="shippingAddress" placeholder="Your full shipping address" rows="3" required></textarea>
+                </div>
+
+                <button type="submit" class="submit-button">
+                    <i class="fas fa-credit-card" style="margin-right: 8px;"></i> Place Card Order
+                </button>
+            </form>
         </section>
+
+        <section class="manage-pin-section">
+            <h2>Manage Card PIN & Activation</h2>
+        <p>To activate a new card or set/change your existing card's PIN, please visit the <a href="<?php echo rtrim(BASE_URL, '/'); ?>/my_cards">Card Activation & PIN Management page</a>.</p>
+            </section>
     </main>
+
+    <div class="message-box-overlay" id="messageBoxOverlay">
+        <div class="message-box-content" id="messageBoxContentWrapper">
+            <p id="messageBoxContent"></p>
+            <button id="messageBoxButton">OK</button>
+        </div>
+    </div>
+    <script>
+        // These variables must be defined before cards.js is loaded
+        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/'); ?>; // *** ADDED '/' to ensure API calls are correct ***
+        // Assuming 'frontend' is directly under your BASE_URL for frontend assets
+        const FRONTEND_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/frontend'); ?>;
+        const currentUserId = <?php echo json_encode($user_id); ?>;
+        const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
+        const currentUserEmail = <?php echo json_encode($user_email); ?>;
+    </script>
+        <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
 </body>
 </html>
