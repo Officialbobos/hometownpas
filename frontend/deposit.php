@@ -26,7 +26,7 @@ try {
 // Fetch user's accounts to populate the dropdown
 $user_accounts = [];
 try {
-    $accounts_cursor = $accountsCollection->find(['user_id' => new MongoDB\BSON\ObjectId($user_id)]);
+    $accounts_cursor = $accountsCollection->find(['user_id' => new ObjectId($user_id)]);
     foreach ($accounts_cursor as $account) {
         $user_accounts[] = $account;
     }
@@ -81,8 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 
                 try {
                     $insertResult = $checkDepositsCollection->insertOne([
-                        'user_id' => new MongoDB\BSON\ObjectId($user_id),
-                        'account_id' => new MongoDB\BSON\ObjectId($account_id),
+                        'user_id' => new ObjectId($user_id),
+                        'account_id' => new ObjectId($account_id),
                         'amount' => (float) $amount,
                         'front_image_path' => $front_image_path,
                         'back_image_path' => $back_image_path,
@@ -209,7 +209,7 @@ function get_currency_symbol($currency_code) {
             <?php if ($error): ?>
                 <div class="alert alert-danger"><?= $error ?></div>
             <?php endif; ?>
-            <form action="Deposit.php" method="post" enctype="multipart/form-data">
+            <form action="deposit" method="post" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="account_id">Choose Account</label>
                     <select class="form-select" id="account_id" name="account_id" required>

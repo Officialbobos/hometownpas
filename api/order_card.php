@@ -20,9 +20,6 @@ require_once __DIR__ . '/../functions.php';
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBException;
 
-// Add this line to confirm the script starts
-error_log("DEBUG: Starting order_card.php script execution.");
-
 // Import PHPMailer classes into the global namespace
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception as PHPMailerException; // Use a specific alias to avoid conflict with general Exception
@@ -30,9 +27,6 @@ use PHPMailer\PHPMailer\Exception as PHPMailerException; // Use a specific alias
 // Initialize a variable to hold the response data
 $response_data = [];
 $statusCode = 200; // Default success status code
-
-// The MongoDB connection object will be created by the getCollection() function from functions.php
-// which is now included.
 
 try {
     // Ensure user is logged in
@@ -48,41 +42,17 @@ try {
         throw new Exception('Invalid user session data. Please try logging in again.', 400);
     }
 
-    // Add this line to confirm the includes are successful and DB is connected
-    error_log("DEBUG: config.php and functions.php included successfully. MongoDB connection ready.");
-
-    // Fetch user details for email notification (recipient name and email)
-    $usersCollection = getCollection('users');
-    $user_doc = $usersCollection->findOne(['_id' => $userObjectId]);
-    if (!$user_doc) {
-        // User not found in DB, which is a critical issue if they are logged in.
-        error_log("CRITICAL ERROR: Logged-in user with ID " . $user_id_string . " not found in database during card order.");
-        throw new Exception('User profile not found. Please contact support.', 500);
-    }
-    $recipient_name = trim(($user_doc['first_name'] ?? '') . ' ' . ($user_doc['last_name'] ?? ''));
-    $recipient_email = $user_doc['email'] ?? '';
-
-    // Basic check for recipient email
-    if (empty($recipient_email) || !filter_var($recipient_email, FILTER_VALIDATE_EMAIL)) {
-        error_log("WARNING: Invalid or missing email for user " . $user_id_string . ". Cannot send order confirmation email.");
-        // For now, let's make it critical to ensure email setup is verified.
-        throw new Exception('User email not available or invalid. Cannot send order confirmation.', 500);
-    }
-
-    // IMPORTANT: Use $_POST as your frontend is sending FormData
-    $cardHolderName = $_POST['cardHolderName'] ?? null;
-    $cardType = $_POST['cardType'] ?? null;
-    $cardNetwork = $_POST['cardNetwork'] ?? null;
-    $accountId = $_POST['accountId'] ?? null;
-    $shippingAddress = $_POST['shippingAddress'] ?? null;
-
-    // Add this line to confirm POST data is received
-    error_log("DEBUG: Received POST data. Card Holder: $cardHolderName, Card Type: $cardType, Account ID: $accountId");
-
-    // Basic validation
-    if (empty($cardHolderName) || empty($cardType) || empty($cardNetwork) || empty($accountId) || empty($shippingAddress)) {
+    // --- Input Validation ---
+    // Check if all necessary POST data is present
+    if (!isset($_POST['cardHolderName'], $_POST['cardType'], $_POST['cardNetwork'], $_POST['accountId'], $_POST['shippingAddress'])) {
         throw new Exception('All card order fields are required.', 400);
     }
+
+    $cardHolderName = $_POST['cardHolderName'];
+    $cardType = $_POST['cardType'];
+    $cardNetwork = $_POST['cardNetwork'];
+    $accountId = $_POST['accountId'];
+    $shippingAddress = $_POST['shippingAddress'];
 
     // Validate account ID format and existence
     try {
@@ -101,8 +71,15 @@ try {
         throw new Exception('Account verification failed. Please try again.', 500);
     }
 
-    // Add this line to confirm validation passed
-    error_log("DEBUG: All input validations passed.");
+    // Fetch user details for email notification (recipient name and email)
+    $usersCollection = getCollection('users');
+    $user_doc = $usersCollection->findOne(['_id' => $userObjectId]);
+    if (!$user_doc || empty($user_doc['email'])) {
+        error_log("CRITICAL ERROR: Logged-in user with ID " . $user_id_string . " not found or email missing. Cannot send order confirmation.");
+        throw new Exception('User email not available. Please contact support.', 500);
+    }
+    $recipient_name = trim(($user_doc['first_name'] ?? '') . ' ' . ($user_doc['last_name'] ?? ''));
+    $recipient_email = $user_doc['email'];
 
     // --- Card Generation Functions (Assumed to be defined elsewhere or included) ---
     // Make sure these functions are available.
@@ -154,51 +131,112 @@ try {
         ];
         $statusCode = 200;
         
-        error_log("DEBUG: Card successfully inserted. PHPMailer section is commented out for testing. Final response is ready.");
-
-        // --- Temporarily Commented Out Email Sending to Isolate Error ---
-        /*
-        error_log("DEBUG: Card successfully inserted. Preparing to send email.");
-        $mail = new PHPMailer(true); // true enables exceptions
+        // --- START OF EMAIL SENDING ---
+        // This section is now uncommented to send the email.
+        $mail = new PHPMailer(true);
         try {
-            // Server settings
+            // Server settings...
+            // (These settings remain the same)
             $mail->isSMTP();
-            $mail->Host      = getenv('SMTP_HOST') ?: 'smtp.gmail.com'; // Your SMTP server
-            $mail->SMTPAuth  = true;
-            $mail->Username  = getenv('SMTP_USERNAME') ?: 'hometownbankpa@gmail.com'; // SMTP username
-            $mail->Password  = getenv('SMTP_PASSWORD'); // SMTP password
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // Use SMTPS (465) or STARTTLS (587)
-            $mail->Port      = 465; // TCP port to connect to; use 587 if you set `SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS`
+            $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.gmail.com';
+            $mail->SMTPAuth   = true;
+            $mail->Username   = getenv('SMTP_USERNAME') ?: 'hometownbankpa@gmail.com';
+            $mail->Password   = getenv('SMTP_PASSWORD');
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+            $mail->Port       = 465;
 
-            // Recipients
+            // Recipients...
+            // (These settings remain the same)
             $sender_email = getenv('ADMIN_EMAIL') ?: 'hometownbankpa@gmail.com';
             $sender_name = getenv('SMTP_FROM_NAME') ?: 'Hometown Bank PA';
-
             $mail->setFrom($sender_email, $sender_name);
-            $mail->addAddress($recipient_email, $recipient_name); // Add a recipient
+            $mail->addAddress($recipient_email, $recipient_name);
 
             // Content
             $mail->isHTML(true);
             $mail->Subject = 'Your Hometown Bank PA Card Order Confirmation';
-            $mail->Body    = "
-                <p>Dear {$recipient_name},</p>
-                <p>Thank you for ordering a new card from Hometown Bank PA!</p>
-                <p>Here are the details of your order:</p>
-                <ul>
-                    <li><strong>Card Type:</strong> {$cardType}</li>
-                    <li><strong>Card Network:</strong> {$cardNetwork}</li>
-                    <li><strong>Card Holder Name:</strong> {$cardHolderName}</li>
-                    <li><strong>Linked Account ID:</strong> {$accountId}</li>
-                    <li><strong>Shipping Address:</strong> {$shippingAddress}</li>
-                    <li><strong>Order Date:</strong> " . (new DateTime())->format('F j, Y') . "</li>
-                    <li><strong>Estimated Delivery:</strong> On or before {$delivery_date_formatted}</li>
-                </ul>
-                <p>Your card (ending in " . substr($cardNumber, -4) . ") is currently <b>pending delivery</b>. Once you receive it, please visit the Card Management section in your online banking portal to activate it and set your Personal Identification Number (PIN).</p>
-                <p>If you have any questions, please contact our support team.</p>
-                <p>Sincerely,</p>
-                <p>The Hometown Bank PA Team</p>
-            ";
-            $mail->AltBody = "Dear {$recipient_name},\n\nThank you for ordering a new card from Hometown Bank PA!\n\nHere are the details of your order:\n- Card Type: {$cardType}\n- Card Network: {$cardNetwork}\n- Card Holder Name: {$cardHolderName}\n- Linked Account ID: {$accountId}\n- Shipping Address: {$shippingAddress}\n- Order Date: " . (new DateTime())->format('F j, Y') . "\n- Estimated Delivery: On or before {$delivery_date_formatted}\n\nYour card (ending in " . substr($cardNumber, -4) . ") is currently pending delivery. Once you receive it, please visit the Card Management section in your online banking portal to activate it and set your Personal Identification Number (PIN).\n\nIf you have any questions, please contact our support team.\n\nSincerely,\n\nThe Hometown Bank PA Team";
+
+            // New and improved HTML body with inline CSS for better compatibility
+            $mail->Body = '
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Card Order Confirmation</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+                    .email-container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden; }
+                    .header { background-color: #004d99; color: #ffffff; padding: 20px; text-align: center; }
+                    .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+                    .content { padding: 30px; line-height: 1.6; color: #333333; }
+                    .button { display: inline-block; padding: 12px 24px; margin-top: 20px; background-color: #007bff; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; }
+                    .footer { text-align: center; padding: 20px; font-size: 12px; color: #999999; border-top: 1px solid #eeeeee; margin-top: 20px; }
+                    .details-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    .details-table th, .details-table td { text-align: left; padding: 10px; border-bottom: 1px solid #f0f0f0; }
+                    .details-table th { background-color: #f9f9f9; width: 40%; font-weight: 600; }
+                </style>
+            </head>
+            <body>
+                <div class="email-container">
+                    <div class="header">
+                        <h1>Hometown Bank PA</h1>
+                    </div>
+                    <div class="content">
+                        <h2>Hello ' . htmlspecialchars($recipient_name) . ',</h2>
+                        <p>Thank you for ordering a new bank card. We have successfully processed your request and your card is now being prepared for shipping.</p>
+                        
+                        <p>Here are the details of your order:</p>
+                        
+                        <table class="details-table">
+                            <tr>
+                                <th>Card Type</th>
+                                <td>' . htmlspecialchars($cardType) . '</td>
+                            </tr>
+                            <tr>
+                                <th>Card Network</th>
+                                <td>' . htmlspecialchars($cardNetwork) . '</td>
+                            </tr>
+                            <tr>
+                                <th>Card Holder Name</th>
+                                <td>' . htmlspecialchars($cardHolderName) . '</td>
+                            </tr>
+                            <tr>
+                                <th>Linked Account ID</th>
+                                <td>' . htmlspecialchars($accountId) . '</td>
+                            </tr>
+                            <tr>
+                                <th>Shipping Address</th>
+                                <td>' . nl2br(htmlspecialchars($shippingAddress)) . '</td>
+                            </tr>
+                            <tr>
+                                <th>Order Date</th>
+                                <td>' . (new DateTime())->format('F j, Y') . '</td>
+                            </tr>
+                            <tr>
+                                <th>Estimated Delivery</th>
+                                <td>On or before ' . htmlspecialchars($delivery_date_formatted) . '</td>
+                            </tr>
+                        </table>
+                        
+                        <p>Your new card will be delivered to the address provided. Once you receive it, please visit your online banking portal to activate it and set a new PIN.</p>
+                        
+                        <p style="text-align: center;">
+                           <a href="' . BASE_URL . '/my_cards" class="button">Manage My Cards</a>
+                        </p>
+                        
+                        <p>If you have any questions, please feel free to contact our support team.</p>
+                        <p>Sincerely,<br>The Hometown Bank PA Team</p>
+                    </div>
+                    <div class="footer">
+                        <p>&copy; ' . date("Y") . ' Hometown Bank PA. All rights reserved.</p>
+                    </div>
+                </div>
+            </body>
+            </html>';
+
+            // Plain-text alternative for email clients that don't support HTML
+            $mail->AltBody = "Hello {$recipient_name},\n\nThank you for ordering a new card from Hometown Bank PA!\n\nHere are the details of your order:\n\n- Card Type: {$cardType}\n- Card Network: {$cardNetwork}\n- Card Holder Name: {$cardHolderName}\n- Linked Account ID: {$accountId}\n- Shipping Address: {$shippingAddress}\n- Order Date: " . (new DateTime())->format('F j, Y') . "\n- Estimated Delivery: On or before {$delivery_date_formatted}\n\nYour card is currently pending delivery. Once you receive it, please visit the Card Management section in your online banking portal to activate it and set your Personal Identification Number (PIN).\n\nIf you have any questions, please contact our support team.\n\nSincerely,\n\nThe Hometown Bank PA Team";
 
             $mail->send();
             error_log("SUCCESS: Order confirmation email sent to {$recipient_email} for card ID {$newCardId}.");
@@ -207,8 +245,7 @@ try {
             error_log("EMAIL ERROR: Failed to send order confirmation email to {$recipient_email}. Mailer Error: {$mail->ErrorInfo}. Exception: {$e->getMessage()}");
             $response_data['message'] .= " However, there was an issue sending your confirmation email. Please check your spam folder.";
         }
-        */
-        // --- End of Commented Section ---
+        // --- END OF EMAIL SENDING ---
 
     } else {
         error_log("ERROR: Failed to insert new card for user " . $userObjectId . ". Insert count: " . $insertResult->getInsertedCount());
@@ -235,4 +272,4 @@ try {
 // Set the HTTP status code before sending the JSON response
 http_response_code($statusCode);
 echo json_encode($response_data);
-exit; // Ensure nothing else is outputted
+exit;
