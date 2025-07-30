@@ -4,8 +4,9 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-require_once '/../../Config.php'; // Assuming Config.php contains MongoDB connection details
-require_once '/../../functions.php'; // This is good to have for future database operations
+require_once '../../Config.php'; 
+require_once '../../vendor/autoload.php';
+require_once '../../functions.php';
 
 // Check if the admin is NOT logged in, redirect to login page
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {

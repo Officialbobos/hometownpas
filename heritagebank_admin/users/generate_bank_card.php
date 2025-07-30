@@ -4,10 +4,11 @@ session_start();
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-require_once '/../../Config.php'; // Adjust path if necessary, depending on file location
 
-// Use MongoDB PHP Library
-require_once '/../../functions.php'; // This is good to have for future database operations
+require_once '../../Config.php'; 
+require_once '../../vendor/autoload.php';
+require_once '../../functions.php';
+
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId; // For working with MongoDB's unique IDs
 use MongoDB\BSON\UTCDateTime; // For handling dates

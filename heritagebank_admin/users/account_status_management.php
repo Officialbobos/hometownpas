@@ -5,10 +5,9 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 session_start();
-
-// Adjust paths as necessary for your file structure
-require_once __DIR__ . '/../../Config.php'; // Corrected path to root Config.php
-require_once __DIR__ . '/../../functions.php'; // Corrected path to root functions.php
+require_once '../../Config.php'; 
+require_once '../../vendor/autoload.php';
+require_once '../../functions.php';
 
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
