@@ -373,7 +373,7 @@ if (isset($_SESSION['admin_message'])) {
                     <li><a href="#">Reports & Analytics</a></li>
                     <li><a href="#">System Settings</a></li>
                     <li><a href="#">Transfer Approvals</a></li>
-                    <li> <a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/manage_modals">Manage Transfer Modal</a></li>
+                    <li> <a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/manage_modals.php">Manage Modal Message</a></li>
 
                 </ul>
             </nav>
