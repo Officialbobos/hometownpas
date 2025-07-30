@@ -354,8 +354,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </p>
             <?php endif; ?>
 
-            <form action="/admin/manage_user_funds.php" method="POST" class="form-standard">
-                <div class="form-group">
+        <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/manage_user_funds.php'; ?>" method="POST">
+    </form>                <div class="form-group">
                     <label for="account_number">User Account Number</label>
                     <input type="text" id="account_number" name="account_number" value="<?php echo htmlspecialchars($_POST['account_number'] ?? ''); ?>" placeholder="e.g., CHK00123456" required>
                     <small>Enter the exact account number to credit or debit.</small>
