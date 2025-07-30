@@ -465,10 +465,9 @@ function complete_pending_transfer($transaction_id): array {
         $session->commitTransaction();
         error_log("MongoDB transaction committed successfully for complete_pending_transfer ID {$transactionObjectId}.");
 
-        // --- Email Notification for Sender ---
-        // Pass original transaction ID (from MySQL) if needed for email history lookup.
-        // Assuming get_user_details can now handle MongoDB _id for users if updated.
-        $sender_user = get_user_details($transaction_details['user_id']); // Use the user_id from the fetched transaction
+        // --- Email Notification for Sender (Rejection) ---
+// Use 'sender_user_id' from the transaction details
+$sender_user = get_user_details($transaction_details['sender_user_id']);
 
         if ($sender_user && $sender_user['email']) {
             $subject = "Transaction Completed - Reference: {$transaction_details['transaction_reference']}";
