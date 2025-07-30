@@ -17,8 +17,10 @@ const BANK_NAME = 'Hometown Bank Pa';
 // Ensure this is an admin user. You'll need to implement your admin_auth_check
 // based on your existing user authentication logic (e.g., checking an 'is_admin' field in the session).
 // For now, we'll assume a simple check.
-if (!isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    die("Access Denied. Admins only.");
+// Check if admin is logged in
+if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ' . rtrim(BASE_URL, characters: '/') . '/heritagebank_admin/index.php');
+    exit;
 }
 
 $message = '';
