@@ -102,6 +102,7 @@ $authenticated_routes = [
     'api/get_user_accounts',
     'api/order_card',
     'api/set_card_pin',
+    'api/deposit_check',
     // ... potentially other API/frontend routes that require authentication
 ];
 
@@ -209,6 +210,9 @@ switch ($path) {
         break;
     case 'api/register':
         require __DIR__ . '/api/register.php';
+        break;
+         case 'api/deposti_check':
+        require __DIR__ . '/api/deposit_check.php';
         break;
     // ... potentially other API routes
 

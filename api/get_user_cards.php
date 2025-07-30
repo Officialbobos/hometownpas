@@ -1,228 +1,170 @@
 <?php
-// api/get_user_cards.php
-
-// 1. Start the session - CRITICAL FOR AJAX ENDPOINTS
+// Path: C:\xampp\htdocs\hometownbank\api\get_user_cards.php
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
 header('Content-Type: application/json');
 
-// 2. Include configuration and functions to establish MongoDB connection - CRITICAL FOR AJAX ENDPOINTS
-// Adjust paths if Config.php and functions.php are not in the parent directory of 'api'
 require_once __DIR__ . '/../Config.php';
 require_once __DIR__ . '/../functions.php';
 
-use MongoDB\Client; // Required for getMongoDBClient() if it returns a Client instance
+use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
+$response_data = ['status' => 'error', 'message' => 'An unknown error occurred.'];
+$statusCode = 500;
+
 try {
-    // 3. Get MongoDB Client instance (assuming getMongoDBClient() returns a Client object)
     $mongoClientInstance = getMongoDBClient();
 
-    // Check if MongoDB client is available and is indeed a Client object
     if (!$mongoClientInstance || !($mongoClientInstance instanceof Client)) {
-        error_log("ERROR: MongoDB Client instance not available or incorrect type in api/get_user_cards.php. Type: " . gettype($mongoClientInstance));
+        error_log("ERROR: MongoDB Client instance not available or incorrect type in get_user_cards.php.");
+        $response_data['message'] = 'Database connection error (Client initialization).';
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Database connection error (Client initialization).']);
+        echo json_encode($response_data);
         exit;
     }
 
-    // Now, select the specific database using the MONGODB_DB_NAME constant
     if (!defined('MONGODB_DB_NAME')) {
-        error_log("ERROR: MONGODB_DB_NAME is not defined in Config.php or environment.");
+        error_log("ERROR: MONGODB_DB_NAME is not defined.");
+        $response_data['message'] = 'Server configuration error: Database name not set.';
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Server configuration error: Database name not set.']);
+        echo json_encode($response_data);
         exit;
     }
     $mongoDb = $mongoClientInstance->selectDatabase(MONGODB_DB_NAME);
 
-    // Check if user is logged in
     if (!isset($_SESSION['user_id'])) {
-        error_log("DEBUG: Session User ID: Not Set in get_user_cards.php. Redirecting to login.");
-        http_response_code(401); // Unauthorized
-        echo json_encode(['success' => false, 'message' => 'User not authenticated. Please log in again.']);
+        error_log("DEBUG: User not authenticated in get_user_cards.php.");
+        $response_data['message'] = 'User not authenticated. Please log in again.';
+        $statusCode = 401;
+        http_response_code(401);
+        echo json_encode($response_data);
         exit;
     }
 
     $userId = $_SESSION['user_id'];
-    if (!($userId instanceof ObjectId)) {
-        // Convert userId from session string to MongoDB\BSON\ObjectId for queries
-        try {
+    try {
+        if (!($userId instanceof ObjectId)) {
             $userId = new ObjectId($userId);
-            error_log("DEBUG: Converted userId to ObjectId: " . (string)$userId);
-        } catch (Exception $e) {
-            error_log("ERROR: Invalid userId format from session: " . $e->getMessage());
-            http_response_code(400); // Bad Request
-            echo json_encode(['success' => false, 'message' => 'Invalid user ID format in session.']);
-            exit;
         }
-    } else {
-        error_log("DEBUG: userId is already ObjectId: " . (string)$userId);
+    } catch (Exception $e) {
+        error_log("ERROR: Invalid userId format from session: " . $e->getMessage());
+        $response_data['message'] = 'Invalid user session data.';
+        $statusCode = 400;
+        http_response_code(400);
+        echo json_encode($response_data);
+        exit;
     }
 
-    // --- CRITICAL FIX: Use 'bank_cards' as the collection name ---
     $cardsCollection = $mongoDb->selectCollection('bank_cards');
 
     // Define the MongoDB Aggregation Pipeline
-    // This pipeline fetches cards, joins them with account info, and formats the output.
     $pipeline = [
-        [
-            // Stage 1: Match cards belonging to the current user
-            '$match' => [
-                'user_id' => $userId
-            ]
-        ],
-        [
-            // Stage 2: Join with the 'accounts' collection
-            '$lookup' => [
-                'from' => 'accounts',             // The collection to join with
-                'localField' => 'account_id',    // Field from the 'bank_cards' collection
-                'foreignField' => '_id',         // Field from the 'accounts' collection
-                'as' => 'accountInfo'            // The name of the new array field to add to the input documents
-            ]
-        ],
-        [
-            // Stage 3: Deconstruct the 'accountInfo' array field into a stream of documents.
-            // This assumes each card is linked to exactly one account.
-            // If a card might not have an account, use '$unwind' with preserveNullAndEmptyArrays: true
-            '$unwind' => [
-                'path' => '$accountInfo',
-                'preserveNullAndEmptyArrays' => true // IMPORTANT: To keep cards even if no matching account is found
-            ]
-        ],
-        [
-            // Stage 4: Project (select and reshape) the desired fields for the output
-            '$project' => [
-                '_id' => 0, // Exclude the original MongoDB _id for the card document
-                'id' => [ '$toString' => '$_id' ], // Convert card's _id to string and rename to 'id'
-                'card_holder_name' => '$card_holder_name',
-                'card_type_raw' => '$card_type', // Keep raw type for internal use if needed
-                'card_number_raw' => '$card_number', // Keep raw number for internal use if needed (e.g. for hashing)
-                // --- MODIFIED: Masking the card number for display ---
-                // Always mask sensitive info before sending to frontend.
-                'card_number_display' => [
-                    '$concat' => [
-                        '**** **** **** ',
-                        ['$substrCP' => ['$card_number', ['$subtract' => [ ['$strLenCP' => '$card_number'], 4 ]], 4]]
-                    ]
-                ],
-                // --- FIX: Combine 'expiry_month' and 'expiry_year' if separate fields ---
-                // Assuming 'expiry_month' and 'expiry_year' are numerical fields
-                'expiry_date_display' => [
-                    '$concat' => [
-                        ['$cond' => [['$lt' => ['$expiry_month', 10]], '0', '']], // Add leading zero if month < 10
-                        ['$toString' => '$expiry_month'],
-                        '/',
-                        ['$substrCP' => [['$toString' => '$expiry_year'], 2, 2]] // Get last two digits of year
-                    ]
-                ],
-                // If you have 'expiry_date' as a single BSON Date object:
-                // 'expiry_date_display' => ['$dateToString' => ['format' => '%m/%y', 'date' => '$expiry_date']],
-
-                // --- MODIFIED: CVV should never be exposed; KEEP placeholder ---
-                'display_cvv' => 'XXX',
-                // Ensure 'status' is always projected, provide a default if it's missing from the document
-                'status' => [ '$ifNull' => [ '$status', 'pending' ] ], // <--- Added $ifNull here
-                
-                // --- MODIFIED: Map card_type for card_network and add card_logo_url ---
-                'card_network' => [ // This is what frontend uses for logo path
-                    '$switch' => [
-                        'branches' => [
-                            ['case' => ['$eq' => ['$card_type', 'Visa']], 'then' => 'Visa'],
-                            ['case' => ['$eq' => ['$card_type', 'MasterCard']], 'then' => 'Mastercard'], // Corrected: use MasterCard from DB
-                            ['case' => ['$eq' => ['$card_type', 'Amex']], 'then' => 'Amex'],
-                            ['case' => ['$eq' => ['$card_type', 'Verve']], 'then' => 'Verve'],
-                        ],
-                        'default' => 'Default' // Default if network is not recognized
-                    ]
-                ],
-                'card_logo_url' => [ '$ifNull' => ['$card_logo_url', null] ], // <--- NEW: Project card_logo_url if exists
-                
-                // Account info (will be null if preserveNullAndEmptyArrays was true and no match)
-                'account_type' => '$accountInfo.account_type',
-                'display_account_number' => '$accountInfo.account_number',
-                'balance' => '$accountInfo.balance',
-                'currency' => '$accountInfo.currency',
-                'bank_name' => '$accountInfo.bank_name', // Assuming 'bank_name' exists in 'accounts'
-                'bank_logo_src' => '$accountInfo.bank_logo_src' // Assuming 'bank_logo_src' exists in 'accounts'
-            ]
-        ]
+        ['$match' => ['user_id' => $userId]],
+        ['$lookup' => [
+            'from' => 'accounts',
+            'localField' => 'account_id',
+            'foreignField' => '_id',
+            'as' => 'accountInfo'
+        ]],
+        ['$unwind' => ['path' => '$accountInfo', 'preserveNullAndEmptyArrays' => true]],
+        ['$project' => [
+            '_id' => 0,
+            'id' => ['$toString' => '$_id'],
+            'card_holder_name' => '$card_holder_name',
+            'card_number' => '$card_number_masked', 
+            'expiry_date_display' => '$expiry_date', 
+            'card_type' => '$card_type',
+            'card_network' => '$card_network', 
+            'is_active' => '$is_active', 
+            'status' => ['$ifNull' => ['$status', 'pending_activation']],
+            'shipping_address' => '$shipping_address', 
+            
+            'account_type' => ['$ifNull' => ['$accountInfo.account_type', 'N/A']],
+            'display_account_number' => ['$ifNull' => ['$accountInfo.account_number', 'N/A']],
+            'balance' => ['$ifNull' => ['$accountInfo.balance', 0.00]],
+            'currency' => ['$ifNull' => ['$accountInfo.currency', 'USD']],
+            'bank_name' => ['$ifNull' => ['$accountInfo.bank_name', 'Hometown Bank PA']],
+            'bank_logo_src' => ['$ifNull' => ['$accountInfo.bank_logo_src', null]],
+        ]]
     ];
 
     error_log("DEBUG: Executing MongoDB aggregation pipeline for user: " . (string)$userId);
     $cards = $cardsCollection->aggregate($pipeline)->toArray();
     error_log("DEBUG: Cards fetched: " . count($cards));
 
-    // The aggregation pipeline directly produces the desired format.
-    // The following loop is now mostly for setting default values if fields are null from $unwind or missing from documents.
     $formattedCards = [];
     foreach ($cards as $card) {
-        // We already added '$ifNull' in the aggregation pipeline for 'status',
-        // so $card['status'] should now always exist and have a default if it was missing.
-        $currentCardStatus = $card['status']; // No need for ?? 'pending' here now due to $ifNull in projection
+        $card['status_display_text'] = getCardStatusText($card['status'] ?? 'unknown');
+        $card['status_display_class'] = getCardStatusClass($card['status'] ?? 'unknown');
 
-        $status_display_text = 'Unknown';
-        $status_display_class = 'status-info';
-        switch ($currentCardStatus) { // This line is now safe
-            case 'active':
-                $status_display_text = 'Active';
-                $status_display_class = 'status-active';
-                break;
-            case 'pending':
-                $status_display_text = 'Pending Activation';
-                $status_display_class = 'status-pending';
-                break;
-            case 'suspended':
-                $status_display_text = 'Suspended';
-                $status_display_class = 'status-suspended';
-                break;
-            case 'cancelled':
-                $status_display_text = 'Cancelled';
-                $status_display_class = 'status-cancelled';
-                break;
-            default:
-                $status_display_text = ucfirst($currentCardStatus); // Use the (now guaranteed) value
-                $status_display_class = 'status-info';
-                break;
+        if (!empty($card['display_account_number']) && strlen($card['display_account_number']) > 4) {
+            $card['display_account_number'] = '****' . substr($card['display_account_number'], -4);
         }
 
-        $formattedCards[] = [
-            'id' => $card['id'],
-            'card_holder_name' => $card['card_holder_name'] ?? 'N/A',
-            'card_number_display' => $card['card_number_display'] ?? 'ERROR: Card number missing',
-            'expiry_date_display' => $card['expiry_date_display'] ?? 'MM/YY',
-            'display_cvv' => 'XXX', // Always hardcode for security
-            'card_network' => $card['card_network'] ?? 'Default', // This will now come from the $switch based on card_type
-            'is_active' => ($currentCardStatus === 'active'), // Derived from status for convenience
-            'card_logo_url' => $card['card_logo_url'] ?? null, // <--- IMPORTANT: Ensure this is passed to frontend
-            'bank_name' => $card['bank_name'] ?? 'HOMETOWN BANK',
-            'bank_logo_src' => $card['bank_logo_src'] ?? null, // From aggregation, if accounts have it
-            'account_type' => $card['account_type'] ?? 'N/A',
-            'display_account_number' => $card['display_account_number'] ? ('****' . substr($card['display_account_number'], -4)) : 'N/A', // Mask account number
-            'balance' => $card['balance'] ?? 0.00,
-            'currency' => $card['currency'] ?? 'USD',
-            'status_display_text' => $status_display_text,
-            'status_display_class' => $status_display_class,
-            'status' => $currentCardStatus // Original status from DB (now always present)
-        ];
+        if (!empty($card['card_number'])) {
+            $card['card_number'] = implode(' ', str_split($card['card_number'], 4));
+        } else {
+            $card['card_number'] = '**** **** **** ****';
+        }
+        
+        $formattedCards[] = $card;
     }
 
-    error_log("DEBUG: Preparing to send JSON response with " . count($formattedCards) . " cards.");
-    echo json_encode(['status' => 'success', 'cards' => $formattedCards]);
+    if (empty($formattedCards)) {
+        $response_data = ['status' => 'success', 'cards' => [], 'message' => 'No bank cards found. Order a new one below!'];
+    } else {
+        $response_data = ['status' => 'success', 'cards' => $formattedCards];
+    }
+    
+    $statusCode = 200;
+    http_response_code($statusCode);
+    echo json_encode($response_data);
     exit;
 
 } catch (MongoDBDriverException $e) {
-    // Catch specific MongoDB driver exceptions for more precise error logging
     error_log("MongoDB Driver EXCEPTION in get_user_cards.php: " . $e->getMessage() . " Code: " . $e->getCode());
-    http_response_code(500); // Internal Server Error
-    echo json_encode(['status' => 'error', 'message' => 'Database error: Could not fetch cards. Please try again later.']);
+    $response_data = ['status' => 'error', 'message' => 'Database error: Could not fetch cards. Please try again later.'];
+    $statusCode = 500;
+    http_response_code(500);
+    echo json_encode($response_data);
     exit;
 } catch (Exception $e) {
-    // Catch any other general PHP exceptions
     error_log("GENERIC EXCEPTION in get_user_cards.php: " . $e->getMessage() . " Line: " . $e->getLine() . " File: " . $e->getFile());
-    http_response_code(500); // Internal Server Error
-    echo json_encode(['status' => 'error', 'message' => 'Server error: An unexpected error occurred.']);
+    $response_data = ['status' => 'error', 'message' => 'Server error: An unexpected error occurred.'];
+    $statusCode = 500;
+    http_response_code(500);
+    echo json_encode($response_data);
     exit;
+}
+
+function getCardStatusText(string $status): string {
+    switch ($status) {
+        case 'active': return 'Active';
+        case 'frozen': return 'Frozen';
+        case 'pending_delivery': return 'Pending Delivery';
+        case 'pending_activation': return 'Pending Activation';
+        case 'lost': return 'Reported Lost';
+        case 'stolen': return 'Reported Stolen';
+        case 'cancelled': return 'Cancelled';
+        default: return 'Unknown Status';
+    }
+}
+
+function getCardStatusClass(string $status): string {
+    switch ($status) {
+        case 'active': return 'status-active';
+        case 'frozen': return 'status-frozen';
+        case 'pending_delivery':
+        case 'pending_activation':
+            return 'status-pending';
+        case 'lost':
+        case 'stolen':
+        case 'cancelled':
+            return 'status-inactive';
+        default: return 'status-default';
+    }
 }
