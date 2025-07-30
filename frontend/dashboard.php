@@ -171,24 +171,8 @@ if (!function_exists('get_currency_symbol')) {
     }
 }
 
-// Fetch modal message from DB (this part remains as it fetches specific data)
-$transferModalContent = '';
-$transferModalActive = false;
-
-try {
-    $settingsCollection = getCollection('app_settings');
-    $settings = $settingsCollection->findOne(['setting_name' => 'transfer_modal_message']);
-
-    if ($settings) {
-        $transferModalContent = $settings['content'] ?? '';
-        $transferModalActive = $settings['is_active'] ?? false;
-    }
-} catch (MongoDB\Driver\Exception\Exception $e) {
-    error_log("Error fetching transfer modal settings: " . $e->getMessage());
-    // Fail gracefully: modal won't show if there's a DB error
-} catch (Exception $e) {
-    error_log("General error fetching transfer modal settings: " . $e->getMessage());
-}
+// The 'transferInfoModal' PHP fetching logic and its HTML/CSS/JS are being removed as requested.
+// Thus, the $transferModalContent and $transferModalActive variables are no longer needed here.
 
 ?>
 <!DOCTYPE html>
@@ -203,7 +187,7 @@ try {
         const BASE_URL_JS = "<?php echo rtrim(BASE_URL, '/'); ?>";
     </script>
     <style>
-        /* Basic Modal Styles */
+        /* Basic Modal Styles for customMessageModal */
         .modal-overlay {
             display: none; /* Hidden by default */
             position: fixed;
@@ -264,7 +248,7 @@ try {
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Responsive adjustments for modal */
+        /* Responsive adjustments for customMessageModal */
         @media (max-width: 600px) {
             .modal-content {
                 padding: 20px;
@@ -276,6 +260,68 @@ try {
             .modal-content p {
                 font-size: 1em;
             }
+        }
+
+        /* Transaction Modal Styles */
+        .transaction-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 500px;
+            width: 90%;
+            border-top: 5px solid; /* Dynamic border color */
+            display: none; /* Initially hidden, dialog element handles display */
+        }
+        
+        .transaction-modal h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .transaction-modal p {
+            line-height: 1.6;
+            color: #555;
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        /* Status-based colors for the transaction modal border */
+        .status-completed { border-top-color: #28a745; }
+        .status-declined { border-top-color: #dc3545; }
+        .status-on-hold, .status-restricted { border-top-color: #ffc107; }
+
+        /* The close button for transaction modal (reusing .modal-close-button class) */
+        .transaction-modal .modal-close-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+
+        .transaction-modal .modal-close-button:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
@@ -475,132 +521,6 @@ try {
             <button class="modal-close-button" onclick="closeModal()">Close</button>
         </div>
     </div>
-    <?php if ($transferModalActive && !empty($transferModalContent)): ?>
-    <div id="transferInfoModal" class="app-modal">
-        <div class="app-modal-content">
-            <span class="close-app-modal-button">&times;</span>
-            <h3>Important Transfer Information</h3>
-            <p><?php echo htmlspecialchars($transferModalContent); ?></p>
-            <button class="app-modal-button">Understood</button>
-        </div>
-    </div>
-
-    <style>
-    /* Basic Modal Styles (for app-modal) */
-    .app-modal {
-        display: none; /* Hidden by default */
-        position: fixed; /* Stay in place */
-        z-index: 2000; /* Sit on top, higher than transfer-modal-overlay */
-        left: 0;
-        top: 0;
-        width: 100%; /* Full width */
-        height: 100%; /* Full height */
-        overflow: auto; /* Enable scroll if needed */
-        background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
-        justify-content: center;
-        align-items: center;
-        padding-top: 50px; /* Adjust as needed */
-    }
-
-    .app-modal-content {
-        background-color: #fefefe;
-        margin: auto; /* Center vertically and horizontally */
-        padding: 30px;
-        border: 1px solid #888;
-        width: 80%; /* Could be responsive */
-        max-width: 500px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        position: relative;
-        text-align: center;
-        color: #333;
-    }
-
-    .app-modal-content h3 {
-        color: #007bff;
-        margin-top: 0;
-        margin-bottom: 20px;
-        font-size: 1.5em;
-    }
-
-    .app-modal-content p {
-        font-size: 1.1em;
-        line-height: 1.6;
-        margin-bottom: 25px;
-    }
-
-    .close-app-modal-button {
-        color: #aaa;
-        position: absolute;
-        top: 10px;
-        right: 15px;
-        font-size: 28px;
-        font-weight: bold;
-        cursor: pointer;
-    }
-
-    .close-app-modal-button:hover,
-    .close-app-modal-button:focus {
-        color: #333;
-        text-decoration: none;
-    }
-
-    .app-modal-button {
-        background-color: #007bff;
-        color: white;
-        padding: 10px 25px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 1em;
-        transition: background-color 0.3s ease;
-    }
-
-    .app-modal-button:hover {
-        background-color: #0056b3;
-    }
-    </style>
-
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const transferInfoModal = document.getElementById('transferInfoModal');
-        // Ensure buttons exist before attaching handlers
-        const closeInfoModalButton = transferInfoModal ? transferInfoModal.querySelector('.close-app-modal-button') : null;
-        const infoModalOkButton = transferInfoModal ? transferInfoModal.querySelector('.app-modal-button') : null;
-
-        if (transferInfoModal) {
-            const hasSeenTransferInfoModal = sessionStorage.getItem('hasSeenTransferInfoModal');
-
-            if (!hasSeenTransferInfoModal) {
-                transferInfoModal.style.display = 'flex'; // Use flex to center content
-            }
-
-            if (closeInfoModalButton) {
-                closeInfoModalButton.onclick = function() {
-                    transferInfoModal.style.display = 'none';
-                    sessionStorage.setItem('hasSeenTransferInfoModal', 'true'); // Mark as seen
-                }
-            }
-
-            if (infoModalOkButton) {
-                infoModalOkButton.onclick = function() {
-                    transferInfoModal.style.display = 'none';
-                    sessionStorage.setItem('hasSeenTransferInfoModal', 'true'); // Mark as seen
-                }
-            }
-
-            // Close the modal if the user clicks anywhere outside of it
-            window.onclick = function(event) {
-                if (event.target == transferInfoModal) {
-                    transferInfoModal.style.display = 'none';
-                    sessionStorage.setItem('hasSeenTransferInfoModal', 'true'); // Mark as seen
-                }
-            }
-        }
-    });
-    </script>
-    <?php endif; ?>
-
 
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
@@ -643,67 +563,6 @@ try {
         <p><strong>Bank Comment:</strong> <span id="modalMessage"><?php echo htmlspecialchars($transaction_alert['message'] ?: 'N/A'); ?></span></p>
         <button id="closeModalButton" class="modal-close-button">Close</button>
     </dialog>
-    <style>
-        .transaction-modal {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            z-index: 1000;
-            max-width: 500px;
-            width: 90%;
-            border-top: 5px solid; /* Dynamic border color */
-            display: none; /* Initially hidden, dialog element handles display */
-        }
-        
-        .transaction-modal h3 {
-            margin-top: 0;
-            color: #333;
-        }
-
-        .transaction-modal p {
-            line-height: 1.6;
-            color: #555;
-        }
-
-        .modal-backdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            z-index: 999;
-            display: none;
-        }
-
-        /* Status-based colors for the modal border */
-        .status-completed { border-top-color: #28a745; }
-        .status-declined { border-top-color: #dc3545; }
-        .status-on-hold, .status-restricted { border-top-color: #ffc107; }
-
-        .modal-close-button {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            text-align: center;
-            font-size: 1em;
-            transition: background-color 0.3s ease;
-        }
-
-        .modal-close-button:hover {
-            background-color: #0056b3;
-        }
-    </style>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const modal = document.getElementById('transactionModal');
@@ -711,11 +570,8 @@ try {
             const closeButton = document.getElementById('closeModalButton');
 
             if (modal && backdrop) {
-                // The <dialog> element has a showModal() method that handles centering and the backdrop automatically.
-                // However, we are also using a custom backdrop for a consistent look.
-                // We'll show both together.
-                modal.showModal();
-                backdrop.style.display = 'block';
+                modal.showModal(); // Show the dialog
+                backdrop.style.display = 'block'; // Show custom backdrop
 
                 function closeModal() {
                     modal.close();
@@ -723,8 +579,6 @@ try {
                 }
 
                 closeButton.addEventListener('click', closeModal);
-
-                // Close the modal if the user clicks the backdrop
                 backdrop.addEventListener('click', closeModal);
             }
         });
@@ -754,21 +608,25 @@ try {
         var userShowModal = <?php echo json_encode($user_show_modal); ?>;
 
         // Event listener for the "View My Card" button
-        viewCardButton.addEventListener('click', function() {
-            if (userShowModal && userModalMessage) {
-                openModal(userModalMessage);
-            } else {
-                // If no message or message is turned off, proceed with normal card view logic
-                window.location.href = BASE_URL_JS + '/bank_cards';
-            }
-        });
+        if (viewCardButton) { // Ensure button exists before adding listener
+            viewCardButton.addEventListener('click', function() {
+                if (userShowModal && userModalMessage) {
+                    openModal(userModalMessage);
+                } else {
+                    // If no message or message is turned off, proceed with normal card view logic
+                    window.location.href = BASE_URL_JS + '/bank_cards';
+                }
+            });
+        }
 
         // Optional: Close modal if clicked outside content
-        customMessageModal.addEventListener('click', function(event) {
-            if (event.target === customMessageModal) {
-                closeModal();
-            }
-        });
+        if (customMessageModal) { // Ensure modal exists
+            customMessageModal.addEventListener('click', function(event) {
+                if (event.target === customMessageModal) {
+                    closeModal();
+                }
+            });
+        }
     </script>
     <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/user.dashboard.js"></script>
 </body>
