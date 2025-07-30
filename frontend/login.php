@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
                 } else {
                     // No 2FA enabled for this user or method is 'none', log them in directly
-                    $_SESSION['user_logged_in'] = true; // Mark as fully logged in
+                    $_SESSION['logged_in'] = true; // Mark as fully logged in
                     $_SESSION['2fa_verified'] = true; // No 2FA, so consider it verified immediately
                     // Assuming you have a user ID or similar to store for the actual logged-in session
                     $_SESSION['user_id'] = (string)$user['_id']; 
