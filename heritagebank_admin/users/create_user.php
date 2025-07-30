@@ -18,7 +18,7 @@ use Aws\S3\Exception\S3Exception;
 
 // Check if admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
+    header('Location: ' . rtrim(BASE_URL, characters: '/') . '/heritagebank_admin/index.php');
     exit;
 }
 

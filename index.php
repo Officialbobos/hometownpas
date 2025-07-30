@@ -188,6 +188,10 @@ switch ($path) {
     case 'verify_code':
         require __DIR__ . '/frontend/verify_code.php';
         break;
+        break;
+    case 'deposit':
+        require __DIR__ . '/frontend/deposit.php';
+        break;
 
     // --- API Routes (No changes here, assuming these are correct and outside heritagebank_admin) ---
     case 'api/get_user_cards':
@@ -262,7 +266,10 @@ switch ($path) {
     case 'admin/activate_card':
         require __DIR__ . '/heritagebank_admin/users/activate_card.php';
         break;
-
+        break;
+    case 'admin/activate_card':
+        require __DIR__ . '/heritagebank_admin/users/DepositCheckApproval.php';
+        break;
     // --- REMOVED/COMMENTED OUT ROUTES (Not found in your provided structure) ---
     // If these files exist elsewhere or you intend to create them, uncomment and correct paths.
     // case 'admin/accounts':
