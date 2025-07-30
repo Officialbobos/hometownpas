@@ -1,15 +1,12 @@
 <?php
 session_start();
 
-<?php
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-
-require_once '../../vendor/autoload.php';
-require_once '../../Config.php'; // Adjust path based on your actual file structure
-require_once '../../functions.php'; // This is good to have for future database operations
-
+require_once __DIR__ . '/../../Config.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../functions.php';
 // Check if admin is logged in
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: ' . rtrim(BASE_URL, characters: '/') . '/heritagebank_admin/index.php');

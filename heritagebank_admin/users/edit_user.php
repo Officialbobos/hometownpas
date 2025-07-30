@@ -1,15 +1,15 @@
 <?php
 session_start();
-require_once '../../Config.php';
+require_once '/../../Config.php';
 
 // Use MongoDB PHP Library
-require_once '../../functions.php';
+require_once '/../../functions.php';
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
 
 // Include AWS SDK for PHP (for Backblaze B2 S3 Compatible API)
-require '../../vendor/autoload.php';
+require '/../../vendor/autoload.php';
 use Aws\S3\S3Client;
 use Aws\Exception\AwsException;
 
