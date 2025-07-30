@@ -42,8 +42,9 @@ try {
         // User data not found, possibly log out or show error
         $message = "User data not found.";
         $message_type = "error";
-        // header('Location: ' . rtrim(BASE_URL, '/') . '/logout.php'); // Consider logging out
-        // exit;
+        // Recommendation: If user data not found, forcibly log out for security.
+        header('Location: ' . rtrim(BASE_URL, '/') . '/logout'); // Corrected for clean URL
+        exit;
     }
 } catch (MongoDBDriverException $e) {
     $message = "Database error: " . $e->getMessage();
@@ -292,7 +293,7 @@ try {
             <div class="user-info">
                 <span>Account: <?php echo htmlspecialchars($userData['account_number'] ?? 'N/A'); ?></span>
             </div>
-            <a href="<?php echo rtrim(BASE_URL, '/') . '/logout.php'; ?>" class="logout-button">Logout</a>
+            <a href="<?php echo rtrim(BASE_URL, '/') . '/logout'; ?>" class="logout-button">Logout</a>
         </div>
 
         <div class="dashboard-content">
@@ -311,7 +312,7 @@ try {
             <div class="card">
                 <h3>Recent Transactions</h3>
                 <p>Review your latest account activities.</p>
-                <a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/transactions.php'; ?>" class="btn">View Transactions</a>
+                <a href="<?php echo rtrim(BASE_URL, '/') . '/transactions'; ?>" class="btn">View Transactions</a>
             </div>
 
             <div class="card">
@@ -329,7 +330,7 @@ try {
             <div class="card">
                 <h3>Profile Settings</h3>
                 <p>Update your personal information and preferences.</p>
-                <a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/profile.php'; ?>" class="btn">Manage Profile</a>
+                <a href="<?php echo rtrim(BASE_URL, '/') . '/profile'; ?>" class="btn">Manage Profile</a>
             </div>
         </div>
     </div>
@@ -390,7 +391,7 @@ try {
                     openModal('transferModal');
                 } else {
                     // Default action if no modal is set or active
-                    window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer_funds.php'; // Example redirect
+                    window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/transfer-funds'; // Corrected for clean URL
                 }
             });
         }
@@ -403,7 +404,7 @@ try {
                     openModal('viewCardsModal');
                 } else {
                     // Default action if no modal is set or active for 'View My Cards'
-                    window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/frontend/my_cards.php'; // Example redirect
+                    window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/my-cards'; // Corrected for clean URL
                 }
             });
         }
@@ -430,13 +431,13 @@ try {
         function continueTransfer() {
             closeModal('transferModal');
             // Navigate to the transfer page or initiate transfer process
-            window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer_funds.php'; // Example redirect
+            window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/transfer-funds'; // Corrected for clean URL
         }
 
         function continueViewCards() { // NEW
             closeModal('viewCardsModal');
             // Navigate to the view cards page or initiate card display
-            window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/frontend/my_cards.php'; // Example redirect
+            window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/my-cards'; // Corrected for clean URL
         }
 
     </script>

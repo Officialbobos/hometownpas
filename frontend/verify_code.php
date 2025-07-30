@@ -31,6 +31,7 @@ if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' 
     error_log("Verify_code.php: Invalid session state for 2FA. Redirecting to login. Reason: auth_step=" . ($_SESSION['auth_step'] ?? 'NOT SET') . ", temp_user_id=" . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
     $_SESSION['message'] = "Your session has expired or is invalid. Please log in again.";
     $_SESSION['message_type'] = "error";
+    // Fixed: Always redirect to /login if session state is invalid
     header('Location: ' . rtrim(BASE_URL, '/') . '/login');
     exit;
 }
@@ -53,7 +54,7 @@ try {
         unset($_SESSION['auth_step']);
         unset($_SESSION['temp_user_id']);
         session_destroy(); // Destroy session if user not found for security
-        header('Location: ' . BASE_URL . '/login');
+        header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
         exit;
     }
     $twoFactorEnabled = $user['two_factor_enabled'] ?? false;
@@ -76,7 +77,8 @@ try {
         unset($_SESSION['temp_user_id']);
 
         $redirect_path = ($_SESSION['is_admin'] ?? false) ? '/admin' : '/dashboard';
-        header('Location: ' . BASE_URL . $redirect_path);
+        error_log("Verify_code.php: 2FA disabled/none. Redirecting directly to: " . rtrim(BASE_URL, '/') . $redirect_path); // Added debug
+        header('Location: ' . rtrim(BASE_URL, '/') . $redirect_path); // Corrected
         exit;
     }
 
@@ -103,7 +105,7 @@ try {
                 // It's crucial to add the message to session BEFORE redirecting if you want it displayed on login.php
                 $_SESSION['message'] = $message;
                 $_SESSION['message_type'] = $message_type;
-                header('Location: ' . BASE_URL . '/login');
+                header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
                 exit;
             }
 
@@ -132,9 +134,16 @@ try {
                     ['$unset' => ['two_factor_temp_code' => '', 'two_factor_code_expiry' => '']]
                 );
 
-                error_log("Verify_code.php: 2FA code verified successfully for user " . $user_id . ". Redirecting to dashboard/admin.");
+                error_log("Verify_code.php: 2FA code verified successfully for user " . $user_id . ". Session vars set.");
+                error_log("Verify_code.php: User ID: " . ($_SESSION['user_id'] ?? 'N/A'));
+                error_log("Verify_code.php: Logged In: " . ($_SESSION['user_logged_in'] ? 'True' : 'False'));
+                error_log("Verify_code.php: 2FA Verified: " . ($_SESSION['2fa_verified'] ? 'True' : 'False'));
+                error_log("Verify_code.php: Is Admin: " . ($_SESSION['is_admin'] ? 'True' : 'False'));
+
+
                 $redirect_path = ($_SESSION['is_admin'] ?? false) ? '/admin' : '/dashboard';
-            header('Location: ' . rtrim(BASE_URL, '/') . $redirect_path);
+                error_log("Verify_code.php: Final redirect path chosen: " . rtrim(BASE_URL, '/') . $redirect_path); // Added debug
+                header('Location: ' . rtrim(BASE_URL, '/') . $redirect_path); // Already correct
                 exit;
             } else {
                 // Code is incorrect or expired
@@ -151,7 +160,7 @@ try {
                     unset($_SESSION['temp_user_id']);
                     $_SESSION['message'] = $message;
                     $_SESSION['message_type'] = "error";
-                    header('Location: ' . BASE_URL . '/login');
+                    header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
                     exit;
                 } else {
                     $message = "Invalid verification code. Please try again.";
@@ -171,7 +180,7 @@ try {
     session_destroy();
     $_SESSION['message'] = $message; // Store message for login.php
     $_SESSION['message_type'] = $message_type;
-    header('Location: ' . BASE_URL . '/login');
+    header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
     exit;
 } catch (Exception $e) {
     error_log("Verify_code.php: General Error: " . $e->getMessage());
@@ -183,7 +192,7 @@ try {
     session_destroy();
     $_SESSION['message'] = $message; // Store message for login.php
     $_SESSION['message_type'] = $message_type;
-    header('Location: ' . BASE_URL . '/login');
+    header('Location: ' . rtrim(BASE_URL, '/') . '/login'); // Corrected
     exit;
 }
 
