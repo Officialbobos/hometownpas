@@ -1,12 +1,13 @@
 <?php
-// Path: C:\xampp\htdocs\heritagebank\admin\transactions_management.php
+// C:\xampp\htdocs\heritagebank\admin\transactions_management.php
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-require_once '/../../Config.php'; 
-require_once '/../../functions.php'; 
+// CORRECTED PATHS: Use __DIR__ to build a reliable path
+require_once __DIR__ . '/../../Config.php'; 
+require_once __DIR__ . '/../../functions.php'; 
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
@@ -15,8 +16,8 @@ use MongoDB\Driver\Exception\Exception as MongoDBException;
 
 // Admin authentication check
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
-    exit;
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
+    exit;
 }
 
 // --- MongoDB Connection ---

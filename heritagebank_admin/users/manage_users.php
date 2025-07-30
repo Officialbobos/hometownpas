@@ -18,8 +18,9 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../functions.php';
 
 // Check if admin is logged in, if not, redirect to login page
+// Corrected redirect URL to use BASE_URL and the routed path
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
+    header('Location: ' . rtrim(BASE_URL, '/') . '/admin/login');
     exit;
 }
 
@@ -174,7 +175,7 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Heritage Bank - Manage Users</title>
-    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         /* General body and container styling */
@@ -356,9 +357,9 @@ try {
 <body>
     <div class="dashboard-container">
         <div class="dashboard-header">
-            <img src="../../images/logo.png" alt="Heritage Bank Logo" class="logo">
+            <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/logo.png" alt="Heritage Bank Logo" class="logo">
             <h2>Manage Users</h2>
-            <a href="../logout.php" class="logout-button">Logout</a>
+            <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/logout'; ?>" class="logout-button">Logout</a>
         </div>
 
         <div class="dashboard-content">
@@ -367,10 +368,10 @@ try {
             <?php endif; ?>
 
             <h3>All Bank Users</h3>
-            <p class="section-description">Here you can view, edit, or delete user accounts. You can also <a href="create_user.php" class="add-user-button">Create New User</a>.</p>
+            <p class="section-description">Here you can view, edit, or delete user accounts. You can also <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/create_user'; ?>" class="add-user-button">Create New User</a>.</p>
 
             <?php if (empty($users)): ?>
-                <p>No users found. <a href="create_user.php">Create a new user</a>.</p>
+                <p>No users found. <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/create_user'; ?>">Create a new user</a>.</p>
             <?php else: ?>
                 <div class="table-responsive">
                     <table>
@@ -381,7 +382,7 @@ try {
                                 <th>Email</th>
                                 <th>Phone</th>
                                 <th>Membership No.</th>
-                                <th>Account Status</th> 
+                                <th>Account Status</th>
                                 <th>Common Bank Details</th>
                                 <th>Accounts & Balances</th>
                                 <th>Actions</th>
@@ -420,7 +421,7 @@ try {
                                     <td>
                                         <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/edit_users?id=' . $user['id']; ?>" class="button-small button-edit">Edit</a>
                                         <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/account_status_management?user_id=' . $user['id']; ?>" class="button-small button-status">Manage Status</a>
-                                        <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_users?action=delete&id=' . $user['id']; ?>" class="button-small button-delete" ...>Delete</a>
+                                        <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_users?action=delete&id=' . $user['id']; ?>" class="button-small button-delete" onclick="return confirm('Are you sure you want to delete this user and ALL their data? This action cannot be undone.');">Delete</a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -429,9 +430,9 @@ try {
                 </div>
             <?php endif; ?>
 
-            <p><a href="../dashboard.php" class="back-link">&larr; Back to Admin Dashboard</a></p>
+            <p><a href="<?php echo rtrim(BASE_URL, '/') . '/admin'; ?>" class="back-link">&larr; Back to Admin Dashboard</a></p>
         </div>
     </div>
-    <script src="../script.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/script.js"></script>
 </body>
 </html>
