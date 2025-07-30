@@ -16,7 +16,7 @@ use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    header('Location: ' . rtrim(BASE_URL, '/') . '/login.php');
+    header('Location: ' . rtrim(BASE_URL, '/') . '/login');
     exit;
 }
 

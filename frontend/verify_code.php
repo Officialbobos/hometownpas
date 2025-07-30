@@ -31,7 +31,7 @@ if (!isset($_SESSION['auth_step']) || $_SESSION['auth_step'] !== 'awaiting_2fa' 
     error_log("Verify_code.php: Invalid session state for 2FA. Redirecting to login. Reason: auth_step=" . ($_SESSION['auth_step'] ?? 'NOT SET') . ", temp_user_id=" . ($_SESSION['temp_user_id'] ?? 'NOT SET'));
     $_SESSION['message'] = "Your session has expired or is invalid. Please log in again.";
     $_SESSION['message_type'] = "error";
-    header('Location: ' . BASE_URL . '/login');
+    header('Location: ' . rtrim(BASE_URL, '/') . '/login');
     exit;
 }
 
