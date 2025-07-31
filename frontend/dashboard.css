@@ -1,27 +1,11 @@
 /* Path: C:\xampp\htdocs\hometownbank\frontend\dashboard.css */
 
-/* CSS Variables for easier management */
-:root {
-    --primary-purple: #a052c9; /* Medium purple */
-    --light-purple: #e6b3ff;   /* Very light purple */
-    --dark-purple: #2c003e;    /* Dark purple for background */
-    --darker-purple: #0a011d;  /* Even darker purple/blue */
-    --green-balance: #90ee90;  /* Light green for balance */
-    --red-debit: #ff6347;      /* Tomato red for debit */
-
-    /* Carousel variables - default for mobile (1 card per view) */
-    --cards-per-view: 1;
-    --gap: 20px; /* Gap between cards */
-    /* Calculation for gap reduction in flex item width */
-    --gap-reduction: calc(var(--gap) * (var(--cards-per-view) - 1) / var(--cards-per-view));
-}
-
 /* General Body and Container Styling */
 body {
     font-family: 'Poppins', sans-serif; /* Using Poppins as per transfer.php */
     margin: 0;
     padding: 0;
-    background: linear-gradient(135deg, var(--dark-purple), var(--darker-purple)); /* Dark purple to very dark purple/blue */
+    background: linear-gradient(135deg, #2c003e, #0a011d); /* Dark purple to very dark purple/blue */
     color: #e0e0e0; /* Light grey for text */
     min-height: 100vh;
     display: flex;
@@ -37,13 +21,6 @@ body {
     margin: 0 auto; /* Center the container */
     box-shadow: 0 0 30px rgba(0, 0, 0, 0.5); /* Stronger shadow for depth */
 }
-
-/* Main content area padding for responsiveness */
-.dashboard-content-area {
-    flex-grow: 1; /* Allows it to take available space */
-    padding: 0 25px; /* Default desktop padding */
-}
-
 
 /* Header Styling */
 .header {
@@ -63,12 +40,12 @@ body {
 .menu-icon {
     font-size: 24px;
     cursor: pointer;
-    color: var(--primary-purple); /* Soft purple */
+    color: #c9a0dc; /* Soft purple */
     transition: color 0.3s ease;
 }
 
 .menu-icon:hover {
-    color: var(--light-purple); /* Lighter purple on hover */
+    color: #e6b3ff; /* Lighter purple on hover */
 }
 
 .greeting h1 {
@@ -83,7 +60,7 @@ body {
     width: 45px;
     height: 45px;
     border-radius: 50%;
-    border: 2px solid var(--primary-purple); /* Purple border */
+    border: 2px solid #a052c9; /* Purple border */
     object-fit: cover;
     transition: transform 0.3s ease;
 }
@@ -96,7 +73,7 @@ body {
 /* Section Common Styling */
 .section {
     padding: 25px;
-    margin: 20px 0; /* Adjusted margin to respect dashboard-content-area padding */
+    margin: 20px;
     background-color: rgba(255, 255, 255, 0.08); /* Semi-transparent white background */
     backdrop-filter: blur(8px); /* Frosted glass effect */
     border-radius: 15px;
@@ -136,39 +113,38 @@ body {
 }
 
 .view-all-link a {
-    color: var(--primary-purple); /* Purple link */
+    color: #c9a0dc; /* Purple link */
     text-decoration: none;
     font-weight: 500;
     transition: color 0.3s ease;
 }
 
 .view-all-link a:hover {
-    color: var(--light-purple); /* Lighter purple on hover */
+    color: #e6b3ff; /* Lighter purple on hover */
     text-decoration: underline;
 }
 
 /* --- Carousel Specific Styles for Accounts --- */
-.account-cards-wrapper {
-    /* This wrapper acts as the visible window for the carousel */
-    overflow: hidden; /* Hide cards outside the view */
-    position: relative; /* For positioning indicators/arrows if any */
-}
-
 .account-cards-container {
     display: flex; /* Use flexbox for horizontal layout */
-    gap: var(--gap); /* Space between cards, controlled by CSS variable */
+    /* REMOVE overflow: hidden; from here */
+    scroll-snap-type: x mandatory; /* Optional: for native smooth snapping */
+    -webkit-overflow-scrolling: touch; /* For smoother scrolling on iOS */
+    gap: 20px; /* Space between cards */
     margin-bottom: 20px;
-    transition: transform 0.5s ease-in-out; /* Smooth transition for JS scrolling */
-    flex-wrap: nowrap; /* Ensure cards stay in a single row */
-    /* Remove scroll-snap-type and -webkit-overflow-scrolling here
-       as JS handles the snapping via transform */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+
+    /* Ensure flex-wrap is nowrap, though flex's default is nowrap */
+    flex-wrap: nowrap;
 }
 
 .account-card {
     /* Use the CSS variables to control width dynamically */
-    flex: 0 0 calc(100% / var(--cards-per-view) - var(--gap-reduction));
-    min-width: 280px; /* Minimum width for each card, prevents too small */
-    max-width: 400px; /* Max width to prevent cards from getting too large on very wide screens */
+    /* On mobile, you likely want --cards-per-view to be 1 */
+    /* On desktop, it could be 2 or more */
+    flex: 0 0 calc(100% / var(--cards-per-view, 1) - var(--gap-reduction, 0px));
+    min-width: 280px; /* Minimum width for each card */
+    max-width: 400px; /* Max width to prevent cards from getting too large */
     background-color: rgba(255, 255, 255, 0.05); /* Lighter transparent white for cards */
     border-radius: 12px;
     padding: 20px;
@@ -179,7 +155,8 @@ body {
     border: 1px solid rgba(200, 100, 255, 0.3); /* Purple border */
     box-shadow: 0 0 15px rgba(160, 82, 201, 0.2), 0 0 25px rgba(255, 255, 255, 0.05); /* Subtle glow */
     transition: transform 0.3s ease, box-shadow 0.3s ease;
-    box-sizing: border-box; /* Include padding and border in the width calculation */
+    scroll-snap-align: start; /* Snap each card to the start of the container */
+    box-sizing: border-box; /* Include padding and border in the width */
 }
 
 .account-card:hover {
@@ -215,7 +192,7 @@ body {
 .balance-amount {
     font-size: 20px;
     font-weight: 700;
-    color: var(--green-balance); /* Green for positive balance */
+    color: #90ee90; /* Green for positive balance */
     margin-bottom: 5px;
     text-shadow: 0 0 8px rgba(144, 238, 144, 0.5); /* Green glow */
 }
@@ -253,7 +230,7 @@ body {
 }
 
 .account-pagination .dot.active {
-    background-color: var(--light-purple); /* Glowing purple for active dot */
+    background-color: #e6b3ff; /* Glowing purple for active dot */
     transform: scale(1.2);
     box-shadow: 0 0 8px rgba(230, 179, 255, 0.8);
 }
@@ -299,7 +276,7 @@ body {
 
 .action-button i {
     font-size: 36px;
-    color: var(--light-purple); /* Lighter purple icon */
+    color: #e6b3ff; /* Lighter purple icon */
     margin-bottom: 10px;
     text-shadow: 0 0 10px rgba(230, 179, 255, 0.7); /* Glowing icon */
 }
@@ -317,7 +294,7 @@ body {
 }
 
 .view-cards-button {
-    background: linear-gradient(45deg, var(--primary-purple), #6a0dad); /* Purple gradient button */
+    background: linear-gradient(45deg, #a052c9, #6a0dad); /* Purple gradient button */
     color: #ffffff;
     border: none;
     padding: 12px 25px;
@@ -355,32 +332,30 @@ body {
     margin-bottom: 40px; /* Space at the bottom */
 }
 
-.transactions-header {
-    display: flex; /* Use flex to align items for header */
-    justify-content: space-between; /* Space out title and more options */
-    align-items: center; /* Vertically align */
-    margin-bottom: 20px; /* Adjusted spacing */
-}
+ .transactions-header {
+        flex-direction: column; /* CHANGED: Stack the heading and the "more options" button */
+        align-items: flex-start; /* CHANGED: Align them to the left */
+        margin-bottom: 10px; /* ADJUSTED */
+    }
 
 .transactions-header h2 {
-    margin: 0; /* Remove default h2 margin */
-    font-size: 20px; /* Consistent with other h2 */
-    white-space: nowrap; /* Prevent wrapping */
-    overflow: hidden; /* Hide overflow */
-    text-overflow: ellipsis; /* Add ellipsis */
-}
+        width: 100%; /* Ensure it takes full available width */
+        margin-bottom: 10px; /* Add space below heading if stacked */
+        white-space: normal; /* CHANGED: Allow text wrapping */
+        text-align: left; /* CHANGED: Align text to left */
+    }
 
 .more-options {
     font-size: 24px;
     font-weight: bold;
-    color: var(--primary-purple);
+    color: #c9a0dc;
     cursor: pointer;
     line-height: 1; /* Adjust to center vertically */
     transition: color 0.3s ease;
 }
 
 .more-options:hover {
-    color: var(--light-purple);
+    color: #e6b3ff;
 }
 
 .transaction-list {
@@ -411,11 +386,10 @@ body {
 .transaction-details {
     flex: 1;
     text-align: left;
-    margin-right: 10px; /* Space between details and amount */
 }
 
 .transaction-description {
-    display: block;
+     display: block;
     font-weight: 600;
     color: #ffffff;
     font-size: 15px;
@@ -442,12 +416,12 @@ body {
 }
 
 .transaction-amount.credit {
-    color: var(--green-balance); /* Green for credit */
+    color: #90ee90; /* Green for credit */
     text-shadow: 0 0 8px rgba(144, 238, 144, 0.5);
 }
 
 .transaction-amount.debit {
-    color: var(--red-debit); /* Tomato red for debit */
+    color: #ff6347; /* Tomato red for debit */
     text-shadow: 0 0 8px rgba(255, 99, 71, 0.5);
 }
 
@@ -463,8 +437,8 @@ body {
     margin: 20px auto 0;
     padding: 10px 25px;
     background-color: rgba(160, 82, 201, 0.3); /* Transparent purple */
-    color: var(--light-purple);
-    border: 1px solid var(--primary-purple);
+    color: #e6b3ff;
+    border: 1px solid #a052c9;
     border-radius: 8px;
     cursor: pointer;
     font-size: 15px;
@@ -521,7 +495,7 @@ body {
 }
 
 .transfer-modal-content h3 {
-    color: var(--light-purple); /* Light purple for heading */
+    color: #e6b3ff; /* Light purple for heading */
     margin-top: 0;
     font-size: 28px;
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
@@ -557,7 +531,7 @@ body {
 
 .transfer-option i {
     font-size: 30px;
-    color: var(--light-purple); /* Light purple icon */
+    color: #e6b3ff; /* Light purple icon */
     margin-bottom: 10px;
     text-shadow: 0 0 8px rgba(230, 179, 255, 0.7);
 }
@@ -570,9 +544,8 @@ body {
     line-height: 1.4;
 }
 
-/* This is the close button for the transfer modal */
-.close-transfer-modal { /* Changed from .close-modal-button to be specific */
-    background: linear-gradient(45deg, #6a0dad, var(--primary-purple)); /* Purple gradient button */
+.close-modal-button {
+    background: linear-gradient(45deg, #6a0dad, #a052c9); /* Purple gradient button */
     color: #ffffff;
     border: none;
     padding: 12px 25px;
@@ -585,104 +558,11 @@ body {
     box-shadow: 0 5px 20px rgba(160, 82, 201, 0.4);
 }
 
-.close-transfer-modal:hover { /* Changed from .close-modal-button to be specific */
+.close-modal-button:hover {
     background: linear-gradient(45deg, #8a2be2, #b862e3); /* Lighter gradient on hover */
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(160, 82, 201, 0.6);
 }
-
-/* --- DYNAMIC MESSAGE MODAL STYLING (New/Unified Modal) --- */
-#dynamicMessageModal { /* The overlay */
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.8); /* Slightly darker overlay */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1050; /* Higher than transfer modal */
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-}
-
-#dynamicMessageModal.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.dynamic-modal-content { /* The actual modal box */
-    background: linear-gradient(135deg, #4d0066, #2d003a); /* Slightly different dark purple gradient */
-    border-radius: 15px;
-    padding: 35px;
-    width: 90%;
-    max-width: 450px;
-    text-align: center;
-    box-shadow: 0 0 35px rgba(160, 82, 201, 0.9), 0 0 70px rgba(255, 255, 255, 0.25); /* Stronger, more central glow */
-    position: relative;
-    transform: translateY(-60px);
-    opacity: 0;
-    transition: transform 0.4s ease-out, opacity 0.4s ease-out;
-    border: 1px solid rgba(200, 100, 255, 0.6);
-}
-
-#dynamicMessageModal.active .dynamic-modal-content {
-    transform: translateY(0);
-    opacity: 1;
-}
-
-.dynamic-modal-content h3 { /* Modal Title */
-    color: var(--light-purple);
-    font-size: 26px;
-    margin-bottom: 20px;
-    text-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
-}
-
-.dynamic-modal-content p { /* Modal Message Content */
-    color: #e0e0e0;
-    font-size: 16px;
-    line-height: 1.6;
-    margin-bottom: 30px;
-}
-
-.dynamic-modal-content .close-button { /* 'X' button inside modal */
-    background: none;
-    border: none;
-    color: #e0e0e0;
-    font-size: 28px;
-    position: absolute;
-    top: 15px;
-    right: 20px;
-    cursor: pointer;
-    transition: color 0.3s ease;
-    line-height: 1; /* Better alignment */
-}
-
-.dynamic-modal-content .close-button:hover {
-    color: #ffffff;
-}
-
-.close-modal-button-main { /* 'Okay' button in dynamic modal */
-    background: linear-gradient(45deg, #6a0dad, var(--primary-purple));
-    color: #ffffff;
-    border: none;
-    padding: 12px 30px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 18px;
-    font-weight: bold;
-    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-    box-shadow: 0 5px 20px rgba(160, 82, 201, 0.4);
-}
-
-.close-modal-button-main:hover {
-    background: linear-gradient(45deg, #8a2be2, #b862e3);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(160, 82, 201, 0.6);
-}
-
 
 /* Sidebar Styling (from previous context, ensure consistency) */
 .sidebar-overlay {
@@ -727,7 +607,7 @@ body {
 .close-sidebar-button {
     background: none;
     border: none;
-    color: var(--light-purple); /* Light purple */
+    color: #e6b3ff; /* Light purple */
     font-size: 24px;
     position: absolute;
     top: 15px;
@@ -753,7 +633,7 @@ body {
     border-radius: 50%;
     object-fit: cover;
     margin-bottom: 10px;
-    border: 3px solid var(--primary-purple); /* Purple border */
+    border: 3px solid #a052c9; /* Purple border */
 }
 
 .sidebar-header h3 {
@@ -791,7 +671,7 @@ body {
 .sidebar-nav ul li a i {
     margin-right: 15px;
     font-size: 18px;
-    color: var(--primary-purple); /* Purple icon */
+    color: #c9a0dc; /* Purple icon */
 }
 
 .sidebar-nav ul li a:hover {
@@ -801,7 +681,7 @@ body {
 }
 
 .sidebar-nav ul li a.active {
-    background-color: var(--primary-purple); /* Stronger purple for active */
+    background-color: #a052c9; /* Stronger purple for active */
     color: #ffffff;
     box-shadow: 0 0 15px rgba(160, 82, 201, 0.6);
     font-weight: bold;
@@ -812,7 +692,7 @@ body {
 }
 
 .logout-button {
-    background: linear-gradient(45deg, #8a2be2, var(--primary-purple)); /* Purple gradient for logout */
+    background: linear-gradient(45deg, #8a2be2, #a052c9); /* Purple gradient for logout */
     color: #ffffff;
     border: none;
     padding: 12px 20px;
@@ -834,16 +714,10 @@ body {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(160, 82, 201, 0.6);
 }
-
 /* --- Responsive Design --- */
 
-/* For Tablets and larger phones (max-width: 768px) */
+/* For Tablets and larger phones (up to 768px, including your original 768px break) */
 @media (max-width: 768px) {
-    :root {
-        --cards-per-view: 1; /* Show 1 card per view on smaller screens */
-        --gap-reduction: 0px; /* No gap reduction needed as only 1 card visible */
-    }
-
     .header {
         padding: 10px 15px;
     }
@@ -861,26 +735,40 @@ body {
         height: 40px;
     }
 
+    /* Important: Section padding should be applied to .dashboard-content-area or directly to the sections */
+    /* if they are inside dashboard-content-area */
     .dashboard-content-area {
         padding: 0 15px; /* Adjust main content area padding for smaller screens */
     }
 
-    .section {
-        padding: 20px; /* Uniform padding for sections on smaller screens */
-        margin: 15px 0; /* Slightly reduce vertical margin */
+    section {
+        padding: 20px 0; /* Maintain vertical padding, horizontal is from dashboard-content-area */
+        margin: 0; /* Remove horizontal margin if padding on content-area is used */
     }
 
-    .section h2 {
+    section h2 {
         font-size: 20px;
     }
 
-    /* Account cards will now correctly occupy 100% width thanks to --cards-per-view: 1 */
+    /* Carousel adjustments for smaller screens (768px and below) */
+    /* Inherits from :root --cards-per-view: 1; and --gap: 20px; */
+    /* The flex: 0 0 calc(...) on .account-card handles the width based on these variables */
     .account-cards-container {
-        /* On mobile, justify-content: flex-start is usually better for touch swiping */
-        justify-content: flex-start;
+        justify-content: flex-start; /* Align items to the start for smoother swiping */
+        /* No overflow-x: scroll here, handled by JS translation */
+        /* No scrollbar hiding here, as no overflow to hide */
     }
 
+    /* The .account-card flex width calculation will automatically be:
+       calc(100% / 1 - (20px * (1 - 1)) / 1) = calc(100% - 0px) = 100%
+       This makes each card exactly 100% width of its parent (.account-cards-wrapper's visible area),
+       which is inside the .dashboard-content-area's padding.
+       This is precisely what you want for a single-card-at-a-time display.
+    */
+
+    /* Your other styles for actions, modals, sidebar etc. go here */
     .actions-section {
+        display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 15px;
     }
@@ -895,8 +783,6 @@ body {
     .action-button p {
         font-size: 13px;
     }
-
-    /* Transfer Modal adjustments */
     .transfer-modal-content {
         padding: 30px;
     }
@@ -912,34 +798,17 @@ body {
     .transfer-option p {
         font-size: 13px;
     }
-    .close-transfer-modal {
+    .close-modal-button {
         padding: 10px 20px;
         font-size: 15px;
     }
-
-    /* Dynamic Message Modal adjustments */
-    .dynamic-modal-content {
-        padding: 30px;
-        max-width: 90%; /* Ensure it fits smaller screens */
-    }
-    .dynamic-modal-content h3 {
-        font-size: 22px;
-    }
-    .dynamic-modal-content p {
-        font-size: 15px;
-    }
-    .close-modal-button-main {
-        padding: 10px 25px;
-        font-size: 16px;
-    }
-
     .sidebar {
         width: 230px;
         left: -250px;
     }
 }
 
-/* For very small screens (max-width: 480px) */
+/* For very small screens (up to 480px) */
 @media (max-width: 480px) {
     .header {
         flex-wrap: wrap;
@@ -950,148 +819,87 @@ body {
 
     .greeting {
         width: 100%;
-        order: 1; /* Pushes greeting to next line below menu/profile */
+        order: 1;
         margin-top: 10px;
         text-align: center;
     }
-    .greeting h1 {
-        font-size: 18px;
-    }
 
-    /* Adjust order to keep menu and profile on the first line */
     .menu-icon {
-        order: 0;
+        order: 1;
         flex: 0 0 auto;
     }
-    .profile-pic {
-        order: 0;
-        flex: 0 0 auto;
-    }
-
 
     .dashboard-content-area {
         padding: 0 10px; /* Even less padding on very small screens */
     }
 
-    .section {
-        padding: 15px; /* Adjusted vertical padding */
-        margin: 10px 0;
+    section {
+        padding: 12px 0; /* Adjusted vertical padding */
+        margin: 0; /* No horizontal margin if padding on content-area is used */
     }
 
-    .section h2 {
-        font-size: 18px;
+    section h2 {
+        font-size: 16px;
     }
 
-    /* Transactions */
-    .transactions-header {
-        flex-direction: column; /* Stack heading and "more options" */
-        align-items: flex-start; /* Align them to the left */
-        margin-bottom: 10px;
-    }
-    .transactions-header h2 {
-        width: 100%; /* Ensure it takes full available width */
-        margin-bottom: 5px;
-        white-space: normal; /* Allow text wrapping */
-        text-align: left;
-    }
+    /* Carousel (account-cards-container and account-card) will inherit from 768px styles,
+       which correctly set --cards-per-view to 1, ensuring single card view. */
 
-    .more-options {
-        font-size: 20px;
-        align-self: flex-end; /* Push to right if needed, or remove if always left */
-    }
-
+    /* Other styles from your snippet */
     .transaction-item {
         flex-direction: column;
         align-items: flex-start;
         padding: 10px 15px;
     }
 
-    .transaction-description {
-        white-space: normal; /* Allow transaction description to wrap */
-        overflow: visible; /* Don't hide overflow */
-        text-overflow: clip; /* No ellipsis needed if wrapping */
-        font-size: 14px;
-    }
-
-    .transaction-account {
-        font-size: 11px;
-    }
-
     .transaction-amount-date {
         margin-top: 5px;
         text-align: left;
-        width: 100%; /* Take full width for amount/date block */
-    }
-    .transaction-amount {
-        font-size: 15px;
-    }
-    .transaction-date {
-        font-size: 11px;
+        width: 100%;
     }
 
-    /* Transfer Modal */
     .transfer-modal-content {
         padding: 20px;
     }
+
     .transfer-modal-content h3 {
         font-size: 20px;
     }
+
     .transfer-options-list {
-        grid-template-columns: 1fr; /* Stack options vertically */
-    }
-    .transfer-option p {
-        font-size: 12px;
+        grid-template-columns: 1fr;
     }
 
-    /* Dynamic Message Modal */
-    .dynamic-modal-content {
-        padding: 20px;
-    }
-    .dynamic-modal-content h3 {
-        font-size: 20px;
-    }
-    .dynamic-modal-content p {
-        font-size: 14px;
-    }
-    .close-modal-button-main {
-        padding: 8px 20px;
-        font-size: 14px;
+    .transfer-option p {
+        font-size: 12px;
     }
 }
 
 /* For Desktop (min-width: 769px) - Override mobile values as needed */
 @media (min-width: 769px) {
-    :root {
-        --cards-per-view: 2; /* Show 2 cards at a time on larger desktop screens */
+    /* If you want more than 1 card visible on desktop */
+    :root { /* Or a more specific container if you only want to affect this section */
+        --cards-per-view: 2; /* Show 2 cards at a time */
         --gap: 20px;
-        --gap-reduction: calc(var(--gap) * (var(--cards-per-view) - 1) / var(--cards-per-view));
     }
 
+    /* More padding from the edges on desktop for the overall content area */
     .dashboard-content-area {
-        padding: 0 40px; /* Example: 40px padding on each side for desktop */
+        padding: 0 40px; /* Example: 40px padding on each side */
     }
 
-    /* Ensure flex items are justified as needed for wider screens */
+    /* The account-cards-wrapper should ideally be centered on desktop */
+    /* This might be handled by .dashboard-content-area or specifically: */
+    /*
+    .account-cards-wrapper {
+        max-width: var(--dashboard-max-width, 1200px); // Or explicitly set a max-width
+        margin: 0 auto; // Center it if it has a max-width
+    }
+    */
+    /* If .account-cards-wrapper is full width of .dashboard-content-area, and cards-per-view > 1
+       then justify-content: center on account-cards-container could be useful */
     .account-cards-container {
-        /* You might want to center or space-between depending on exact layout desire
-           when multiple cards are visible */
-        justify-content: flex-start; /* Keeps them aligned to the left */
-    }
-
-    /* Transactions header for desktop - reverts to horizontal */
-    .transactions-header {
-        flex-direction: row;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-    .transactions-header h2 {
-        width: auto;
-        margin-bottom: 0;
-        white-space: nowrap;
-        text-align: left;
-    }
-    .more-options {
-        align-self: auto;
+        justify-content: center; /* Center the cards within the wrapper on desktop if they don't fill it */
     }
 }
 
@@ -1100,9 +908,5 @@ body {
     :root {
         --cards-per-view: 2.5; /* Show 2.5 cards on very large screens */
         --gap: 20px;
-        --gap-reduction: calc(var(--gap) * (var(--cards-per-view) - 1) / var(--cards-per-view));
-    }
-    .dashboard-content-area {
-        padding: 0 60px; /* Even more padding for very large screens */
     }
 }
