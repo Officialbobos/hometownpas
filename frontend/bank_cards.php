@@ -7,11 +7,14 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 // Ensure session is started and Config/functions are available.
+// In a production setup with index.php as a router, these might be handled globally.
+// We'll keep them here for standalone testing flexibility, but comment out if index.php handles them.
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-require_once __DIR__ . '/../Config.php'; // Ensure Config.php is loaded for BASE_URL and MongoDB constants
-require_once __DIR__ . '/../functions.php'; // For getMongoDBClient()
+// These might be handled by your main index.php router already
+//require_once __DIR__ . '/../Config.php'; // Uncomment if not handled by index.php
+//require_once __DIR__ . '/../functions.php'; // Uncomment if not handled by index.php
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
@@ -19,7 +22,7 @@ use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // Check if the user is logged in. If not, redirect to login page.
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true || !isset($_SESSION['user_id'])) {
-    header('Location: ' . BASE_URL . '/login.php'); // Changed to login.php for consistency
+    header('Location: ' . BASE_URL . '/index.php'); // Or wherever your login page is
     exit;
 }
 
@@ -30,23 +33,36 @@ $user_email = $_SESSION['user_email'] ?? '';
 $message = '';
 $message_type = '';
 
-// Assuming getMongoDBClient() is defined in functions.php and returns a MongoDB\Client instance
-try {
-    $client = getMongoDBClient();
-    $db = $client->selectDatabase(MONGODB_DB_NAME); // Use constant from Config.php
-    $usersCollection = $db->selectCollection('users');
-    $accountsCollection = $db->selectCollection('accounts');
-    $bankCardsCollection = $db->selectCollection('bank_cards');
-} catch (Exception $e) {
-    error_log("CRITICAL ERROR: MongoDB connection not available in bank_cards.php: " . $e->getMessage());
+// --- NEW: Check for session messages set by other pages (e.g., after an API call) ---
+if (isset($_SESSION['message'])) {
+    $message = $_SESSION['message'];
+    $message_type = $_SESSION['message_type'] ?? 'info'; // Default to info if type not set
+    // Clear the session messages after displaying them
+    unset($_SESSION['message']);
+    unset($_SESSION['message_type']);
+}
+// --- END NEW ---
+
+// Assuming $mongoDb object is available from index.php's scope
+// If not, uncomment and initialize here:
+// $mongoDb = getMongoDBClient(); // Assuming getMongoDBClient() is in functions.php
+global $mongoDb; // Access the global variable set in index.php
+
+if (!$mongoDb) {
+    error_log("CRITICAL ERROR: MongoDB connection not available in bank_cards.php. Check index.php or getMongoDBClient().");
     die("<h1>Database connection error. Please try again later.</h1>");
 }
+
+$usersCollection = $mongoDb->selectCollection('users');
+$accountsCollection = $mongoDb->selectCollection('accounts');
+$bankCardsCollection = $mongoDb->selectCollection('bank_cards');
 
 try {
     // Convert user_id from session string to MongoDB ObjectId
     $userObjectId = new ObjectId($user_id);
 
     // Fetch user's full name and email from the database if not already in session
+    // This provides a fallback if session data is somehow lost or incomplete.
     if (empty($user_full_name) || empty($user_email)) {
         $user_doc = $usersCollection->findOne(['_id' => $userObjectId]);
         if ($user_doc) {
@@ -70,32 +86,13 @@ try {
     $message = "An unexpected error occurred during page setup. Please try again later.";
     $message_type = 'error';
     // If user_id is invalid, it's safer to redirect to login
-    header('Location: ' . BASE_URL . '/login.php?error=invalid_user_session'); // Redirect with an error indicator
+    header('Location: ' . BASE_URL . '/index.php?error=invalid_user_session'); // Redirect with an error indicator
     exit;
 }
 
 // Ensure full name and email are set for display, even if database lookup failed
 $user_full_name = $user_full_name ?: 'Bank Customer';
 $user_email = $user_email ?: 'default@example.com';
-
-// --- NEW LOGIC FOR ADMIN MODAL MESSAGE ---
-$showCustomModal = false;
-$modalMessageContent = '';
-
-if (!empty($user_id)) {
-    try {
-        $currentUser = $usersCollection->findOne(['_id' => new ObjectId($user_id)]);
-        if ($currentUser) {
-            $showCustomModal = $currentUser['show_bank_cards_modal'] ?? false; // Assuming a field 'show_bank_cards_modal'
-            $modalMessageContent = $currentUser['bank_cards_modal_message'] ?? ''; // Assuming a field 'bank_cards_modal_message'
-        }
-    } catch (Exception $e) {
-        error_log("Error fetching user modal message in bank_cards.php: " . $e->getMessage());
-        $showCustomModal = false;
-        $modalMessageContent = '';
-    }
-}
-// --- END NEW LOGIC ---
 
 // --- Non-AJAX request, render the HTML page ---
 // We need to fetch the accounts for the dropdown in the form
@@ -132,85 +129,9 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hometown Bank PA - Manage Cards</title>
-    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
+        <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        /* --- NEW CSS FOR CUSTOM TRANSFER MODAL (copied from transfer.php) --- */
-        .custom-modal-overlay {
-            display: none; /* Hidden by default */
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0, 0, 0, 0.6);
-            display: flex; /* Use flexbox for centering */
-            align-items: center; /* Center vertically */
-            justify-content: center; /* Center horizontally */
-        }
-
-        .custom-modal-content {
-            background-color: #ffffff;
-            padding: 30px;
-            border: 1px solid #888;
-            width: 90%;
-            max-width: 500px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            font-family: 'Poppins', sans-serif; /* Keep Poppins or adjust to Space Mono if preferred for modals */
-            position: relative;
-        }
-
-        .custom-modal-header {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-
-        .caution-icon {
-            font-size: 2em;
-            color: #ff9800; /* A strong caution color */
-            margin-right: 15px;
-        }
-
-        .custom-modal-header h2 {
-            color: #4B0082; /* Deep purple */
-            margin: 0;
-            font-weight: 700;
-        }
-
-        .custom-modal-body p {
-            font-size: 1.1em;
-            line-height: 1.6;
-            color: #333;
-        }
-
-        .custom-modal-footer {
-            margin-top: 25px;
-        }
-
-        .custom-modal-footer .btn-purple {
-            background-color: #4B0082; /* Deep purple */
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 5px;
-            font-size: 1em;
-            cursor: pointer;
-            text-decoration: none;
-            transition: background-color 0.3s ease;
-        }
-
-        .custom-modal-footer .btn-purple:hover {
-            background-color: #6A0DAD; /* Lighter purple on hover */
-        }
-        /* --- END NEW CSS --- */
-    </style>
 </head>
 <body>
     <header class="header">
@@ -224,8 +145,13 @@ try {
         </div>
     </header>
 
-    <main class="main-content" id="mainContent">
-        <?php if (!empty($message)): ?>
+    <main class="main-content">
+        <?php
+        // This PHP block is for displaying messages directly on the page,
+        // it's distinct from the modal message box.
+        if (!empty($message) && !isset($_SESSION['message_displayed'])): // Only display once
+            $_SESSION['message_displayed'] = true; // Set a flag to prevent re-display on refresh
+        ?>
             <p class="message <?php echo $message_type; ?>"><?php echo htmlspecialchars($message); ?></p>
         <?php endif; ?>
 
@@ -321,54 +247,20 @@ try {
             <button id="messageBoxButton">OK</button>
         </div>
     </div>
-
-    <div id="bankCardsCustomModal" class="custom-modal-overlay">
-        <div class="custom-modal-content">
-            <div class="custom-modal-header">
-                <span class="caution-icon">&#9888;</span> <h2>Important Notification</h2>
-            </div>
-            <div class="custom-modal-body">
-                <p><?php echo htmlspecialchars($modalMessageContent); ?></p>
-            </div>
-            <div class="custom-modal-footer">
-                <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="btn-purple">Understood</a>
-            </div>
-        </div>
-    </div>
     <script>
         // These variables must be defined before cards.js is loaded
-        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/'); ?>;
+        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/'); ?>; // *** ADDED '/' to ensure API calls are correct ***
+        // Assuming 'frontend' is directly under your BASE_URL for frontend assets
         const FRONTEND_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/frontend'); ?>;
         const currentUserId = <?php echo json_encode($user_id); ?>;
         const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
         const currentUserEmail = <?php echo json_encode($user_email); ?>;
 
-        // --- NEW DATA FOR CUSTOM MODAL ---
-        const showBankCardsCustomModal = <?php echo $showCustomModal ? 'true' : 'false'; ?>;
-        // --- END NEW DATA ---
+        // --- NEW: Pass PHP messages to JavaScript ---
+        const initialMessage = <?php echo json_encode($message); ?>;
+        const initialMessageType = <?php echo json_encode($message_type); ?>;
+        // --- END NEW ---
     </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var customModal = document.getElementById('bankCardsCustomModal');
-            var mainContent = document.getElementById('mainContent'); // Target the main content to hide it
-
-            // Check if the custom modal should be displayed
-            if (showBankCardsCustomModal) {
-                // Display the custom modal
-                customModal.style.display = 'flex'; // Use flex for centering
-
-                // Hide the main content so the user can't interact with it
-                if (mainContent) {
-                    mainContent.style.display = 'none';
-                }
-            } else {
-                // If the custom modal is not needed, make sure the main content is visible
-                if (mainContent) {
-                    mainContent.style.display = 'block'; // Or 'flex' depending on your layout
-                }
-            }
-        });
-    </script>
-    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
+        <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
 </body>
 </html>
