@@ -1,20 +1,21 @@
 <?php
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// The session, autoloader, and core files are already loaded by index.php
+// ini_set('display_errors', 1); // REMOVE THIS FOR PRODUCTION
+// ini_set('display_startup_errors', 1); // REMOVE THIS FOR PRODUCTION
+// error_reporting(E_ALL); // KEEP THIS FOR LOGGING, BUT NOT DISPLAYING ERRORS
 
+// session_start(); // REMOVED: Assumed to be handled by index.php
 
-require_once __DIR__ . '/../Config.php'; // <-- THIS IS CORRECT
-require_once __DIR__.'/../vendor/autoload.php'; // Make sure Composer's autoloader is included for MongoDB classes
-require_once __DIR__.'/../functions.php'; // Include functions.php if it contains utility functions like getCollection
+require_once __DIR__ . '/../Config.php'; // Correct path
+require_once __DIR__.'/../vendor/autoload.php'; // Correct path
+require_once __DIR__.'/../functions.php'; // Correct path
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException; // Specific MongoDB exception
 
 // Check if the user is logged in. If not, redirect to login page.
-// Using BASE_URL for redirection for robustness.
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
     header('Location: ' . rtrim(BASE_URL, '/') . '/login.php'); // Redirect to login page
     exit;
@@ -66,8 +67,6 @@ try {
     $user_data = []; // Ensure user_data is empty on error
 } finally {
     // It's good practice to close the MongoDB client connection if it was opened
-    // In PHP, MongoDB connections are persistent by default, but explicitly nulling
-    // the client can help with resource management if you're not using a global client.
     $mongoClient = null;
 }
 
@@ -92,15 +91,7 @@ $display_occupation = $user_data['occupation'] ?? 'N/A';
 $display_membership_number = $user_data['membership_number'] ?? 'N/A';
 
 // --- PROFILE IMAGE PATH LOGIC ---
-// Define the path to the default profile image relative to the project root.
-// Assuming 'images' folder is also at the project root, similar to 'uploads'.
 $default_profile_image_path = 'images/default_profile.png';
-
-// Determine the image to display: user's custom image or the default.
-// The path stored in the database is 'uploads/profile_images/filename.ext'.
-// Since profile.php is in 'frontend/', and 'uploads/' is in root, we go up one level (..)
-// before concatenating the stored path.
-// Using BASE_URL for robustness as well.
 $profile_image_src = !empty($user_data['profile_image']) ?
                      rtrim(BASE_URL, '/') . '/' . htmlspecialchars($user_data['profile_image']) :
                      rtrim(BASE_URL, '/') . '/' . $default_profile_image_path;
@@ -322,52 +313,40 @@ $profile_image_src = !empty($user_data['profile_image']) ?
         </div>
     </header>
 
-    <div class="dashboard-container">
-        <nav class="sidebar">
-            <ul>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/dashboard.php'; ?>"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/accounts.php'; ?>"><i class="fas fa-wallet"></i> <span>Accounts</span></a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/transfer.php'; ?>"><i class="fas fa-exchange-alt"></i> <span>Transfers</span></a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/transactions.php'; ?>"><i class="fas fa-history"></i> <span>Transaction History</span></a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/statements.php'; ?>"><i class="fas fa-file-invoice"></i> <span>Statements</span></a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/profile.php'; ?>" class="active"><i class="fas fa-user"></i> <span>Profile</span></a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/bank_cards.php'; ?>"><i class="fas fa-credit-card"></i> <span>Bank Cards</span></a></li>
-                <li><a href="#"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/logout.php'; ?>"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
-            </ul>
-        </nav>
+    <div class="main-content-area">
+        <section class="profile-card">
+            <h2>User Profile</h2>
+            <?php if (!empty($errorMessage)): ?>
+                <div style="padding: 15px; margin-bottom: 20px; border-radius: 4px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;">
+                    <?php echo htmlspecialchars($errorMessage); ?>
+                </div>
+            <?php endif; ?>
 
-        <main class="profile-container">
-            <section class="profile-card">
-                <h2>User Profile</h2>
-                <?php if (!empty($errorMessage)): ?>
-                    <div style="padding: 15px; margin-bottom: 20px; border-radius: 4px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;">
-                        <?php echo htmlspecialchars($errorMessage); ?>
-                    </div>
-                <?php endif; ?>
+            <?php if (!empty($user_data)): ?>
+                <div class="profile-image-container">
+                    <img src="<?php echo $profile_image_src; ?>" alt="Profile Image">
+                </div>
+                <div class="profile-details">
+                    <p><strong>Username:</strong> <?php echo $display_username; ?></p>
+                    <p><strong>First Name:</strong> <?php echo $display_first_name; ?></p>
+                    <p><strong>Last Name:</strong> <?php echo $display_last_name; ?></p>
+                    <p><strong>Email:</strong> <?php echo $display_email; ?></p>
+                    <p><strong>Phone:</strong> <?php echo $display_phone; ?></p>
+                    <p><strong>Address:</strong> <?php echo $display_address; ?></p>
+                    <p><strong>Nationality:</strong> <?php echo $display_nationality; ?></p>
+                    <p><strong>Date of Birth:</strong> <?php echo $display_dob; ?></p>
+                    <p><strong>Gender:</strong> <?php echo $display_gender; ?></p>
+                    <p><strong>Occupation:</strong> <?php echo $display_occupation; ?></p>
+                    <p><strong>Membership No.:</strong> <?php echo $display_membership_number; ?></p>
+                </div>
+            <?php else: ?>
+                <p>User data not found or could not be loaded.</p>
+            <?php endif; ?>
+        </section>
 
-                <?php if (!empty($user_data)): ?>
-                    <div class="profile-image-container">
-                        <img src="<?php echo $profile_image_src; ?>" alt="Profile Image">
-                    </div>
-                    <div class="profile-details">
-                        <p><strong>Username:</strong> <?php echo $display_username; ?></p>
-                        <p><strong>First Name:</strong> <?php echo $display_first_name; ?></p>
-                        <p><strong>Last Name:</strong> <?php echo $display_last_name; ?></p>
-                        <p><strong>Email:</strong> <?php echo $display_email; ?></p>
-                        <p><strong>Phone:</strong> <?php echo $display_phone; ?></p>
-                        <p><strong>Address:</strong> <?php echo $display_address; ?></p>
-                        <p><strong>Nationality:</strong> <?php echo $display_nationality; ?></p>
-                        <p><strong>Date of Birth:</strong> <?php echo $display_dob; ?></p>
-                        <p><strong>Gender:</strong> <?php echo $display_gender; ?></p>
-                        <p><strong>Occupation:</strong> <?php echo $display_occupation; ?></p>
-                        <p><strong>Membership No.:</strong> <?php echo $display_membership_number; ?></p>
-                    </div>
-                <?php else: ?>
-                    <p>User data not found or could not be loaded.</p>
-                <?php endif; ?>
-            </section>
-        </main>
+        <a href="<?php echo rtrim(BASE_URL, '/') . '/frontend/dashboard.php'; ?>" class="back-to-dashboard-btn">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
     </div>
 
     <footer class="dashboard-footer">
