@@ -10,7 +10,7 @@ if (session_status() == PHP_SESSION_NONE) {
 require_once __DIR__ . '/../Config.php';
 
 // Then load functions.php, which might depend on constants or autoloader from Config.php.
-require_once __DIR__ . '/../functions.php'; // Contains get_currency_symbol, generateUniqueReference, sanitize_input
+require_once __DIR__ . '/../functions.php'; // Contains get_currency_symbol, generateUniqueReferenceNumber, sanitize_input
 
 // Composer's autoloader is now available due to Config.php
 use MongoDB\Client;
@@ -139,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         'status' => 'pending', // All transfers initially pending approval
         'created_at' => new MongoDB\BSON\UTCDateTime(),
         'updated_at' => new MongoDB\BSON\UTCDateTime(),
-        'reference_number' => generateUniqueReference(),
+        'reference_number' => generateUniqueReferenceNumber(),
         'recipient_name' => $recipient_name,
         'type' => 'debit' // Mark as debit from source account
     ];
