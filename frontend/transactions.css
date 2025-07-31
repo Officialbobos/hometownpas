@@ -206,15 +206,22 @@
             background-color: #f1f1f1;
         }
 
-        /* Status Colors */
-        .status-completed { color: #28a745; font-weight: bold; } /* Green */
-        .status-pending { color: #ffc107; font-weight: bold; }  /* Orange */
-        .status-failed, .status-cancelled { color: #dc3545; font-weight: bold; } /* Red */
+       /* Amount Colors for Credit/Debit */
+    .amount-credit {
+    color: #28a745; /* Green - Matches Bootstrap's success color */
+    font-weight: bold; /* Make it stand out */
+    }
 
-        /* Amount Colors */
-        .text-success { color: #28a745; } /* Green for positive amounts */
-        .text-danger { color: #dc3545; } /* Red for negative amounts */
+    .amount-debit {
+    color: #dc3545; /* Red - Matches Bootstrap's danger color */
+    font-weight: bold; /* Make it stand out */
+    }
 
+    /* You already have these, ensure they are present for consistency */
+    .status-completed { color: #28a745; font-weight: bold; } /* Green */
+    .status-pending { color: #ffc107; font-weight: bold; }  /* Orange */
+    .status-failed, .status-cancelled { color: #dc3545; font-weight: bold; } /* Red */
+    
         /* Pagination */
         .pagination {
             display: flex;

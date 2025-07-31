@@ -1,59 +1,193 @@
 <?php
-// C:\xampp_lite_8_4\www\phpfile-main\frontend\dashboard.php
+// Path: C:\xampp\htdocs\hometownbank\frontend\dashboard.php
+session_start();
 
-// Ensure session is started and user is authenticated
-// Assumes a central router or a dedicated auth file handles session_start()
-// and setting $_SESSION['user_id'] and $_SESSION['logged_in']
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
-
+// Load Composer's autoloader FIRST.
+// This is crucial because Dotenv and other libraries are loaded through it.
 require_once __DIR__ . '/../vendor/autoload.php';
+
+// --- Start Dotenv loading (conditional for deployment) ---
+// This block attempts to load .env files only if they exist.
+// On Render, environment variables should be set directly in the dashboard,
+// so a physical .env file won't be present.
+$dotenvPath = dirname(__DIR__); // Go up one level from 'frontend' to the project root (hometownbank)
+
+// THIS IS THE CRUCIAL CONDITIONAL CHECK
+if (file_exists($dotenvPath . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
+    try {
+        $dotenv->load(); // This will only run if .env file exists
+        // error_log("DEBUG: .env file EXISTS locally. Loaded Dotenv."); // Optional: for debugging local environment
+    } catch (Dotenv\Exception\InvalidPathException $e) {
+        // This catch is mostly for local dev if .env is missing or unreadable.
+        error_log("Dotenv load error locally on path " . $dotenvPath . ": " . $e->getMessage());
+    }
+} else {
+    // This block will execute on Render, as .env should NOT exist there.
+    // Environment variables are expected to be set via Render's Config Vars.
+    // error_log("DEBUG: .env file DOES NOT exist. Skipping Dotenv load. (Expected on Render)"); // Optional: for debugging Render environment
+}
+// If .env doesn't exist (like on Render), the variables are assumed to be pre-loaded
+// into the environment by the hosting platform (e.g., Render's Config Vars).
+// --- End Dotenv loading ---
+
+// Now load your Config.php and functions.php files.
+// Config.php can now safely access $_ENV variables if they're defined in your .env file
+// or if they're loaded as environment variables by the hosting provider.
 require_once __DIR__ . '/../Config.php';
-require_once __DIR__ . '/../functions.php'; // For getCollection()
+require_once __DIR__ . '/../functions.php'; // For sanitize_input, and potentially other utilities
 
-use MongoDB\BSON\ObjectId;
-use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    header('Location: ' . rtrim(BASE_URL, '/') . '/login');
+// Check if the user is logged in. If not, redirect to login page.
+// Also ensure 2FA is verified if it was initiated.
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id']) || !isset($_SESSION['2fa_verified']) || $_SESSION['2fa_verified'] !== true) {
+    // Clear any lingering 2FA session variables on failed/incomplete login
+    unset($_SESSION['auth_step']);
+    unset($_SESSION['temp_user_id']);
+    // Redirect to the base URL (login page)
+    header('Location: ' . rtrim(BASE_URL, '/')); // Corrected
     exit;
 }
 
-$usersCollection = getCollection('users');
-$loggedInUserId = $_SESSION['user_id'];
-$userData = null;
-$transferModalMessage = '';
-$showTransferModal = false;
-$cardModalMessage = ''; // NEW: For View My Cards Modal
-$showCardModal = false; // NEW: For View My Cards Modal
-$message = '';
-$message_type = '';
+// After successful login and 2FA verification, ensure temporary 2FA session variables are cleared.
+if (isset($_SESSION['auth_step'])) {
+    unset($_SESSION['auth_step']);
+}
+if (isset($_SESSION['temp_user_id'])) {
+    unset($_SESSION['temp_user_id']);
+}
 
+// Check for the transaction alert session variable
+$transaction_alert = $_SESSION['transaction_alert'] ?? null;
+// IMPORTANT: Clear the session variable immediately after fetching it
+unset($_SESSION['transaction_alert']);
+
+
+$user_id = $_SESSION['user_id'];
+// Fetch first_name, last_name, email from session (set during login)
+$first_name = $_SESSION['first_name'] ?? '';
+$last_name = $_SESSION['last_name'] ?? '';
+$user_email = $_SESSION['email'] ?? '';
+
+// Generate full name for display
+$full_name = trim($first_name . ' ' . $last_name);
+if (empty($full_name)) {
+    $full_name = 'User'; // Fallback if no name parts are available
+}
+
+// MongoDB Connection
+$mongoClient = null;
 try {
-    $userData = $usersCollection->findOne(['_id' => new ObjectId($loggedInUserId)]);
+    // Connect to MongoDB
+    // *** CORRECTED: Use the constant names defined in Config.php ***
+    $mongoClient = new MongoDB\Client(MONGODB_CONNECTION_URI); // Use MONGODB_CONNECTION_URI
+    $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME); // Use MONGODB_DB_NAME
 
-    if ($userData) {
-        $transferModalMessage = $userData['transfer_modal_message'] ?? '';
-        $showTransferModal = $userData['show_transfer_modal'] ?? false;
-        $cardModalMessage = $userData['card_modal_message'] ?? ''; // NEW
-        $showCardModal = $userData['show_card_modal'] ?? false; // NEW
-    } else {
-        // User data not found, possibly log out or show error
-        $message = "User data not found.";
-        $message_type = "error";
-        // Recommendation: If user data not found, forcibly log out for security.
-        header('Location: ' . rtrim(BASE_URL, '/') . '/logout'); // Corrected for clean URL
-        exit;
+    $accountsCollection = $mongoDb->accounts;
+    $transactionsCollection = $mongoDb->transactions;
+    $usersCollection = $mongoDb->users; // Added for fetching user data for the modal
+
+} catch (MongoDB\Driver\Exception\Exception $e) {
+    // Handle MongoDB connection errors
+    error_log("ERROR: Could not connect to MongoDB. " . $e->getMessage()); // Log the error
+    // Display a user-friendly message without exposing raw error
+    die("A critical database error occurred. Please try again later.");
+}
+
+
+$user_accounts = []; // Array to store all accounts for the logged-in user
+$recent_transactions = []; // Array to store recent transactions
+
+// NEW: Variables to hold modal messages and their active status (from DB for persistent messages)
+$transferModalMessage = ''; // This is the persistent message set by admin for general transfers
+$showTransferModal = false; // This controls the persistent transfer modal
+$cardModalMessage = ''; // This is the persistent message set by admin for card activation
+$showCardModal = false; // This controls the persistent card activation modal
+
+// NEW: Variables for the outstanding payment modal (set in session after a transfer)
+$showOutstandingPaymentModal = $_SESSION['show_outstanding_payment_modal'] ?? false;
+$outstandingPaymentModalUserName = $_SESSION['outstanding_payment_modal_user_name'] ?? '';
+$outstandingPaymentModalMessage = $_SESSION['outstanding_payment_modal_message'] ?? '';
+
+// IMPORTANT: Clear the session variables for the outstanding payment modal immediately after fetching them
+unset($_SESSION['show_outstanding_payment_modal']);
+unset($_SESSION['outstanding_payment_modal_user_name']);
+unset($_SESSION['outstanding_payment_modal_message']);
+
+
+// 1. Fetch user's accounts from MongoDB
+if ($mongoClient) {
+    try {
+        // MongoDB stores _id as ObjectId by default. If your user_id is an integer or string, adjust the query.
+        // You mentioned the _id was '6881f2fa549401e932055a2d' in which is an ObjectId.
+        // So, use new MongoDB\BSON\ObjectId($user_id);
+        $filter = ['user_id' => new MongoDB\BSON\ObjectId($user_id)];
+
+        $accounts_cursor = $accountsCollection->find($filter);
+        foreach ($accounts_cursor as $account_data) {
+            // Convert MongoDB BSON Document to PHP array
+            $user_accounts[] = $account_data->getArrayCopy();
+        }
+    } catch (MongoDB\Driver\Exception\Exception $e) {
+        error_log("Error fetching accounts from MongoDB: " . $e->getMessage());
+        // You might want to display a user-friendly message or redirect
+        // echo "Error fetching accounts: " . $e->getMessage(); // For debugging
     }
-} catch (MongoDBDriverException $e) {
-    $message = "Database error: " . $e->getMessage();
-    $message_type = "error";
-    error_log("Frontend Dashboard User Data Load Error: " . $e->getMessage());
-} catch (Exception $e) {
-    $message = "An unexpected error occurred: " . $e->getMessage();
-    $message_type = "error";
-    error_log("Frontend Dashboard General Error: " . $e->getMessage());
+
+    // 2. Fetch recent transactions for the user from MongoDB
+    try {
+        // Query for transactions where user_id matches
+        // Also use ObjectId for user_id in transactions if consistent with users collection
+        $filter_transactions = ['user_id' => new MongoDB\BSON\ObjectId($user_id)];
+        // Sort by 'initiated_at' in descending order and limit to 10
+        $options_transactions = [
+            'sort' => ['initiated_at' => -1],
+            'limit' => 10,
+        ];
+
+        $transactions_cursor = $transactionsCollection->find($filter_transactions, $options_transactions);
+        foreach ($transactions_cursor as $transaction_data) {
+            // Convert MongoDB BSON Document to PHP array
+            $recent_transactions[] = $transaction_data->getArrayCopy();
+        }
+    } catch (MongoDB\Driver\Exception\Exception $e) {
+        error_log("Error fetching transactions from MongoDB: " . $e->getMessage());
+        // You might want to display a user-friendly message or redirect
+        // echo "Error fetching transactions: " . $e->getMessage(); // For debugging
+    }
+
+    // UPDATED: Fetch user's persistent modal messages from MongoDB
+    try {
+        $currentUser = $usersCollection->findOne(['_id' => new MongoDB\BSON\ObjectId($_SESSION['user_id'])]);
+        if ($currentUser) {
+            // Persistent transfer modal message
+            $transferModalMessage = $currentUser['transfer_modal_message'] ?? '';
+            $showTransferModal = $currentUser['show_transfer_modal'] ?? false;
+            // Persistent card modal message
+            $cardModalMessage = $currentUser['card_modal_message'] ?? '';
+            $showCardModal = $currentUser['show_card_modal'] ?? false;
+        }
+    } catch (MongoDB\Driver\Exception\Exception $e) {
+        error_log("Error fetching user persistent modal data from MongoDB: " . $e->getMessage());
+    }
+}
+
+// MongoDB connection does not need an explicit close like MySQLi;
+// the client connection is managed by the driver or garbage collection.
+// However, if you explicitly want to unset it:
+// unset($mongoClient);
+
+// Helper function to get currency symbol (moved here for local scope if not in functions.php)
+if (!function_exists('get_currency_symbol')) {
+    function get_currency_symbol($currency_code) {
+        switch (strtoupper($currency_code)) {
+            case 'GBP': return '£';
+            case 'USD': return '$';
+            case 'EUR': return '€';
+            case 'NGN': return '₦';
+            default: return '';
+        }
+    }
 }
 
 ?>
@@ -62,384 +196,356 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Dashboard - Heritage Bank</title>
-    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
-    <style>
-        /* General Styles */
-        body {
-            font-family: 'Roboto', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f7f6;
-            color: #333;
-        }
-
-        .dashboard-container {
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            background-color: #fff;
-            margin: 20px auto;
-            border-radius: 8px;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            max-width: 1200px;
-        }
-
-        .dashboard-header {
-            background-color: #007bff;
-            color: white;
-            padding: 20px 30px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid #0056b3;
-        }
-
-        .dashboard-header .logo {
-            max-height: 50px;
-            width: auto;
-            margin-right: 20px;
-        }
-
-        .dashboard-header h1 {
-            margin: 0;
-            font-size: 2em;
-            flex-grow: 1;
-        }
-
-        .user-info {
-            font-size: 1.1em;
-            font-weight: 300;
-        }
-
-        .logout-button {
-            background-color: #dc3545;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: background-color 0.3s ease;
-            margin-left: 20px;
-        }
-
-        .logout-button:hover {
-            background-color: #c82333;
-        }
-
-        .dashboard-content {
-            padding: 30px;
-            flex-grow: 1;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        .card {
-            background-color: #f8f9fa;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-            flex: 1 1 calc(33% - 20px); /* Adjust for responsiveness */
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            min-width: 280px; /* Minimum width for cards */
-        }
-
-        .card h3 {
-            color: #007bff;
-            margin-top: 0;
-            margin-bottom: 15px;
-            font-size: 1.4em;
-            border-bottom: 2px solid #e9ecef;
-            padding-bottom: 10px;
-            width: 100%;
-        }
-
-        .card p {
-            margin-bottom: 10px;
-            line-height: 1.6;
-        }
-
-        .card .balance {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: #28a745;
-            margin-bottom: 15px;
-        }
-
-        .card .btn {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: background-color 0.3s ease;
-            cursor: pointer;
-            margin-top: auto; /* Pushes button to the bottom */
-        }
-
-        .card .btn:hover {
-            background-color: #0056b3;
-        }
-
-        .message-box {
-            width: 100%;
-            padding: 12px 20px;
-            margin-bottom: 20px;
-            border-radius: 6px;
-            text-align: center;
-            font-size: 0.95em;
-        }
-        .message-box.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .message-box.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .message-box.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
-
-        /* Modal Styles */
-        .modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1000; /* Sit on top */
-            left: 0;
-            top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-content {
-            background-color: #fefefe;
-            margin: auto;
-            padding: 30px;
-            border: 1px solid #888;
-            border-radius: 10px;
-            width: 80%; /* Could be more specific, e.g., 500px */
-            max-width: 600px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            position: relative;
-            text-align: center;
-        }
-
-        .modal-content h2 {
-            color: #007bff;
-            margin-top: 0;
-            margin-bottom: 20px;
-            font-size: 1.8em;
-        }
-
-        .modal-content p {
-            font-size: 1.1em;
-            line-height: 1.6;
-            margin-bottom: 30px;
-        }
-
-        .close-button {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            position: absolute;
-            top: 10px;
-            right: 20px;
-        }
-
-        .close-button:hover,
-        .close-button:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .dashboard-content {
-                flex-direction: column;
-                align-items: center;
-            }
-            .card {
-                flex: 1 1 90%;
-            }
-            .dashboard-header {
-                flex-direction: column;
-                text-align: center;
-            }
-            .dashboard-header .logo {
-                margin-bottom: 10px;
-            }
-            .logout-button {
-                margin-top: 10px;
-                margin-left: 0;
-            }
-        }
-    </style>
+    <title>HomeTown Bank Pa - Dashboard</title>
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script>
+        const BASE_URL_JS = "<?php echo rtrim(BASE_URL, '/'); ?>";
+    </script>
 </head>
 <body>
-    <div class="dashboard-container">
-        <div class="dashboard-header">
-            <img src="https://i.imgur.com/YmC3kg3.png" alt="Heritage Bank Logo" class="logo">
-            <h1>Welcome, <?php echo htmlspecialchars($userData['first_name'] ?? 'User'); ?>!</h1>
-            <div class="user-info">
-                <span>Account: <?php echo htmlspecialchars($userData['account_number'] ?? 'N/A'); ?></span>
+    <div class="container">
+        <header class="header">
+            <div class="menu-icon" id="menuIcon">
+                <i class="fas fa-bars"></i>
             </div>
-            <a href="<?php echo rtrim(BASE_URL, '/') . '/logout'; ?>" class="logout-button">Logout</a>
-        </div>
+            <div class="greeting">
+                <h1 data-user-first-name="<?php echo htmlspecialchars($first_name); ?>">Hi, <?php echo htmlspecialchars($first_name); ?></h1>
+            </div>
+        </header>
 
-        <div class="dashboard-content">
-            <?php if ($message): ?>
-                <div class="message-box <?php echo htmlspecialchars($message_type); ?>">
-                    <?php echo htmlspecialchars($message); ?>
+        <section class="accounts-section">
+            <div class="accounts-header-row">
+                <h2>Accounts</h2>
+                <div class="view-all-link">
+                   <a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/accounts.php">View all</a>
                 </div>
-            <?php endif; ?>
-
-            <div class="card">
-                <h3>Account Balance</h3>
-                <p>Your current available balance is:</p>
-                <p class="balance">$<?php echo number_format($userData['account_balance'] ?? 0, 2); ?></p>
             </div>
+            <div class="account-cards-container">
+                <?php if (empty($user_accounts)): ?>
+                    <p class="loading-message" id="accountsLoadingMessage">No accounts found. Please contact support.</p>
+                <?php else: ?>
+                    <?php
+                    // Sort accounts to ensure checking always comes first if present, then savings
+                    usort($user_accounts, function($a, $b) {
+                        $typeA = strtolower($a['account_type'] ?? '');
+                        $typeB = strtolower($b['account_type'] ?? '');
+                        if ($typeA === 'checking' && $typeB !== 'checking') return -1;
+                        if ($typeB === 'checking' && $typeA !== 'checking') return 1;
+                        if ($typeA === 'savings' && $typeB !== 'savings') return -1;
+                        if ($typeB === 'savings' && $typeA !== 'savings') return 1;
+                        return 0; // Maintain original order for other types
+                    });
 
-            <div class="card">
-                <h3>Recent Transactions</h3>
-                <p>Review your latest account activities.</p>
-                <a href="<?php echo rtrim(BASE_URL, '/') . '/transactions'; ?>" class="btn">View Transactions</a>
-            </div>
+                    // Collect account types for easy lookup of toggle targets
+                    $account_types_available = array_map(function($acc) {
+                        return strtolower($acc['account_type'] ?? '');
+                    }, $user_accounts);
+                    $account_types_available = array_unique($account_types_available);
 
-            <div class="card">
-                <h3>Fund Transfer</h3>
-                <p>Transfer funds to other accounts quickly.</p>
-                <button id="transferButton" class="btn">Transfer Funds</button>
+                    foreach ($user_accounts as $account):
+                        $account_type_lower = strtolower($account['account_type'] ?? '');
+                        $card_class = 'account-card';
+                        // Determine the target for the toggle button
+                        $toggle_target = '';
+                        if ($account_type_lower === 'checking' && in_array('savings', $account_types_available)) {
+                            $toggle_target = 'savings';
+                        } elseif ($account_type_lower === 'savings' && in_array('checking', $account_types_available)) {
+                            $toggle_target = 'checking';
+                        }
+                    ?>
+                        <div class="<?php echo htmlspecialchars($card_class); ?>" data-account-type="<?php echo htmlspecialchars($account_type_lower); ?>">
+                            <div class="account-details">
+                                <p class="account-type"><?php echo htmlspecialchars(ucfirst($account_type_lower)); ?> Account</p>
+                                <p class="account-number">**** **** **** <?php echo htmlspecialchars(substr($account['account_number'] ?? 'N/A', -4)); ?></p>
+                            </div>
+                            <div class="account-balance">
+                                <p class="balance-amount">
+                                    <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <?php echo number_format($account['balance'] ?? 0, 2); ?>
+                                </p>
+                                <p class="balance-status">Available</p>
+                            </div>
+                            <?php if (!empty($toggle_target)): ?>
+                                <span class="account-toggle-indicator" data-toggle-target="<?php echo htmlspecialchars($toggle_target); ?>">
+                                    <i class="fas fa-exchange-alt"></i>
+                                    <span><?php echo htmlspecialchars(ucfirst($toggle_target)); ?></span>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
+            <div class="account-pagination">
+            </div>
+        </section>
 
-            <div class="card">
-                <h3>View My Cards</h3>
-                <p>Access details about your linked cards.</p>
-                <button id="viewCardsButton" class="btn">View My Cards</button>
+        <section class="actions-section">
+            <div class="action-button" id="transferButton" data-action="open-transfer-modal">
+                <i class="fas fa-exchange-alt"></i>
+                <p>Transfer</p>
             </div>
+            <div class="action-button" id="depositButton" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/deposit'">
+                <i class="fas fa-download"></i>
+                <p>Deposit</p>
+            </div>
+            <div class="action-button">
+                <i class="fas fa-dollar-sign"></i>
+                <p>Pay</p>
+            </div>
+            <div class="action-button" id="messageButton" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/customer-service'">
+                <i class="fas fa-headset"></i> <p>Customer Service</p>
+            </div>
+        </section>
 
-            <div class="card">
-                <h3>Profile Settings</h3>
-                <p>Update your personal information and preferences.</p>
-                <a href="<?php echo rtrim(BASE_URL, '/') . '/profile'; ?>" class="btn">Manage Profile</a>
+        <section class="bank-cards-section">
+            <h2>My Cards</h2>
+            <div class="view-all-link">
+                <button id="viewCardButton" data-action="view-cards" style="background: none; border: none; padding: 0; margin: 0; font: inherit; cursor: pointer; color: inherit; text-decoration: none; display: flex; align-items: center;">
+                    <i class="fas fa-credit-card"></i> View My Card
+                </button>
             </div>
+            <div class="card-list-container" id="userCardList" style="display: none;">
+                <p class="loading-message" id="cardsLoadingMessage">No cards found. Go to "Manage All Cards" to add one.</p>
+            </div>
+        </section>
+
+        <section class="activity-section">
+            <div class="transactions-header">
+                <div class="transactions-header">
+                <h2>Transactions</h2>
+                <span class="more-options" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/statements'">...</span></div>
+            <div class="transaction-list">
+                <?php if (empty($recent_transactions)): ?>
+                    <p class="loading-message" id="transactionsLoadingMessage">No recent transactions to display.</p>
+                <?php else: ?>
+                    <?php foreach ($recent_transactions as $transaction): ?>
+                        <div class="transaction-item">
+                            <div class="transaction-details">
+                                <span class="transaction-description"><?php echo htmlspecialchars($transaction['description'] ?? 'N/A'); ?></span>
+                                <span class="transaction-account">
+                                    <?php
+                                    echo htmlspecialchars($transaction['account_type'] ?? 'N/A');
+                                    if (isset($transaction['account_number'])) {
+                                        echo ' x' . htmlspecialchars(substr($transaction['account_number'], -4));
+                                    }
+                                    ?>
+                                </span>
+                            </div>
+                            <div class="transaction-amount-date">
+                                <span class="transaction-amount <?php echo (($transaction['transaction_type'] ?? '') == 'Credit') ? 'credit' : 'debit'; ?>">
+                                    <?php echo (($transaction['transaction_type'] ?? '') == 'Credit' ? '+' : '-'); ?>
+                                    <?php
+                                    echo get_currency_symbol($transaction['currency'] ?? 'USD');
+                                    ?> <?php echo number_format($transaction['amount'] ?? 0, 2); ?>
+                                </span>
+                                <span class="transaction-date">
+                                    <?php
+                                    if (isset($transaction['initiated_at']) && $transaction['initiated_at'] instanceof MongoDB\BSON\UTCDateTime) {
+                                        echo htmlspecialchars(date('M d', $transaction['initiated_at']->toDateTime()->getTimestamp()));
+                                    } else if (isset($transaction['initiated_at'])) {
+                                        echo htmlspecialchars(date('M d', strtotime($transaction['initiated_at'])));
+                                    } else {
+                                        echo 'N/A';
+                                    }
+                                    ?>
+                                </span>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+            <button class="see-more-button" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/statements'">See more</button>
+        </section>
+
+    </div>
+
+    <div class="transfer-modal-overlay" id="transferModalOverlay">
+        <div class="transfer-modal-content">
+            <h3>Choose Transfer Type</h3>
+            <div class="transfer-options-list">
+                <button class="transfer-option" data-transfer-type="Own Account" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=own_account">
+                    <i class="fas fa-wallet"></i> <p>Transfer to My Other Account</p>
+                </button>
+
+                <button class="transfer-option" data-transfer-type="Bank to Bank" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=bank_to_bank">
+                    <i class="fas fa-university"></i>
+                    <p>Bank to Bank Transfer</p>
+                </button>
+                <button class="transfer-option" data-transfer-type="ACH" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=ach">
+                    <i class="fas fa-exchange-alt"></i>
+                    <p>ACH Transfer</p>
+                </button>
+                <button class="transfer-option" data-transfer-type="Wire" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=wire">
+                    <i class="fas fa-ethernet"></i>
+                    <p>Wire Transfer</p>
+                </button>
+                <button class="transfer-option" data-transfer-type="International Bank" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=international_bank">
+                    <i class="fas fa-globe"></i>
+                    <p>International Bank Transfer</p>
+                </button>
+                <button class="transfer-option" data-transfer-type="Domestic Wire" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=domestic_wire">
+                    <i class="fas fa-home"></i>
+                    <p>Domestic Wire Transfer</p>
+                </button>
+            </div>
+            <button class="close-modal-button" id="closeTransferModal">Close</button>
         </div>
     </div>
 
-    <div id="transferModal" class="modal">
+    <div id="dynamicMessageModal" class="modal-overlay">
         <div class="modal-content">
             <span class="close-button">&times;</span>
-            <h2 id="transferModalTitle">Important Transfer Notice</h2>
-            <p id="transferModalMessage"></p>
-            <button class="btn" onclick="continueTransfer()">Continue to Transfer</button>
-            <button class="btn" style="background-color: #6c757d;" onclick="closeModal('transferModal')">Cancel</button>
+            <h3 id="modalTitle">Important Message</h3>
+            <p id="modalMessageContent"></p>
+            <button class="modal-close-button close-modal-button-main">Okay</button>
         </div>
     </div>
 
-    <div id="viewCardsModal" class="modal">
+    <?php if ($showOutstandingPaymentModal && !empty($outstandingPaymentModalMessage)): ?>
+    <div id="outstandingPaymentModal" class="modal-overlay">
         <div class="modal-content">
             <span class="close-button">&times;</span>
-            <h2 id="viewCardsModalTitle">Information About Your Cards</h2>
-            <p id="viewCardsModalMessage"></p>
-            <button class="btn" onclick="continueViewCards()">View Cards Now</button>
-            <button class="btn" style="background-color: #6c757d;" onclick="closeModal('viewCardsModal')">Close</button>
+            <h2>Important Notification</h2>
+            <p>Dear <?php echo htmlspecialchars($outstandingPaymentModalUserName); ?>,</p>
+            <p><?php echo nl2br(htmlspecialchars($outstandingPaymentModalMessage)); ?></p>
+            <button class="modal-close-button close-modal-button-main">Close</button>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const outstandingModal = document.getElementById('outstandingPaymentModal');
+            if (outstandingModal) {
+                outstandingModal.style.display = 'flex'; // Show the modal
+                const closeButtons = outstandingModal.querySelectorAll('.close-button, .modal-close-button-main');
+                closeButtons.forEach(button => {
+                    button.onclick = function() {
+                        outstandingModal.style.display = 'none';
+                    }
+                });
+                window.onclick = function(event) {
+                    if (event.target == outstandingModal) {
+                        outstandingModal.style.display = 'none';
+                    }
+                }
+            }
+        });
+    </script>
+    <?php endif; ?>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <button class="close-sidebar-button" id="closeSidebarBtn">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="sidebar-profile">
+                <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
+                <h3><span id="sidebarUserName"><?php echo htmlspecialchars($full_name); ?></span></h3>
+                <p><span id="sidebarUserEmail"><?php echo htmlspecialchars($user_email); ?></span></p>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <ul>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="active"><i class="fas fa-home"></i> Dashboard</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/accounts"><i class="fas fa-wallet"></i> Accounts</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer"><i class="fas fa-exchange-alt"></i> Transfers</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/statements"><i class="fas fa-file-invoice"></i> Statements</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/profile"><i class="fas fa-user"></i> Profile</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/settings"><i class="fas fa-cog"></i> Settings</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/bank_cards"><i class="fas fa-credit-card"></i> Bank Cards</a></li>
+            </ul>
+        </nav>
+        <button class="logout-button" id="logoutButton" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/logout'">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+    </div>
+
+    <?php if ($transaction_alert && (string)$transaction_alert['user_id'] === (string)$_SESSION['user_id']): ?>
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <dialog id="transactionModal" class="transaction-modal status-<?php echo htmlspecialchars(str_replace(' ', '-', strtolower($transaction_alert['status']))); ?>">
+        <h3 id="modalTitle">Transaction Status Update</h3>
+        <p>Hello <?php echo htmlspecialchars($_SESSION['first_name']); ?>,</p>
+        <p>Your transaction with reference number <strong><?php echo htmlspecialchars($transaction_alert['ref_no']); ?></strong> has been updated.</p>
+        <p><strong>New Status:</strong> <span id="modalStatus"><?php echo htmlspecialchars(ucfirst($transaction_alert['status'])); ?></span></p>
+        <p><strong>Recipient:</strong> <?php echo htmlspecialchars($transaction_alert['recipient_name']); ?></p>
+        <p><strong>Amount:</strong> <?php echo htmlspecialchars($transaction_alert['currency'] . ' ' . number_format($transaction_alert['amount'], 2)); ?></p>
+        <p><strong>Bank Comment:</strong> <span id="modalMessage"><?php echo htmlspecialchars($transaction_alert['message'] ?: 'N/A'); ?></span></p>
+        <button id="closeModalButton" class="modal-close-button">Close</button>
+    </dialog>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('transactionModal');
+            const backdrop = document.getElementById('modalBackdrop');
+            const closeButton = document.getElementById('closeModalButton');
+
+            if (modal && backdrop) {
+                modal.showModal(); // Show the dialog
+                backdrop.style.display = 'block'; // Show custom backdrop
+
+                function closeModal() {
+                    modal.close();
+                    backdrop.style.display = 'none';
+                }
+
+                closeButton.addEventListener('click', closeModal);
+                backdrop.addEventListener('click', closeModal);
+            }
+        });
+    </script>
+    <?php endif; ?>
 
     <script>
-        // PHP variables for JavaScript
-        const showTransferModal = <?php echo json_encode($showTransferModal); ?>;
+        // These are for the *persistent* admin-set modals, controlled by the user's DB profile
         const transferModalMessage = <?php echo json_encode($transferModalMessage); ?>;
-        const showCardModal = <?php echo json_encode($showCardModal); ?>; // NEW
-        const cardModalMessage = <?php echo json_encode($cardModalMessage); ?>; // NEW
+        const showTransferModal = <?php echo json_encode($showTransferModal); ?>;
+        const cardModalMessage = <?php echo json_encode($cardModalMessage); ?>;
+        const showCardModal = <?php echo json_encode($showCardModal); ?>;
 
-        // Get the modals
-        const transferModal = document.getElementById('transferModal');
-        const viewCardsModal = document.getElementById('viewCardsModal'); // NEW
+        // You might need to update user.dashboard.js to utilize these or add new JS for them
+        // if they are meant to appear on dashboard load.
+        // For example, if showTransferModal is true, you could make user.dashboard.js open #dynamicMessageModal
+        // with transferModalMessage. Same for cardModalMessage.
+        // I'll add a simple example to show the `dynamicMessageModal` if `showTransferModal` or `showCardModal` is true,
+        // prioritizing the card message if both are true.
 
-        // Get the buttons that open the modals
-        const transferBtn = document.getElementById('transferButton');
-        const viewCardsBtn = document.getElementById('viewCardsButton'); // NEW
+        document.addEventListener('DOMContentLoaded', function() {
+            const dynamicMessageModal = document.getElementById('dynamicMessageModal');
+            const modalTitleElement = document.getElementById('modalTitle');
+            const modalMessageContentElement = document.getElementById('modalMessageContent');
+            const closeButtonsDynamic = dynamicMessageModal ? dynamicMessageModal.querySelectorAll('.close-button, .modal-close-button-main') : [];
 
-        // Get the <span> elements that close the modals
-        const closeButtons = document.querySelectorAll('.close-button');
+            let messageToShow = '';
+            let titleToShow = '';
 
-        // Function to open a specific modal
-        function openModal(modalId) {
-            document.getElementById(modalId).style.display = 'flex'; // Use 'flex' for centering
-        }
-
-        // Function to close a specific modal
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-        }
-
-        // Event listener for transfer button
-        if (transferBtn) {
-            transferBtn.addEventListener('click', function() {
-                if (showTransferModal && transferModalMessage) {
-                    document.getElementById('transferModalMessage').innerText = transferModalMessage;
-                    openModal('transferModal');
-                } else {
-                    // Default action if no modal is set or active
-                    window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/transfer-funds'; // Corrected for clean URL
-                }
-            });
-        }
-
-        // Event listener for view cards button (NEW)
-        if (viewCardsBtn) {
-            viewCardsBtn.addEventListener('click', function() {
-                if (showCardModal && cardModalMessage) {
-                    document.getElementById('viewCardsModalMessage').innerText = cardModalMessage;
-                    openModal('viewCardsModal');
-                } else {
-                    // Default action if no modal is set or active for 'View My Cards'
-                    window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/my-cards'; // Corrected for clean URL
-                }
-            });
-        }
-
-        // Attach close event to all close buttons
-        closeButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                // Find the parent modal and hide it
-                this.closest('.modal').style.display = 'none';
-            });
-        });
-
-        // Close modal if user clicks outside of it
-        window.addEventListener('click', function(event) {
-            if (event.target == transferModal) {
-                transferModal.style.display = 'none';
+            if (showCardModal && cardModalMessage) {
+                messageToShow = cardModalMessage;
+                titleToShow = "Card Activation Information";
+            } else if (showTransferModal && transferModalMessage) {
+                messageToShow = transferModalMessage;
+                titleToShow = "Important Transfer Notice";
             }
-            if (event.target == viewCardsModal) { // NEW
-                viewCardsModal.style.display = 'none';
+
+            if (messageToShow && dynamicMessageModal && modalTitleElement && modalMessageContentElement) {
+                modalTitleElement.textContent = titleToShow;
+                modalMessageContentElement.innerHTML = messageToShow.replace(/\n/g, '<br>'); // Allow new lines
+                dynamicMessageModal.style.display = 'flex'; // Show modal
+
+                closeButtonsDynamic.forEach(button => {
+                    button.onclick = function() {
+                        dynamicMessageModal.style.display = 'none';
+                    };
+                });
+
+                window.onclick = function(event) {
+                    if (event.target == dynamicMessageModal) {
+                        dynamicMessageModal.style.display = 'none';
+                    }
+                };
             }
         });
-
-        // Functions for 'Continue' actions within the modals
-        function continueTransfer() {
-            closeModal('transferModal');
-            // Navigate to the transfer page or initiate transfer process
-            window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/transfer-funds'; // Corrected for clean URL
-        }
-
-        function continueViewCards() { // NEW
-            closeModal('viewCardsModal');
-            // Navigate to the view cards page or initiate card display
-            window.location.href = '<?php echo rtrim(BASE_URL, '/'); ?>/my-cards'; // Corrected for clean URL
-        }
 
     </script>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/user.dashboard.js"></script>
 </body>
 </html>

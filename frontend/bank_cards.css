@@ -691,7 +691,26 @@ p.card-cvv-mock {
     background-color: var(--dark-blue);
     text-decoration: none;
 }
-
+.message-box-content.success {
+    border-color: #28a745; /* Green */
+    background-color: #d4edda;
+    color: #155724;
+}
+.message-box-content.error {
+    border-color: #dc3545; /* Red */
+    background-color: #f8d7da;
+    color: #721c24;
+}
+.message-box-content.warning {
+    border-color: #ffc107; /* Yellow/Orange */
+    background-color: #fff3cd;
+    color: #856404;
+}
+.message-box-content.info {
+    border-color: #007bff; /* Blue */
+    background-color: #cce5ff;
+    color: #004085;
+}
 
 /* --- Media Queries for Responsiveness --- */
 

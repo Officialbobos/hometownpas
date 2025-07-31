@@ -19,7 +19,8 @@ use MongoDB\Client; // Make sure this is imported if using new MongoDB\Client
 use MongoDB\BSON\ObjectId; // For converting string IDs to MongoDB ObjectIds
 
 // Check if the user is logged in. If not, redirect to login page.
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
+// *** CORRECTION: Use $_SESSION['logged_in'] for consistency with dashboard.php ***
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
     // Corrected: Use BASE_URL for redirect to login page
     // Assuming index.php is your login page. Adjust if your login page is e.g., login.php
     header('Location: ' . BASE_URL . '/index.php');
@@ -257,6 +258,5 @@ if (!function_exists('get_currency_symbol')) {
         </div>
     </main>
     </div>
-    <script src="<?php echo BASE_URL; ?>/frontend/script.js"></script>
 </body>
 </html>

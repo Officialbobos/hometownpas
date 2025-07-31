@@ -1,49 +1,162 @@
 // Path: C:\xampp\htdocs\hometownbank\frontend\cards.js
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Message Box Elements - Define them ONCE within DOMContentLoaded
+    // Message Box Elements (for general page messages, not the card modal)
     const messageBoxOverlay = document.getElementById('messageBoxOverlay');
     const messageBoxContentWrapper = document.getElementById('messageBoxContentWrapper');
     const messageBoxContentParagraph = document.getElementById('messageBoxContent'); // The <p> tag itself
     const messageBoxButton = document.getElementById('messageBoxButton');
 
-    // Card Action Elements (NEW)
+    // Card Activation/Info Modal Elements (for admin-set card messages)
+    const cardActivationModal = document.getElementById('cardActivationModal');
+    const cardActivationModalTitle = document.getElementById('cardActivationModalTitle');
+    const cardActivationModalMessage = document.getElementById('cardActivationModalMessage');
+    const closeCardActivationModalBtn = document.getElementById('closeCardActivationModalBtn');
+    const cardActivationModalOkBtn = document.getElementById('cardActivationModalOkBtn');
+
+
+    // Card Action Elements
     const actionCardSelect = document.getElementById('actionCardSelect');
     const freezeActionButton = document.getElementById('freezeActionButton');
     const reportActionButton = document.getElementById('reportActionButton');
     const setPinActionButton = document.getElementById('setPinActionButton');
-    const activateActionButton = document.getElementById('activateActionButton'); // NEW: Activate button
 
-    // --- Function to show custom message box ---
-    function showMessageBox(message, type = 'info') {
-        // Ensure elements exist before trying to manipulate them
+    // Ensure these variables are globally available from bank_cards.php
+    // These are already defined in your bank_cards.php <script> block
+    // const PHP_BASE_URL;
+    // const FRONTEND_BASE_URL;
+    // const currentUserId;
+    // const currentUserFullName;
+    // const currentUserEmail;
+    // const initialMessage; // General page message
+    // const initialMessageType; // Type for general page message
+    // const initialCardModalMessage; // Specific message for card modal
+    // const initialShowCardModal; // Boolean to show card modal
+    // const initialCardModalMessageType; // Type for card modal message
+
+
+    // --- Function to show general custom message box (already present) ---
+    window.showMessageBox = function(message, type = 'info') {
         if (!messageBoxContentParagraph || !messageBoxContentWrapper || !messageBoxOverlay) {
             console.error("MessageBox elements not found in DOM!");
-            // Fallback to console log if elements are missing
-            console.log(`MessageBox: Type: ${type}, Message: ${message}`);
+            console.log(`MessageBox (fallback): Type: ${type}, Message: ${message}`);
             return;
         }
 
         messageBoxContentParagraph.textContent = message;
-        // Clear previous classes ensuring only one type class is active
-        messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'message-box-info');
+        messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'message-box-info', 'message-box-warning');
 
-        // Apply type-specific classes for styling
         if (type === 'success') {
             messageBoxContentWrapper.classList.add('message-box-success');
         } else if (type === 'error') {
             messageBoxContentWrapper.classList.add('message-box-error');
+        } else if (type === 'warning') { // Added warning type
+            messageBoxContentWrapper.classList.add('message-box-warning');
         } else {
             messageBoxContentWrapper.classList.add('message-box-info');
         }
 
-        messageBoxOverlay.classList.add('show'); // Show the overlay
+        messageBoxOverlay.classList.add('show');
+    };
+
+    // Function to hide the general message box
+    function hideMessageBox() {
+        if (messageBoxOverlay) {
+            messageBoxOverlay.classList.remove('show');
+            messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'message-box-info', 'message-box-warning');
+            messageBoxContentParagraph.textContent = '';
+        }
     }
+
+    // Event listener for the general message box OK button
+    if (messageBoxButton) {
+        messageBoxButton.addEventListener('click', hideMessageBox);
+    }
+    // Optional: Hide if clicking outside for general message box
+    if (messageBoxOverlay) {
+        messageBoxOverlay.addEventListener('click', function(event) {
+            if (event.target === messageBoxOverlay) {
+                hideMessageBox();
+            }
+        });
+    }
+
+    // --- NEW: Functions to manage the dedicated Card Activation/Info Modal ---
+    function showCardInfoModal(message, type = 'info', title = 'Important Message') {
+        if (!cardActivationModal || !cardActivationModalMessage || !cardActivationModalTitle) {
+            console.error("Card info modal elements not found in DOM!");
+            return;
+        }
+
+        cardActivationModalMessage.textContent = message;
+        cardActivationModalTitle.textContent = title;
+
+        // Clear previous classes and add the new one for styling
+        cardActivationModal.classList.remove('modal-success', 'modal-error', 'modal-info', 'modal-warning');
+        if (type === 'success') {
+            cardActivationModal.classList.add('modal-success');
+        } else if (type === 'error') {
+            cardActivationModal.classList.add('modal-error');
+        } else if (type === 'warning') {
+            cardActivationModal.classList.add('modal-warning');
+        } else {
+            cardActivationModal.classList.add('modal-info');
+        }
+
+        cardActivationModal.style.display = 'flex'; // Use flex for centering
+    }
+
+    async function hideCardInfoModal() {
+        if (!cardActivationModal) return;
+
+        cardActivationModal.style.display = 'none';
+        cardActivationModalMessage.textContent = '';
+        cardActivationModalTitle.textContent = '';
+        cardActivationModal.classList.remove('modal-success', 'modal-error', 'modal-info', 'modal-warning');
+
+        // Make an AJAX call to clear the session variables after the modal is dismissed
+        try {
+            const response = await fetch(`${PHP_BASE_URL}api/clear_card_modal_session.php`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action: 'clear_card_modal_message' }) // Action name is descriptive
+            });
+            const result = await response.json();
+            if (result.status !== 'success') {
+                console.error('Failed to clear card modal session:', result.message);
+            }
+        } catch (error) {
+            console.error('Error clearing card modal session:', error);
+        }
+
+        // --- NEW: Redirect user to the dashboard after closing the modal ---
+        window.location.href = `${FRONTEND_BASE_URL}dashboard.php`;
+    }
+
+    // Event listeners for the Card Activation/Info Modal
+    if (closeCardActivationModalBtn) {
+        closeCardActivationModalBtn.addEventListener('click', hideCardInfoModal);
+    }
+    if (cardActivationModalOkBtn) {
+        cardActivationModalOkBtn.addEventListener('click', hideCardInfoModal);
+    }
+    if (cardActivationModal) {
+        cardActivationModal.addEventListener('click', function(event) {
+            if (event.target === cardActivationModal) {
+                hideCardInfoModal();
+            }
+        });
+    }
+
+    // --- END NEW Card Activation/Info Modal Logic ---
+
 
     // Check if PHP_BASE_URL and FRONTEND_BASE_URL are defined by PHP
     if (typeof PHP_BASE_URL === 'undefined' || typeof FRONTEND_BASE_URL === 'undefined') {
         console.error("Critical JavaScript variables (PHP_BASE_URL, FRONTEND_BASE_URL) are not defined. Check PHP include.");
-        showMessageBox("Application error: Path configuration missing. Please contact support.", 'error');
+        window.showMessageBox("Application error: Path configuration missing. Please contact support.", 'error');
         return; // Stop execution if critical variables are missing
     }
 
@@ -54,14 +167,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const accountIdSelect = document.getElementById('accountId');
     const orderCardSubmitButton = orderCardForm ? orderCardForm.querySelector('button[type="submit"]') : null;
 
-    // Handle message box dismissal
-    if (messageBoxButton) {
-        messageBoxButton.addEventListener('click', () => {
-            messageBoxOverlay.classList.remove('show');
-            messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'message-box-info');
-            messageBoxContentParagraph.textContent = '';
-        });
+
+    // --- Initial page message display (using the unified message box) ---
+    // This logic handles general page messages (e.g., from order processing)
+    if (typeof initialMessage !== 'undefined' && initialMessage.trim() !== '') {
+        window.showMessageBox(initialMessage, initialMessageType);
     }
+
+    // --- Handle initial display of the specific Card Info Modal from session ---
+    // This uses the dedicated card modal elements and new functions
+    if (typeof initialShowCardModal !== 'undefined' && initialShowCardModal === true &&
+        typeof initialCardModalMessage !== 'undefined' && initialCardModalMessage.trim() !== '') {
+        let modalTitle = 'Important Message';
+        switch (initialCardModalMessageType) {
+            case 'success':
+                modalTitle = 'Success!';
+                break;
+            case 'error':
+                modalTitle = 'Error!';
+                break;
+            case 'warning':
+                modalTitle = 'Warning!';
+                break;
+            case 'info':
+            default:
+                modalTitle = 'Notification';
+                break;
+        }
+        showCardInfoModal(initialCardModalMessage, initialCardModalMessageType, modalTitle);
+        // The session clearing for this modal happens when hideCardInfoModal() is called
+    }
+
 
     // Function to fetch and populate user's bank accounts for the order form
     async function fetchUserAccounts() {
@@ -95,19 +231,18 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 accountIdSelect.innerHTML = '<option value="" disabled>No Accounts Found</option>';
                 console.warn("No accounts found for the user or error fetching accounts:", data.message || "Unknown error");
-                showMessageBox(data.message || "No bank accounts found for your profile. Please add an account before ordering a card.", 'info');
             }
         } catch (error) {
             accountIdSelect.innerHTML = '<option value="" disabled>Error Loading Accounts</option>';
             console.error("Error fetching user accounts:", error);
             if (error.message.includes("Failed to fetch")) {
-                showMessageBox("Failed to load accounts: Could not connect to the server. Please check your network or server status.", 'error');
+                window.showMessageBox("Failed to load accounts: Could not connect to the server. Please check your network or server status.", 'error');
             } else if (error.message.includes("Server error or API endpoint not found")) {
-                showMessageBox(`Failed to load accounts: Server returned an unexpected response. This usually means the API endpoint is wrong or there's a PHP error on the server. Details: ${error.message.substring(0, 100)}...`, 'error');
+                window.showMessageBox(`Failed to load accounts: Server returned an unexpected response. This usually means the API endpoint is wrong or there's a PHP error on the server. Details: ${error.message.substring(0, 100)}...`, 'error');
             } else if (error.message.includes("Unexpected token") || error.message.includes("JSON")) {
-                showMessageBox("Failed to load accounts: The server response was not valid JSON. This often means a PHP error occurred on the API script. Check server logs.", 'error');
+                window.showMessageBox("Failed to load accounts: The server response was not valid JSON. This often means a PHP error occurred on the API script. Check server logs.", 'error');
             } else {
-                showMessageBox(`Failed to load accounts: ${error.message}. Please try refreshing the page.`, 'error');
+                window.showMessageBox(`Failed to load accounts: ${error.message}. Please try refreshing the page.`, 'error');
             }
         }
     }
@@ -135,10 +270,10 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (cardNetworkLower === 'mastercard' || cardNetworkLower === 'master') {
                 networkLogoSrc = 'https://i.imgur.com/hYwvs0x.png';
             } else {
-                networkLogoSrc = `${PHP_BASE_URL}images/default_network_logo.png`;
+                networkLogoSrc = `${FRONTEND_BASE_URL}/images/default_network_logo.png`; // Use FRONTEND_BASE_URL for static assets
             }
 
-            cardNetworkLogoHtml = `<img src="${networkLogoSrc}" alt="${card.card_network} Logo" class="card-network-logo-img" onerror="this.src='${PHP_BASE_URL}images/default_network_logo.png'; this.alt='Default Network Logo';">`;
+            cardNetworkLogoHtml = `<img src="${networkLogoSrc}" alt="${card.card_network} Logo" class="card-network-logo-img" onerror="this.src='${FRONTEND_BASE_URL}/images/default_network_logo.png'; this.alt='Default Network Logo';">`;
         }
 
         const networkClass = card.card_network ? card.card_network.toLowerCase() : '';
@@ -154,7 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         // Determine the card number to display
-        // Assuming card.card_number from API is the full or already masked number you want to display
         const displayCardNumber = formatCardNumber(card.card_number);
 
         return `
@@ -218,22 +352,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (cardElement) {
                         cardElement.addEventListener('click', (event) => {
-                            if (event.target.closest('.card-actions button')) {
-                                const button = event.target.closest('.card-actions button');
-                                const cardId = button.dataset.cardId;
-                                if (button.classList.contains('freeze-btn')) {
-                                    const currentStatus = button.dataset.status;
-                                    toggleCardStatus(cardId, currentStatus);
-                                } else if (button.classList.contains('report-btn')) {
-                                    reportLostStolen(cardId);
-                                } else if (button.classList.contains('set-pin-btn')) {
-                                    window.location.href = `${FRONTEND_BASE_URL}/set_card_pin.php?card_id=${cardId}`;
-                                } else if (button.classList.contains('activate-btn')) { // Handle activate button click
-                                    activateCard(cardId);
-                                }
-                                event.stopPropagation();
-                                return;
-                            }
                             window.location.href = `${FRONTEND_BASE_URL}/manage_card.php?card_id=${card.id}`;
                         });
                         userCardList.appendChild(cardElement);
@@ -248,20 +366,20 @@ document.addEventListener('DOMContentLoaded', () => {
             noCardsMessage.textContent = `Error loading cards: ${error.message}. Please try again.`;
             noCardsMessage.style.display = 'block';
             if (error.message.includes("Failed to fetch")) {
-                showMessageBox("Failed to load cards: Could not connect to the server. Please check your network or server status.", 'error');
+                window.showMessageBox("Failed to load cards: Could not connect to the server. Please check your network or server status.", 'error');
             } else if (error.message.includes("Server error or API endpoint not found")) {
-                showMessageBox(`Failed to load cards: Server returned an unexpected response. This usually means the API endpoint is wrong or there's a PHP error on the server. Details: ${error.message.substring(0, 100)}...`, 'error');
+                window.showMessageBox(`Failed to load cards: Server returned an unexpected response. This usually means the API endpoint is wrong or there's a PHP error on the server. Details: ${error.message.substring(0, 100)}...`, 'error');
             } else if (error.message.includes("Unexpected token") || error.message.includes("JSON")) {
-                showMessageBox("Failed to load cards: The server response was not valid JSON. This often means a PHP error occurred on the API script. Check server logs.", 'error');
+                window.showMessageBox("Failed to load cards: The server response was not valid JSON. This often means a PHP error occurred on the API script. Check server logs.", 'error');
             } else {
-                showMessageBox(`Failed to load cards: ${error.message}`, 'error');
+                window.showMessageBox(`Failed to load cards: ${error.message}`, 'error');
             }
         } finally {
             cardsLoadingMessage.style.display = 'none';
         }
     }
 
-    // --- NEW: Function to fetch and populate cards for the action dropdown ---
+    // --- Function to fetch and populate cards for the action dropdown ---
     async function populateActionCardSelect() {
         if (!actionCardSelect) {
             console.error("Action card select element not found.");
@@ -291,34 +409,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 result.cards.forEach(card => {
                     const option = document.createElement('option');
                     option.value = card.id;
-                    // Ensure 'display_card_number' exists or provide a fallback
                     const displayNum = card.display_card_number || (card.card_number ? card.card_number.slice(-4) : '****');
                     option.textContent = `${card.card_type} (...${displayNum}) - Status: ${card.status_display_text}`;
                     option.dataset.status = card.status;
                     actionCardSelect.appendChild(option);
                 });
-                // Enable buttons if cards are available
-                actionCardSelect.dispatchEvent(new Event('change')); // Trigger change to set initial button states
+                actionCardSelect.dispatchEvent(new Event('change'));
             } else {
                 actionCardSelect.innerHTML = '<option value="" disabled>No Cards Available</option>';
-                // Disable all action buttons if no cards are available
-                freezeActionButton.disabled = true;
-                reportActionButton.disabled = true;
-                setPinActionButton.disabled = true;
-                if (activateActionButton) activateActionButton.disabled = true; // Disable new button
+                if (freezeActionButton) freezeActionButton.disabled = true;
+                if (reportActionButton) reportActionButton.disabled = true;
+                if (setPinActionButton) setPinActionButton.disabled = true;
             }
         } catch (error) {
             console.error('Error populating action card select:', error);
             actionCardSelect.innerHTML = '<option value="" disabled>Error Loading Cards</option>';
-            freezeActionButton.disabled = true;
-            reportActionButton.disabled = true;
-            setPinActionButton.disabled = true;
-            if (activateActionButton) activateActionButton.disabled = true; // Disable new button
-            showMessageBox(`Failed to load cards for actions: ${error.message}`, 'error');
+            if (freezeActionButton) freezeActionButton.disabled = true;
+            if (reportActionButton) reportActionButton.disabled = true;
+            if (setPinActionButton) setPinActionButton.disabled = true;
+            window.showMessageBox(`Failed to load cards for actions: ${error.message}`, 'error');
         }
     }
 
-    // --- Event listener for card selection in the action dropdown (NEW) ---
+    // --- Event listener for card selection in the action dropdown ---
     if (actionCardSelect) {
         actionCardSelect.addEventListener('change', () => {
             const selectedOption = actionCardSelect.options[actionCardSelect.selectedIndex];
@@ -326,46 +439,42 @@ document.addEventListener('DOMContentLoaded', () => {
             const cardStatus = selectedOption.dataset.status;
 
             // Reset all buttons to disabled first
-            freezeActionButton.disabled = true;
-            reportActionButton.disabled = true;
-            setPinActionButton.disabled = true;
-            if (activateActionButton) activateActionButton.disabled = true;
+            if (freezeActionButton) freezeActionButton.disabled = true;
+            if (reportActionButton) reportActionButton.disabled = true;
+            if (setPinActionButton) setPinActionButton.disabled = true;
 
             // Reset button texts
-            freezeActionButton.textContent = '❄️ Freeze/Unfreeze Card';
-
+            if (freezeActionButton) freezeActionButton.textContent = '❄️ Freeze/Unfreeze Card';
 
             if (cardId) {
                 // Set cardId on all relevant buttons
-                freezeActionButton.dataset.cardId = cardId;
-                reportActionButton.dataset.cardId = cardId;
-                setPinActionButton.dataset.cardId = cardId;
-                if (activateActionButton) activateActionButton.dataset.cardId = cardId;
-
+                if (freezeActionButton) freezeActionButton.dataset.cardId = cardId;
+                if (reportActionButton) reportActionButton.dataset.cardId = cardId;
+                if (setPinActionButton) setPinActionButton.dataset.cardId = cardId;
 
                 // Enable/Disable buttons based on card status
                 if (cardStatus === 'active') {
-                    freezeActionButton.disabled = false;
-                    freezeActionButton.textContent = '❄️ Freeze Card';
-                    freezeActionButton.dataset.status = 'active'; // Update dataset status
-                    reportActionButton.disabled = false;
-                    setPinActionButton.disabled = false;
+                    if (freezeActionButton) {
+                        freezeActionButton.disabled = false;
+                        freezeActionButton.textContent = '❄️ Freeze Card';
+                        freezeActionButton.dataset.status = 'active';
+                    }
+                    if (reportActionButton) reportActionButton.disabled = false;
+                    if (setPinActionButton) setPinActionButton.disabled = false;
                 } else if (cardStatus === 'frozen') {
-                    freezeActionButton.disabled = false;
-                    freezeActionButton.textContent = '🔓 Unfreeze Card';
-                    freezeActionButton.dataset.status = 'frozen'; // Update dataset status
-                    reportActionButton.disabled = false; // Still allow reporting
-                    setPinActionButton.disabled = false; // Still allow PIN setting
-                } else if (cardStatus === 'pending_activation') { // NEW: Handle pending activation state
-                    if (activateActionButton) activateActionButton.disabled = false;
-                    reportActionButton.disabled = false; // Allow reporting even if pending
-                    // Other actions (freeze, set pin) might be disabled until activated
+                    if (freezeActionButton) {
+                        freezeActionButton.disabled = false;
+                        freezeActionButton.textContent = '🔓 Unfreeze Card';
+                        freezeActionButton.dataset.status = 'frozen';
+                    }
+                    if (reportActionButton) reportActionButton.disabled = false;
+                    if (setPinActionButton) setPinActionButton.disabled = false;
+                } else if (cardStatus === 'pending_activation') {
+                    // if (activateActionButton) activateActionButton.disabled = false;
+                    if (reportActionButton) reportActionButton.disabled = false;
                 } else if (cardStatus === 'lost' || cardStatus === 'stolen' || cardStatus === 'cancelled') {
-                    // All actions should be disabled for lost/stolen/cancelled cards
-                    // Potentially show a message like "Card cannot be managed"
-                    showMessageBox(`This card is ${cardStatus} and cannot be managed further.`, 'info');
+                    window.showMessageBox(`This card is ${cardStatus} and cannot be managed further.`, 'info');
                 }
-                // For any other statuses, keep buttons disabled by default (as per initial reset)
             }
         });
     }
@@ -373,11 +482,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Card Action Functions ---
     async function toggleCardStatus(cardId, currentStatus) {
         if (!cardId) {
-            showMessageBox("Please select a card first.", 'info');
+            window.showMessageBox("Please select a card first.", 'info');
             return;
         }
         const action = currentStatus === 'frozen' ? 'unfreeze' : 'freeze';
-        showMessageBox(`Attempting to ${action} card...`, 'info');
+        window.showMessageBox(`Attempting to ${action} card...`, 'info');
         try {
             const response = await fetch(`${PHP_BASE_URL}api/update_card_status.php`, {
                 method: 'POST',
@@ -386,28 +495,28 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const result = await response.json();
             if (result.status === 'success') {
-                showMessageBox(result.message, 'success');
+                window.showMessageBox(result.message, 'success');
                 fetchUserCards();
                 populateActionCardSelect();
             } else {
-                showMessageBox(result.message, 'error');
+                window.showMessageBox(result.message, 'error');
             }
         } catch (error) {
             console.error("Error toggling card status:", error);
-            showMessageBox(`Failed to toggle card status: ${error.message}`, 'error');
+            window.showMessageBox(`Failed to toggle card status: ${error.message}`, 'error');
         }
     }
 
     async function reportLostStolen(cardId) {
         if (!cardId) {
-            showMessageBox("Please select a card first.", 'info');
+            window.showMessageBox("Please select a card first.", 'info');
             return;
         }
         const confirmReport = confirm("Are you sure you want to report this card as lost/stolen? This action cannot be undone and a new card will be issued.");
         if (!confirmReport) {
             return;
         }
-        showMessageBox(`Reporting card as lost/stolen...`, 'info');
+        window.showMessageBox(`Reporting card as lost/stolen...`, 'info');
         try {
             const response = await fetch(`${PHP_BASE_URL}api/update_card_status.php`, {
                 method: 'POST',
@@ -416,51 +525,19 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const result = await response.json();
             if (result.status === 'success') {
-                showMessageBox(result.message, 'success');
+                window.showMessageBox(result.message, 'success');
                 fetchUserCards();
                 populateActionCardSelect();
             } else {
-                showMessageBox(result.message, 'error');
+                window.showMessageBox(result.message, 'error');
             }
         } catch (error) {
             console.error("Error reporting card:", error);
-            showMessageBox(`Failed to report card: ${error.message}`, 'error');
+            window.showMessageBox(`Failed to report card: ${error.message}`, 'error');
         }
     }
 
-    // NEW: Function to activate a card
-    async function activateCard(cardId) {
-        if (!cardId) {
-            showMessageBox("Please select a card to activate.", 'info');
-            return;
-        }
-        const confirmActivate = confirm("Are you sure you want to activate this card?");
-        if (!confirmActivate) {
-            return;
-        }
-        showMessageBox(`Activating card...`, 'info');
-        try {
-            const response = await fetch(`${PHP_BASE_URL}api/update_card_status.php`, { // Assuming this API can handle activation
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ card_id: cardId, action: 'activate' })
-            });
-            const result = await response.json();
-            if (result.status === 'success') {
-                showMessageBox(result.message, 'success');
-                fetchUserCards(); // Refresh cards display
-                populateActionCardSelect(); // Refresh action dropdown
-            } else {
-                showMessageBox(result.message, 'error');
-            }
-        } catch (error) {
-            console.error("Error activating card:", error);
-            showMessageBox(`Failed to activate card: ${error.message}`, 'error');
-        }
-    }
-
-
-    // --- NEW: Event listeners for action buttons ---
+    // --- Event listeners for action buttons ---
     if (freezeActionButton) {
         freezeActionButton.addEventListener('click', () => {
             const cardId = freezeActionButton.dataset.cardId;
@@ -468,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (cardId) {
                 toggleCardStatus(cardId, currentStatus);
             } else {
-                showMessageBox("Please select a card to freeze/unfreeze.", 'info');
+                window.showMessageBox("Please select a card to freeze/unfreeze.", 'info');
             }
         });
     }
@@ -479,7 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (cardId) {
                 reportLostStolen(cardId);
             } else {
-                showMessageBox("Please select a card to report.", 'info');
+                window.showMessageBox("Please select a card to report.", 'info');
             }
         });
     }
@@ -488,20 +565,9 @@ document.addEventListener('DOMContentLoaded', () => {
         setPinActionButton.addEventListener('click', () => {
             const cardId = setPinActionButton.dataset.cardId;
             if (cardId) {
-                window.location.href = `${FRONTEND_BASE_URL}/set_card_pin.php?card_id=${cardId}`; // Using the more direct page
+                window.location.href = `${FRONTEND_BASE_URL}/set_card_pin.php?card_id=${cardId}`;
             } else {
-                showMessageBox("Please select a card to set its PIN.", 'info');
-            }
-        });
-    }
-
-    if (activateActionButton) { // NEW: Event listener for activate button
-        activateActionButton.addEventListener('click', () => {
-            const cardId = activateActionButton.dataset.cardId;
-            if (cardId) {
-                activateCard(cardId);
-            } else {
-                showMessageBox("Please select a card to activate.", 'info');
+                window.showMessageBox("Please select a card to set its PIN.", 'info');
             }
         });
     }
@@ -540,24 +606,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                    showMessageBox(data.message, 'success');
+                    window.showMessageBox(data.message, 'success');
                     orderCardForm.reset();
-                    document.getElementById('cardHolderName').value = currentUserFullName;
+                    if (typeof currentUserFullName !== 'undefined') {
+                        document.getElementById('cardHolderName').value = currentUserFullName;
+                    }
                     fetchUserCards();
                     populateActionCardSelect();
                 } else {
-                    showMessageBox(data.message, 'error');
+                    window.showMessageBox(data.message, 'error');
                 }
             } catch (error) {
                 console.error('Error ordering card:', error);
                 if (error.message.includes("Failed to fetch")) {
-                    showMessageBox("An unexpected error occurred: Could not connect to the server. Please check your network or server status.", 'error');
+                    window.showMessageBox("An unexpected error occurred: Could not connect to the server. Please check your network or server status.", 'error');
                 } else if (error.message.includes("Server error or API endpoint not found")) {
-                    showMessageBox(`An unexpected error occurred: Server returned an unexpected response. This usually means the API endpoint is wrong or there's a PHP error on the server. Details: ${error.message.substring(0, 100)}...`, 'error');
+                    window.showMessageBox(`An unexpected error occurred: Server returned an unexpected response. This usually means the API endpoint is wrong or there's a PHP error on the server. Details: ${error.message.substring(0, 100)}...`, 'error');
                 } else if (error.message.includes("Unexpected token") || error.message.includes("JSON")) {
-                    showMessageBox("An unexpected error occurred: The server response was not valid JSON. This often means a PHP error occurred on the API script. Check server logs.", 'error');
+                    window.showMessageBox("An unexpected error occurred: The server response was not valid JSON. This often means a PHP error occurred on the API script. Check server logs.", 'error');
                 } else {
-                    showMessageBox(`An unexpected error occurred while placing your order: ${error.message}. Please try again.`, 'error');
+                    window.showMessageBox(`An unexpected error occurred while placing your order: ${error.message}. Please try again.`, 'error');
                 }
             } finally {
                 if (orderCardSubmitButton) {

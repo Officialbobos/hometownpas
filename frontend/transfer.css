@@ -81,35 +81,76 @@ body {
     z-index: 1; /* Ensure it's above background but below sidebar overlay */
 }
 
+/* MODIFIED: Glowing white and purple background for the transfer form container */
 .transfer-form-container {
-    background-color: rgba(255, 255, 255, 0.08); /* Semi-transparent white background */
-    backdrop-filter: blur(8px); /* Frosted glass effect */
-    border-radius: 15px;
-    padding: 35px 45px;
-    box-shadow: 0 0 25px rgba(150, 0, 255, 0.3), 0 0 40px rgba(255, 255, 255, 0.1); /* Purple and white glow */
+    /* Base background: White with a subtle purple tint */
+    background-color: #ffffff; /* Pure white base */
+    background: linear-gradient(160deg, #ffffff 0%, #f0f0ff 30%, #e8e8ff 70%, #f5edff 100%); /* Very light gradient */
+    
+    /* Frosted glass effect */
+    backdrop-filter: blur(15px); /* Stronger blur for a more ethereal look */
+    -webkit-backdrop-filter: blur(15px); /* Safari support */
+
+    border-radius: 20px; /* More rounded corners for a modern feel */
+    padding: 40px 50px; /* Generous padding */
     width: 100%;
-    max-width: 600px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    animation: fadeInScale 0.7s ease-out;
+    max-width: 700px; /* Slightly wider for transfer forms */
+    /* margin: 40px auto; Remove margin here if main-content handles centering */
+    
+    /* Glowing effect */
+    box-shadow: 
+        0 0 40px rgba(160, 82, 201, 0.4), /* Primary purple glow */
+        0 0 80px rgba(255, 255, 255, 0.6), /* Secondary white glow for luminosity */
+        0 15px 30px rgba(0, 0, 0, 0.2); /* Soft drop shadow for depth */
+    
+    border: 2px solid rgba(160, 82, 201, 0.3); /* Subtle purple border */
+    animation: fadeInGlow 1s ease-out forwards; /* Fade in with glow */
+    color: #333; /* Darker text for readability on light background */
+    position: relative; /* For pseudo-elements or inner glows */
+    overflow: hidden; /* Important for inner glow effects */
 }
 
-@keyframes fadeInScale {
+/* Keyframe for the new fade in with glow animation */
+@keyframes fadeInGlow {
     from {
         opacity: 0;
-        transform: scale(0.95);
+        transform: translateY(20px) scale(0.98);
+        box-shadow: 0 0 0 rgba(160, 82, 201, 0), 0 0 0 rgba(255, 255, 255, 0);
     }
     to {
         opacity: 1;
-        transform: scale(1);
+        transform: translateY(0) scale(1);
+        box-shadow: 
+            0 0 40px rgba(160, 82, 201, 0.4), 
+            0 0 80px rgba(255, 255, 255, 0.6),
+            0 15px 30px rgba(0, 0, 0, 0.2);
     }
 }
 
+/* Inner glow effect for .transfer-form-container (optional, makes it more "glowing from within") */
+.transfer-form-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 20px;
+    box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.5), /* Inner white glow */
+                inset 0 0 15px rgba(160, 82, 201, 0.3); /* Inner purple glow */
+    pointer-events: none; /* Allows clicks to pass through */
+    z-index: 1; /* Above background, below content */
+}
+
+
 .transfer-form-container h2 {
-    color: #ffffff;
+    color: #6a0dad; /* Deep purple for headings */
     text-align: center;
-    margin-bottom: 30px;
-    font-size: 28px;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8); /* Stronger white glow */
+    margin-bottom: 35px;
+    font-size: 32px;
+    text-shadow: 0 0 15px rgba(160, 82, 201, 0.3); /* Soft purple text shadow */
+    position: relative;
+    z-index: 2; /* Ensure heading is above inner glow */
 }
 
 .form-group {
@@ -119,8 +160,8 @@ body {
 .form-group label {
     display: block;
     margin-bottom: 8px;
-    color: #e0e0e0; /* Light grey */
-    font-weight: bold;
+    color: #444; /* Darker grey for labels */
+    font-weight: 600; /* Slightly bolder labels */
 }
 
 .form-group input[type="text"],
@@ -129,43 +170,44 @@ body {
 .form-group textarea {
     width: calc(100% - 20px); /* Adjust for padding */
     padding: 12px;
-    border: 1px solid rgba(200, 100, 255, 0.5); /* Light purple border */
+    background-color: rgba(255, 255, 255, 0.9); /* Opaque white input background */
+    border: 1px solid #ccc; /* Lighter border for inputs */
     border-radius: 8px;
-    background-color: rgba(255, 255, 255, 0.1); /* Slightly transparent white input background */
-    color: #ffffff;
+    color: #333; /* Dark text for input content */
     font-size: 16px;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
     outline: none;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); /* Subtle inner shadow for depth */
 }
 
 .form-group input[type="text"]::placeholder,
 .form-group input[type="number"]::placeholder,
 .form-group textarea::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+    color: #888; /* Darker placeholder text */
 }
 
 .form-group input[type="text"]:focus,
 .form-group input[type="number"]:focus,
 .form-group select:focus,
 .form-group textarea:focus {
-    border-color: #a052c9; /* Stronger purple on focus */
-    box-shadow: 0 0 15px rgba(200, 100, 255, 0.6); /* Purple glow on focus */
+    border-color: #8a2be2; /* Vibrant purple on focus */
+    box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.2), inset 0 1px 3px rgba(0,0,0,0.1); /* Soft glowing ring on focus */
 }
 
 .form-group select option {
-    background-color: #2c003e; /* Dark background for dropdown options */
-    color: #ffffff;
+    background-color: #ffffff; /* White background for dropdown options */
+    color: #333; /* Dark text for options */
 }
 
 .currency-symbol {
-    color: #c9a0dc; /* Purple color for currency symbol */
+    color: #6a0dad; /* Deep purple for currency symbol */
     font-weight: bold;
     margin-left: 5px;
 }
 
 #display_current_balance, #current_currency_display {
     font-weight: bold;
-    color: #c9a0dc; /* Purple for balance */
+    color: #6a0dad; /* Deep purple for balance */
 }
 
 /* --- NEW / MODIFIED RULES FOR TRANSACTION DISPLAY --- */
@@ -200,26 +242,36 @@ body {
 
 /* Messages */
 .message {
-    padding: 15px;
+    padding: 18px; /* Slightly more padding */
     margin-bottom: 20px;
-    border-radius: 8px;
+    border-radius: 10px; /* Slightly more rounded */
     font-weight: bold;
     text-align: center;
     animation: slideInFromTop 0.5s ease-out;
+    border-left: 5px solid; /* Emphasize border */
+    font-size: 1.05em; /* Slightly larger text */
 }
 
 .message.success {
-    background-color: rgba(144, 238, 144, 0.2); /* Light green with transparency */
-    color: #90ee90; /* Light green text */
-    border: 1px solid #90ee90;
-    box-shadow: 0 0 10px rgba(144, 238, 144, 0.5);
+    background-color: rgba(220, 255, 220, 0.9); /* Lighter success green */
+    color: #28a745; /* Darker green text */
+    border-color: #28a745;
+    box-shadow: 0 0 15px rgba(40, 167, 69, 0.2);
 }
 
 .message.error {
-    background-color: rgba(255, 99, 71, 0.2); /* Tomato red with transparency */
-    color: #ff6347; /* Tomato red text */
-    border: 1px solid #ff6347;
-    box-shadow: 0 0 10px rgba(255, 99, 71, 0.5);
+    background-color: rgba(255, 220, 220, 0.9); /* Lighter error red */
+    color: #dc3545; /* Darker red text */
+    border-color: #dc3545;
+    box-shadow: 0 0 15px rgba(220, 53, 69, 0.2);
+}
+
+/* Add an info message style for the warning from PHP email failure */
+.message.warning { /* Renamed from 'info' to 'warning' for consistency with PHP */
+    background-color: rgba(255, 245, 200, 0.9); /* Light yellow */
+    color: #ffc107; /* Orange/Yellow text */
+    border-color: #ffc107;
+    box-shadow: 0 0 15px rgba(255, 193, 7, 0.2);
 }
 
 @keyframes slideInFromTop {
@@ -238,7 +290,7 @@ body {
     display: block;
     width: 100%;
     padding: 15px;
-    background: linear-gradient(45deg, #a052c9, #6a0dad); /* Purple gradient */
+    background: linear-gradient(45deg, #8a2be2, #a052c9); /* Consistent purple gradient */
     color: #ffffff;
     border: none;
     border-radius: 8px;
@@ -246,14 +298,14 @@ body {
     font-weight: bold;
     cursor: pointer;
     transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-    box-shadow: 0 5px 20px rgba(160, 82, 201, 0.4); /* Soft purple shadow */
+    box-shadow: 0 8px 25px rgba(138, 43, 226, 0.5); /* Stronger button shadow */
     text-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 
 .button-primary:hover {
-    background: linear-gradient(45deg, #b862e3, #8a2be2); /* Lighter purple gradient on hover */
+    background: linear-gradient(45deg, #9933ff, #b862e3);
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(160, 82, 201, 0.6); /* Enhanced shadow on hover */
+    box-shadow: 0 12px 30px rgba(138, 43, 226, 0.7);
 }
 
 .button-primary:active {
@@ -448,79 +500,170 @@ body {
     visibility: visible;
 }
 
+/* MODIFIED: Modal Styling to inherit or match the glowing style */
 .modal-content {
-    background: linear-gradient(135deg, #3a0050, #1a002a); /* Dark purple gradient */
-    border-radius: 15px;
-    padding: 40px;
+    /* Existing background: linear-gradient(135deg, #3a0050, #1a002a); (dark purple gradient) */
+    /* To make it white and purple glow, you need to override these */
+    background-color: #ffffff; /* Pure white base */
+    background: linear-gradient(160deg, #ffffff 0%, #f0f0ff 30%, #e8e8ff 70%, #f5edff 100%); /* Very light gradient */
+    backdrop-filter: blur(15px); /* Stronger blur for a more ethereal look */
+    -webkit-backdrop-filter: blur(15px); /* Safari support */
+
+    border-radius: 20px; /* More rounded */
+    padding: 40px; /* Generous padding */
     width: 90%;
     max-width: 500px;
     text-align: center;
-    box-shadow: 0 0 30px rgba(160, 82, 201, 0.8), 0 0 60px rgba(255, 255, 255, 0.2); /* Stronger glow */
+    /* Updated glow for modal */
+    box-shadow: 
+        0 0 40px rgba(160, 82, 201, 0.6), /* Stronger purple glow */
+        0 0 80px rgba(255, 255, 255, 0.8), /* Stronger white glow */
+        0 15px 30px rgba(0, 0, 0, 0.3); /* More pronounced depth shadow */
+    
     position: relative;
     transform: translateY(-50px);
     opacity: 0;
     transition: transform 0.4s ease-out, opacity 0.4s ease-out;
-    border: 1px solid rgba(200, 100, 255, 0.5);
+    border: 2px solid rgba(160, 82, 201, 0.5); /* Stronger border */
+    color: #333; /* Dark text for readability */
+    overflow: hidden;
 }
 
-.modal-overlay.active .modal-content {
-    transform: translateY(0);
-    opacity: 1;
+/* Inner glow for modal-content */
+.modal-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 20px;
+    box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.6), /* Inner white glow */
+                inset 0 0 20px rgba(160, 82, 201, 0.4); /* Inner purple glow */
+    pointer-events: none;
+    z-index: 1;
 }
 
 .modal-content h3 {
-    color: #e6b3ff; /* Light purple for heading */
+    color: #6a0dad; /* Deep purple for heading */
     margin-top: 0;
-    font-size: 28px;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
-    margin-bottom: 20px;
+    font-size: 30px; /* Larger */
+    text-shadow: 0 0 15px rgba(160, 82, 201, 0.4); /* Stronger purple text shadow */
+    margin-bottom: 25px;
+    position: relative;
+    z-index: 2;
 }
 
 .modal-content p {
-    color: #e0e0e0; /* Light text for paragraphs */
+    color: #555; /* Slightly darker text for paragraphs */
     margin-bottom: 15px;
     line-height: 1.8;
 }
 
 .modal-content strong {
-    color: #ffffff; /* White for strong text */
+    color: #6a0dad; /* Deep purple for strong text in modal */
 }
 
 .modal-content .status-pending {
     color: #FFA500; /* Orange for pending status */
     font-weight: bold;
+    font-size: 1.1em;
 }
 
 .modal-content .modal-reference {
     font-family: 'Courier New', Courier, monospace;
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(160, 82, 201, 0.1); /* Light purple background for reference */
     padding: 8px 12px;
     border-radius: 5px;
     display: inline-block;
-    margin-top: 10px;
+    margin-top: 15px;
     color: #90ee90; /* Greenish glow for reference */
-    box-shadow: 0 0 8px rgba(144, 238, 144, 0.3);
+    box-shadow: 0 0 10px rgba(144, 238, 144, 0.4); /* Stronger glow */
+    border: 1px solid rgba(144, 238, 144, 0.3);
 }
 
 .modal-button {
-    background: linear-gradient(45deg, #6a0dad, #a052c9); /* Purple gradient button */
+    background: linear-gradient(45deg, #8a2be2, #a052c9); /* Consistent purple gradient */
     color: #ffffff;
     border: none;
-    padding: 12px 25px;
+    padding: 14px 30px; /* Larger padding */
     border-radius: 8px;
     cursor: pointer;
-    font-size: 17px;
+    font-size: 18px; /* Larger font */
     font-weight: bold;
-    margin-top: 25px;
+    margin-top: 30px; /* More space */
     transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-    box-shadow: 0 5px 20px rgba(160, 82, 201, 0.4);
+    box-shadow: 0 8px 25px rgba(138, 43, 226, 0.5);
 }
 
 .modal-button:hover {
-    background: linear-gradient(45deg, #8a2be2, #b862e3); /* Lighter gradient on hover */
+    background: linear-gradient(45deg, #9933ff, #b862e3);
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(160, 82, 201, 0.6);
+    box-shadow: 0 12px 30px rgba(138, 43, 226, 0.7);
 }
+
+/* Styling for the transfer type selection buttons/radios */
+.transfer-type-selection {
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    justify-content: center; /* Center buttons */
+    margin-bottom: 30px;
+    gap: 15px; /* Space between buttons */
+}
+
+.transfer-type-selection label {
+    background-color: rgba(255, 255, 255, 0.95); /* Nearly opaque white */
+    border: 1px solid #e0e0e0; /* Light grey border */
+    border-radius: 12px; /* Slightly more rounded */
+    padding: 18px 25px; /* More padding */
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 18px rgba(0,0,0,0.08); /* Stronger normal shadow */
+    color: #444; /* Darker text */
+    font-weight: bold;
+    text-align: center;
+    flex: 1; /* Distribute space evenly */
+    min-width: 150px; /* Ensure buttons don't get too small */
+    display: flex; /* Use flex for icon and text alignment */
+    flex-direction: column; /* Stack icon and text */
+    align-items: center;
+    font-size: 1.05em;
+}
+
+.transfer-type-selection label i {
+    font-size: 1.8em; /* Larger icons */
+    margin-bottom: 8px; /* Space below icon */
+    color: #a052c9; /* Purple icon color */
+    transition: color 0.3s ease;
+}
+
+.transfer-type-selection input[type="radio"] {
+    display: none; /* Hide native radio button */
+}
+
+.transfer-type-selection input[type="radio"]:checked + label {
+    background: linear-gradient(45deg, #a052c9, #8a2be2); /* Purple gradient when checked */
+    color: #ffffff; /* White text when checked */
+    border-color: #8a2be2;
+    box-shadow: 0 8px 25px rgba(138, 43, 226, 0.45); /* Stronger glow when checked */
+    transform: translateY(-5px); /* Lift effect */
+}
+
+.transfer-type-selection input[type="radio"]:checked + label i {
+    color: #ffffff; /* White icon when checked */
+}
+
+.transfer-type-selection label:hover {
+    background-color: rgba(245, 245, 255, 0.95); /* Lighter hover background */
+    box-shadow: 0 7px 20px rgba(0,0,0,0.12); /* Slightly stronger hover shadow */
+    transform: translateY(-2px); /* Subtle lift on hover */
+}
+
+.transfer-type-selection input[type="radio"]:checked + label:hover {
+    background: linear-gradient(45deg, #b862e3, #9933ff); /* Lighter gradient on hover when checked */
+    box-shadow: 0 10px 28px rgba(138, 43, 226, 0.6); /* Even stronger glow */
+}
+
 
 /* Responsive Design */
 @media (max-width: 768px) {
@@ -542,11 +685,11 @@ body {
     }
 
     .transfer-form-container {
-        padding: 25px 30px;
+        padding: 30px 35px; /* Adjust padding */
     }
 
     .transfer-form-container h2 {
-        font-size: 24px;
+        font-size: 28px;
     }
 
     .form-group input,
@@ -565,6 +708,14 @@ body {
     .sidebar {
         width: 230px;
         left: -250px;
+    }
+
+    .modal-content {
+        padding: 30px;
+    }
+
+    .modal-content h3 {
+        font-size: 26px;
     }
 }
 
@@ -594,25 +745,29 @@ body {
     }
 
     .transfer-form-container {
-        padding: 20px;
+        padding: 25px;
         box-shadow: 0 0 15px rgba(150, 0, 255, 0.3), 0 0 25px rgba(255, 255, 255, 0.1); /* Smaller glow for small screens */
+        border-radius: 15px; /* Slightly less rounded for small screens */
     }
 
     .transfer-form-container h2 {
-        font-size: 20px;
+        font-size: 24px;
+        margin-bottom: 25px;
     }
 
     .modal-content {
         padding: 25px;
+        border-radius: 15px;
     }
 
     .modal-content h3 {
         font-size: 22px;
+        margin-bottom: 20px;
     }
 
     .modal-button {
-        padding: 10px 20px;
-        font-size: 15px;
+        padding: 12px 25px;
+        font-size: 16px;
     }
 
     /* Stack description and amount vertically on very small screens */
@@ -626,5 +781,21 @@ body {
     }
     .transaction-amount {
         font-size: 0.9rem; /* Even smaller on mobile */
+    }
+
+    /* Responsive adjustment for transfer type selection */
+    .transfer-type-selection {
+        flex-direction: column; /* Stack buttons vertically on very small screens */
+        gap: 10px;
+    }
+    .transfer-type-selection label {
+        width: 100%; /* Full width when stacked */
+        min-width: unset;
+        padding: 15px 20px;
+        font-size: 1em;
+    }
+    .transfer-type-selection label i {
+        font-size: 1.5em;
+        margin-bottom: 5px;
     }
 }

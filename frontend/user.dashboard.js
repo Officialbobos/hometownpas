@@ -11,23 +11,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Logic for Account Cards Carousel ---
-    const accountCardsWrapper = document.querySelector('.account-cards-wrapper'); // Added wrapper for better targeting
+    const accountCardsWrapper = document.querySelector('.account-cards-wrapper'); // This might be null if not in HTML
     const accountCardsContainer = document.querySelector('.account-cards-container');
     const accountCards = accountCardsContainer ? Array.from(accountCardsContainer.querySelectorAll('.account-card')) : [];
     const accountPagination = document.querySelector('.account-pagination');
-    // Select all toggle indicators
+    // Select all toggle indicators if they exist
     const accountToggleIndicators = accountCardsContainer ? Array.from(accountCardsContainer.querySelectorAll('.account-toggle-indicator')) : [];
-
 
     let currentAccountIndex = 0; // Index of the currently displayed card
 
-    // Helper to get computed styles for card dimensions including margin
+    // Helper to get computed styles for card dimensions including margin/gap
     function getCardDimensions() {
-        if (accountCards.length === 0) return { cardWidth: 0, cardMarginRight: 0, totalCardWidth: 0 };
-        const cardStyle = getComputedStyle(accountCards[0]);
-        const cardWidth = accountCards[0].offsetWidth; // Includes padding and border
-        const gap = parseFloat(cardStyle.marginRight) || 0; // If using margin for gap
-        const totalCardWidth = cardWidth + gap; // Card width + space after it
+        if (accountCards.length === 0) return { cardWidth: 0, gap: 0, totalCardWidth: 0 };
+
+        const cardElement = accountCards[0];
+        const cardStyle = getComputedStyle(cardElement);
+        const cardWidth = cardElement.offsetWidth; // Includes padding and border
+
+        let gap = 0;
+        // Try to get gap from the container (CSS gap/column-gap property)
+        if (accountCardsContainer) {
+            const containerStyle = getComputedStyle(accountCardsContainer);
+            gap = parseFloat(containerStyle.columnGap) || parseFloat(containerStyle.gap) || 0;
+        }
+
+        // Fallback to margin-right if container gap is not set (legacy/different CSS approach)
+        if (gap === 0) {
+            gap = parseFloat(cardStyle.marginRight) || 0;
+        }
+
+        const totalCardWidth = cardWidth + gap;
         return { cardWidth, gap, totalCardWidth };
     }
 
@@ -37,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function showAccountCard(index) {
         if (accountCards.length === 0 || !accountCardsContainer) {
-            console.warn("No account cards or container found for carousel. Skipping carousel logic.");
+            // console.warn("No account cards or container found for carousel. Skipping carousel logic.");
             return;
         }
 
@@ -87,7 +100,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Only show dots if more than one card
         if (accountCards.length <= 1) {
+            accountPagination.style.display = 'none'; // Hide dots if only one card
             return;
+        } else {
+            accountPagination.style.display = 'flex'; // Show dots if multiple cards
         }
 
         accountCards.forEach((_, index) => {
@@ -130,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         accountCardsContainer.addEventListener('touchstart', (e) => {
             // Only start swipe if not on the toggle indicator
             if (e.target.closest('.account-toggle-indicator')) {
+                isSwiping = false; // Do not start swipe if clicking toggle
                 return;
             }
             touchStartX = e.touches[0].clientX;
@@ -147,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Apply the drag visually by directly manipulating transform
             accountCardsContainer.style.transform = `translateX(${currentOffset + diff}px)`;
-        });
+        }, { passive: true });
 
         accountCardsContainer.addEventListener('touchend', (e) => {
             if (!isSwiping) return;
@@ -178,6 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
         accountCardsContainer.addEventListener('mousedown', (e) => {
             // Only left click (main button) and not on the toggle indicator
             if (e.button !== 0 || e.target.closest('.account-toggle-indicator')) {
+                isDragging = false; // Do not start drag if clicking toggle
                 return;
             }
 
@@ -188,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentTranslate = transformMatch ? parseFloat(transformMatch[1]) : 0;
             accountCardsContainer.style.transition = 'none'; // Disable transition during drag
             accountCardsContainer.style.cursor = 'grabbing'; // Change cursor
+            e.preventDefault(); // Prevent default drag behavior (e.g., image drag)
         });
 
         accountCardsContainer.addEventListener('mousemove', (e) => {
@@ -223,79 +242,220 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     } // End of accountCards.length > 0 check
 
-    // --- Account Toggle Button Logic (New Feature) ---
+    // --- Account Toggle Button Logic (Integrated with showAccountCardByType) ---
     accountToggleIndicators.forEach(indicator => {
         indicator.addEventListener('click', (e) => {
-            // Prevent carousel swipe if clicking the indicator
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent carousel swipe/drag event from firing
             const targetAccountType = indicator.dataset.toggleTarget; // e.g., 'savings' or 'checking'
             showAccountCardByType(targetAccountType);
         });
     });
 
 
-    // --- Transfer Modal Logic ---
-    const transferButton = document.getElementById('transferButton');
-    const transferModalOverlay = document.getElementById('transferModalOverlay');
-    const closeTransferModal = document.getElementById('closeTransferModal');
+    // --- UNIFIED DYNAMIC MESSAGE MODAL HANDLING ---
+    // Ensure these elements exist in your HTML (they should based on previous instructions)
+    const dynamicMessageModal = document.getElementById('dynamicMessageModal');
+    const modalTitleElement = dynamicMessageModal ? dynamicMessageModal.querySelector('#modalTitle') : null;
+    const modalMessageContentElement = dynamicMessageModal ? dynamicMessageModal.querySelector('#modalMessageContent') : null;
+    const closeDynamicModalButtons = dynamicMessageModal ? dynamicMessageModal.querySelectorAll('.close-button, .close-modal-button-main') : [];
 
-    if (transferButton && transferModalOverlay && closeTransferModal) {
+    function openDynamicMessageModal(title, message, callback = null) {
+        if (!dynamicMessageModal || !modalTitleElement || !modalMessageContentElement) {
+            console.error("Dynamic message modal elements not found.");
+            return;
+        }
+        modalTitleElement.textContent = title;
+        // Use innerHTML and replace newlines for correct rendering
+        modalMessageContentElement.innerHTML = message.replace(/\n/g, '<br>');
+        dynamicMessageModal.classList.add('active'); // This class controls display: flex
+
+        // Clear previous listeners on the main close button
+        const mainCloseButton = dynamicMessageModal.querySelector('.close-modal-button-main');
+        if (mainCloseButton) {
+            // Clone the node to remove all existing event listeners
+            const newOkayButton = mainCloseButton.cloneNode(true);
+            mainCloseButton.parentNode.replaceChild(newOkayButton, mainCloseButton);
+            newOkayButton.addEventListener('click', () => {
+                closeDynamicMessageModal();
+                if (callback && typeof callback === 'function') {
+                    callback();
+                }
+            });
+        }
+    }
+
+    function closeDynamicMessageModal() {
+        if (dynamicMessageModal) {
+            dynamicMessageModal.classList.remove('active');
+            if (modalMessageContentElement) {
+                modalMessageContentElement.innerHTML = ''; // Clear content on close
+            }
+        }
+    }
+
+    // Add event listeners for closing the dynamic message modal (for X button and overlay click)
+    closeDynamicModalButtons.forEach(button => {
+        // Ensure we don't double-add listeners if they are already handled by openDynamicMessageModal for the main button
+        if (!button.classList.contains('close-modal-button-main')) {
+            button.addEventListener('click', closeDynamicMessageModal);
+        }
+    });
+
+    // Close modal if user clicks outside of it
+    if (dynamicMessageModal) {
+        dynamicMessageModal.addEventListener('click', (event) => {
+            if (event.target === dynamicMessageModal) {
+                closeDynamicMessageModal();
+            }
+        });
+    }
+
+    // --- TRANSFER MODAL (Choose Transfer Type) Handling ---
+    const transferButton = document.getElementById('transferButton'); // The main 'Transfer' action button
+    const transferModalOverlay = document.getElementById('transferModalOverlay'); // The choose transfer type modal
+    const closeTransferModalButton = document.getElementById('closeTransferModal');
+    const transferOptionButtons = document.querySelectorAll('.transfer-options-list .transfer-option');
+
+    if (transferButton && transferModalOverlay && closeTransferModalButton) {
         transferButton.addEventListener('click', () => {
             transferModalOverlay.classList.add('active');
         });
 
-        closeTransferModal.addEventListener('click', () => {
+        closeTransferModalButton.addEventListener('click', () => {
             transferModalOverlay.classList.remove('active');
         });
 
-        // Close modal if clicking on the overlay itself (outside the content)
-        transferModalOverlay.addEventListener('click', (e) => {
-            if (e.target === transferModalOverlay) {
+        // Close transfer type modal if user clicks outside of it
+        transferModalOverlay.addEventListener('click', (event) => {
+            if (event.target === transferModalOverlay) {
                 transferModalOverlay.classList.remove('active');
             }
         });
     }
 
-    // --- Sidebar Logic ---
-    const menuIcon = document.getElementById('menuIcon');
-    const sidebar = document.getElementById('sidebar');
-    const closeSidebarBtn = document.getElementById('closeSidebarBtn');
-    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    // --- Logic for displaying admin-set transfer message ---
+    transferOptionButtons.forEach(button => {
+        button.addEventListener('click', (event) => {
+            // Check if the admin-set message should be shown for transfers
+            // `showTransferModal` and `transferModalMessage` are global constants set by PHP
+            if (window.showTransferModal && window.transferModalMessage) {
+                event.preventDefault(); // Stop the navigation to transfer page
+                transferModalOverlay.classList.remove('active'); // Close the choose transfer type modal
 
-    if (menuIcon && sidebar && closeSidebarBtn && sidebarOverlay) {
-        menuIcon.addEventListener('click', () => {
-            sidebar.classList.add('active');
-            sidebarOverlay.classList.add('active');
-        });
+                const originalHref = button.dataset.href; // Get the original link from data-href
 
-        closeSidebarBtn.addEventListener('click', () => {
-            sidebar.classList.remove('active');
-            sidebarOverlay.classList.remove('active');
-        });
-
-        // Close sidebar if clicking on the overlay
-        sidebarOverlay.addEventListener('click', () => {
-            sidebar.classList.remove('active');
-            sidebarOverlay.classList.remove('active');
-        });
-    }
-
-    // --- View My Cards Logic ---
-    // Make sure the <a> tag in dashboard.php has id="viewMyCardsButton"
-    const viewMyCardsButton = document.getElementById('viewMyCardsButton');
-
-    if (viewMyCardsButton) {
-        viewMyCardsButton.addEventListener('click', (e) => {
-            e.preventDefault(); // Prevent default link behavior
-
-            // Check if BASE_URL_JS is defined (it should be, via the PHP script block)
-            if (typeof BASE_URL_JS !== 'undefined') {
-                window.location.href = `${BASE_URL_JS}/bank_cards`; // Ensure this matches your router
+                openDynamicMessageModal(
+                    'Transfer Information',
+                    window.transferModalMessage,
+                    () => { // Callback to execute after user clicks 'Okay'
+                        window.location.href = originalHref;
+                    }
+                );
             } else {
-                console.error("BASE_URL_JS is not defined. Cannot navigate to bank cards.");
-                // Fallback to relative path, though relying on BASE_URL_JS is better
-                window.location.href = './bank_cards';
+                // If no message or message is turned off, proceed with normal transfer logic
+                const href = button.dataset.href;
+                if (href) {
+                    window.location.href = href;
+                }
+            }
+        });
+    });
+
+
+    // --- MODIFIED LOGIC FOR "VIEW MY CARDS" BUTTON ---
+    const viewCardButton = document.getElementById('viewCardButton');
+
+    if (viewCardButton) {
+        viewCardButton.addEventListener('click', (event) => {
+            event.preventDefault(); // Prevent default navigation initially
+
+            const message = window.cardModalMessage;
+            const show = window.showCardModal;
+
+            const redirectToBankCards = () => {
+                // Function to handle the AJAX call and redirection
+                fetch(BASE_URL_JS + '/api/set_session_for_card_modal.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message, show: show }) // Send current message/show status
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Session set response:', data);
+                    window.location.href = `${BASE_URL_JS}/bank_cards`;
+                })
+                .catch(error => {
+                    console.error('Error setting session for card modal:', error);
+                    // Still redirect even on error to avoid breaking user flow
+                    window.location.href = `${BASE_URL_JS}/bank_cards`;
+                });
+            };
+
+            if (show && message) {
+                // If message should be shown, display the modal first
+                openDynamicMessageModal(
+                    'My Cards Information',
+                    message,
+                    redirectToBankCards // Call the redirect function as a callback
+                );
+            } else {
+                // If no message or message is turned off, proceed directly with setting session (to clear previous) and redirect
+                redirectToBankCards();
             }
         });
     }
+
+    // --- SIDEBAR TOGGLE LOGIC ---
+    const menuIcon = document.querySelector('.menu-icon');
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarOverlay = document.querySelector('.sidebar-overlay');
+    const closeSidebarButton = document.querySelector('.close-sidebar-button');
+
+    // Function to open the sidebar
+    function openSidebar() {
+        if (sidebar && sidebarOverlay) {
+            sidebar.classList.add('active');
+            sidebarOverlay.classList.add('active');
+            // Disable body scrolling when sidebar is open
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    // Function to close the sidebar
+    function closeSidebar() {
+        if (sidebar && sidebarOverlay) {
+            sidebar.classList.remove('active');
+            sidebarOverlay.classList.remove('active');
+            // Re-enable body scrolling
+            document.body.style.overflow = '';
+        }
+    }
+
+    // Event listener for opening the sidebar (menu icon click)
+    if (menuIcon) {
+        menuIcon.addEventListener('click', openSidebar);
+    }
+
+    // Event listener for closing the sidebar (close button click)
+    if (closeSidebarButton) {
+        closeSidebarButton.addEventListener('click', closeSidebar);
+    }
+
+    // Event listener for closing the sidebar (clicking on the overlay)
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', (event) => {
+            // Ensure the click was directly on the overlay, not its children
+            if (event.target === sidebarOverlay) {
+                closeSidebar();
+            }
+        });
+    }
+
+    // --- Initialize dynamic modals if active on page load ---
+    // These are global variables set by PHP in dashboard.php
+    // The previous logic correctly prevents auto-opening these specific modals on dashboard load,
+    // as they are meant to be triggered by button clicks.
+    // The outstanding payment modal is handled separately by PHP directly in dashboard.php.
 });

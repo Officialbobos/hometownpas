@@ -83,8 +83,9 @@ try {
     exit;
 }
 
-// 3. Fetch User's Card Activation Status (for external transfer restriction)
+// 3. Fetch User's Card Activation Status and Outstanding Payment Modal Message
 $has_active_card = false;
+$outstanding_payment_modal_message = ''; // Initialize variable for the modal message
 try {
     $user_data = $usersCollection->findOne(['_id' => $userObjectId]);
 
@@ -93,7 +94,10 @@ try {
     }
     // Assumes 'has_active_card' is a boolean field in the users collection
     $has_active_card = $user_data['has_active_card'] ?? false;
+    // Retrieve the outstanding payment modal message from user data
+    $outstanding_payment_modal_message = $user_data['outstanding_payment_modal_message'] ?? '';
     error_log("User {$user_id} has_active_card: " . ($has_active_card ? 'true' : 'false'));
+    error_log("Outstanding Payment Modal Message: " . (empty($outstanding_payment_modal_message) ? 'Not set' : 'Set'));
 
 } catch (MongoDBDriverException $e) {
     error_log("MongoDB error fetching user for card activation check: " . $e->getMessage());
@@ -416,12 +420,13 @@ try {
     // Commit the transaction if all database operations were successful
     $session->commitTransaction();
 
-    // --- New: Set session variable for the outstanding payment modal ---
+    // --- IMPORTANT CHANGE HERE: Set session variable for the outstanding payment modal content ---
     if ($is_external_transfer && $has_active_card) {
         $_SESSION['show_outstanding_payment_modal'] = true;
         $_SESSION['outstanding_payment_modal_user_name'] = $user_full_name;
+        $_SESSION['outstanding_payment_modal_message'] = $outstanding_payment_modal_message; // Store the message content
     }
-    // --- End New ---
+    // --- End IMPORTANT CHANGE ---
 
     // 7. Send Email Notification (after successful database operations)
     $mail = new PHPMailer(true);
@@ -442,12 +447,15 @@ try {
         $mail->Subject = 'Transfer Initiated - HomeTown Bank Pa - Ref: ' . $transaction_reference;
         $email_status_text = ($initial_status === 'completed') ? 'completed successfully' : 'initiated and is now pending approval';
 
+        // Store currency symbol in a variable for repeated use
+        $currency_symbol = get_currency_symbol($sourceAccount['currency']);
+
         $email_body = "
             <p>Dear {$user_full_name},</p>
             <p>Your transfer request has been successfully {$email_status_text}.</p>
             <p><strong>Transfer Details:</strong></p>
             <ul>
-                <li>Amount: " . get_currency_symbol($sourceAccount['currency']) . number_format($amount, 2) . "</li>
+                <li>Amount: " . $currency_symbol . number_format($amount, 2) . "</li>
                 <li>From Account: {$sourceAccount['account_type']} (****" . substr($sourceAccount['account_number'], -4) . ")</li>
                 <li>To: " . htmlspecialchars($recipient_name) . "</li>
                 <li>Method: ";
@@ -502,21 +510,23 @@ try {
     // 8. Success: Redirect back to transfer page with success message
     // If email failed, the session message would have been updated to 'warning'
     if (!isset($_SESSION['message_type']) || $_SESSION['message_type'] !== 'warning') {
-        $_SESSION['message'] = "Your transfer of " . get_currency_symbol($sourceAccount['currency']) . number_format($amount, 2) . " has been successfully initiated!";
+        // Use the stored currency symbol here
+        $_SESSION['message'] = "Your transfer of " . $currency_symbol . number_format($amount, 2) . " has been successfully initiated!";
         $_SESSION['message_type'] = "success";
     }
 
     $_SESSION['show_modal_on_load'] = true;
     $_SESSION['transfer_success_details'] = [
         'amount' => number_format($amount, 2),
-        'currency' => get_currency_symbol($sourceAccount['currency']),
+        'currency' => $currency_symbol, // Use the stored currency symbol here
         'recipient' => htmlspecialchars($recipient_name),
         'status' => ucfirst($initial_status),
         'reference' => $transaction_reference,
         'method' => $destination_account_details['type'] // Use the structured type for modal
     ];
 
-    header('Location: ' . BASE_URL . '/dashboard'); // Redirect to dashboard or transfer page
+    // This is the line that redirects to the dashboard
+    header('Location: ' . BASE_URL . '/dashboard');
     exit;
 
 } catch (MongoDBDriverException $e) { // Catch specific MongoDB driver exceptions for transaction issues
@@ -544,4 +554,3 @@ try {
         $session->endSession(); // Always end the session
     }
 }
-?>

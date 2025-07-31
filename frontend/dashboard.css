@@ -127,18 +127,22 @@ body {
 /* --- Carousel Specific Styles for Accounts --- */
 .account-cards-container {
     display: flex; /* Use flexbox for horizontal layout */
-    overflow: hidden; /* Hide cards outside the view */
+    /* REMOVE overflow: hidden; from here */
     scroll-snap-type: x mandatory; /* Optional: for native smooth snapping */
     -webkit-overflow-scrolling: touch; /* For smoother scrolling on iOS */
     gap: 20px; /* Space between cards */
     margin-bottom: 20px;
     -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 
-    /* Remove grid properties if they were here */
+    /* Ensure flex-wrap is nowrap, though flex's default is nowrap */
+    flex-wrap: nowrap;
 }
 
 .account-card {
-    flex: 0 0 calc(100% / var(--cards-per-view, 1) - var(--gap-reduction, 0px)); /* Control card width based on visible cards */
+    /* Use the CSS variables to control width dynamically */
+    /* On mobile, you likely want --cards-per-view to be 1 */
+    /* On desktop, it could be 2 or more */
+    flex: 0 0 calc(100% / var(--cards-per-view, 1) - var(--gap-reduction, 0px));
     min-width: 280px; /* Minimum width for each card */
     max-width: 400px; /* Max width to prevent cards from getting too large */
     background-color: rgba(255, 255, 255, 0.05); /* Lighter transparent white for cards */
@@ -710,8 +714,9 @@ body {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(160, 82, 201, 0.6);
 }
+/* --- Responsive Design --- */
 
-/* Responsive Design */
+/* For Tablets and larger phones (up to 768px, including your original 768px break) */
 @media (max-width: 768px) {
     .header {
         padding: 10px 15px;
@@ -730,138 +735,117 @@ body {
         height: 40px;
     }
 
+    /* Important: Section padding should be applied to .dashboard-content-area or directly to the sections */
+    /* if they are inside dashboard-content-area */
+    .dashboard-content-area {
+        padding: 0 15px; /* Adjust main content area padding for smaller screens */
+    }
+
     section {
-        padding: 20px;
-        margin: 15px;
+        padding: 20px 0; /* Maintain vertical padding, horizontal is from dashboard-content-area */
+        margin: 0; /* Remove horizontal margin if padding on content-area is used */
     }
 
     section h2 {
         font-size: 20px;
     }
 
-    /* Carousel adjustments for smaller screens */
+    /* Carousel adjustments for smaller screens (768px and below) */
+    /* Inherits from :root --cards-per-view: 1; and --gap: 20px; */
+    /* The flex: 0 0 calc(...) on .account-card handles the width based on these variables */
     .account-cards-container {
-        --cards-per-view: 1; /* Show 1 card per view on smaller screens */
-        --gap-reduction: 0px; /* No gap reduction needed as only 1 card is visible */
         justify-content: flex-start; /* Align items to the start for smoother swiping */
-        overflow-x: scroll; /* Allow horizontal scrolling */
-        -webkit-overflow-scrolling: touch; /* For smoother scrolling on iOS */
-        scrollbar-width: none; /* Hide scrollbar for Firefox */
-        -ms-overflow-style: none;  /* Hide scrollbar for IE/Edge */
+        /* No overflow-x: scroll here, handled by JS translation */
+        /* No scrollbar hiding here, as no overflow to hide */
     }
 
+    /* The .account-card flex width calculation will automatically be:
+       calc(100% / 1 - (20px * (1 - 1)) / 1) = calc(100% - 0px) = 100%
+       This makes each card exactly 100% width of its parent (.account-cards-wrapper's visible area),
+       which is inside the .dashboard-content-area's padding.
+       This is precisely what you want for a single-card-at-a-time display.
+    */
 
-    .account-cards-container::-webkit-scrollbar { /* Hide scrollbar for Chrome/Safari */
-        display: none;
-    }
-
-    .account-card {
-        flex: 0 0 calc(100% - 20px); /* 100% width minus the gap */
-        margin-right: 20px; /* Explicit margin for gap */
-    }
-    .account-card:last-child {
-        margin-right: 0; /* No margin on the last card */
-    }
-
-
-    .account-balance {
-        text-align: left;
-        margin-top: 10px;
-        width: 100%;
-    }
-
+    /* Your other styles for actions, modals, sidebar etc. go here */
     .actions-section {
-        display: grid; /* Changed to grid here for consistency if you meant 2 columns */
-        grid-template-columns: repeat(2, 1fr); /* 2 columns on smaller screens */
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
         gap: 15px;
     }
-
     .action-button {
         padding: 15px 10px;
         min-width: unset;
         max-width: unset;
     }
-
     .action-button i {
         font-size: 30px;
     }
-
     .action-button p {
         font-size: 13px;
     }
-
     .transfer-modal-content {
         padding: 30px;
     }
-
     .transfer-modal-content h3 {
         font-size: 24px;
     }
-
     .transfer-option {
         padding: 12px;
     }
-
     .transfer-option i {
         font-size: 26px;
     }
-
     .transfer-option p {
         font-size: 13px;
     }
-
     .close-modal-button {
         padding: 10px 20px;
         font-size: 15px;
     }
-
     .sidebar {
         width: 230px;
         left: -250px;
     }
 }
 
+/* For very small screens (up to 480px) */
 @media (max-width: 480px) {
-     .header {
+    .header {
         flex-wrap: wrap;
-        justify-content: space-between; /* Keeps elements at edges */
+        justify-content: space-between;
         align-items: center;
-        padding: 10px 15px; /* Adjust padding as needed for edges */
+        padding: 10px 15px;
     }
 
     .greeting {
         width: 100%;
-        order: 1; /* Move greeting below icons */
+        order: 1;
         margin-top: 10px;
         text-align: center;
     }
 
-     .menu-icon {
-        order: 1; /* Move to the right side of the top row */
+    .menu-icon {
+        order: 1;
         flex: 0 0 auto;
-        /* text-align: right; /* Not strictly necessary if flex handles it */
     }
 
-   
+    .dashboard-content-area {
+        padding: 0 10px; /* Even less padding on very small screens */
+    }
+
     section {
-        padding: 12px;
-        margin: 9px;
+        padding: 12px 0; /* Adjusted vertical padding */
+        margin: 0; /* No horizontal margin if padding on content-area is used */
     }
 
     section h2 {
         font-size: 16px;
     }
 
-    /* Account cards on very small screens (still carousel, but maybe slightly smaller minimums) */
-    .account-card {
-        min-width: 260px;
-        flex: 0 0 calc(100% - 16px); /* ADJUSTED for a smaller margin */
-        margin-right: 16px; /* ADJUSTED */
-    }
-      .account-card:last-child {
-        margin-right: 0;
-    }
+    /* Carousel (account-cards-container and account-card) will inherit from 768px styles,
+       which correctly set --cards-per-view to 1, ensuring single card view. */
 
+    /* Other styles from your snippet */
     .transaction-item {
         flex-direction: column;
         align-items: flex-start;
@@ -883,10 +867,46 @@ body {
     }
 
     .transfer-options-list {
-        grid-template-columns: 1fr; /* Single column for transfer options */
+        grid-template-columns: 1fr;
     }
 
     .transfer-option p {
         font-size: 12px;
+    }
+}
+
+/* For Desktop (min-width: 769px) - Override mobile values as needed */
+@media (min-width: 769px) {
+    /* If you want more than 1 card visible on desktop */
+    :root { /* Or a more specific container if you only want to affect this section */
+        --cards-per-view: 2; /* Show 2 cards at a time */
+        --gap: 20px;
+    }
+
+    /* More padding from the edges on desktop for the overall content area */
+    .dashboard-content-area {
+        padding: 0 40px; /* Example: 40px padding on each side */
+    }
+
+    /* The account-cards-wrapper should ideally be centered on desktop */
+    /* This might be handled by .dashboard-content-area or specifically: */
+    /*
+    .account-cards-wrapper {
+        max-width: var(--dashboard-max-width, 1200px); // Or explicitly set a max-width
+        margin: 0 auto; // Center it if it has a max-width
+    }
+    */
+    /* If .account-cards-wrapper is full width of .dashboard-content-area, and cards-per-view > 1
+       then justify-content: center on account-cards-container could be useful */
+    .account-cards-container {
+        justify-content: center; /* Center the cards within the wrapper on desktop if they don't fill it */
+    }
+}
+
+/* Example for very large screens where you might want more cards */
+@media (min-width: 1200px) {
+    :root {
+        --cards-per-view: 2.5; /* Show 2.5 cards on very large screens */
+        --gap: 20px;
     }
 }

@@ -1,7 +1,9 @@
 <?php
 // C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\manage_modals.php
 
-// Removed session_start() as it should be handled by a central router file.
+// Ensure session starts at the very beginning of the script.
+// No whitespace, comments, or other output before this line.
+session_start();
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../Config.php';
@@ -11,19 +13,25 @@ use MongoDB\BSON\UTCDateTime;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
-// Corrected authentication check to look for 'admin_logged_in'
+// --- Authentication Check ---
+// Log session status before checking
+error_log("manage_modals.php: Session started. admin_user_id: " . ($_SESSION['admin_user_id'] ?? 'Not set') . ", admin_logged_in: " . var_export($_SESSION['admin_logged_in'] ?? null, true));
+
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    error_log("manage_modals.php: Admin not logged in. Redirecting to login page.");
+    // Corrected redirection to point specifically to the admin index/login page
     header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
+// --- End Authentication Check ---
 
 $usersCollection = getCollection('users');
-$modalMessage = ''; // For Transfer Modal
-$isActive = false;  // For Transfer Modal
-$cardModalMessage = ''; // For View My Cards Modal (NEW)
-$showCardModal = false; // For View My Cards Modal (NEW)
-$message = '';
-$message_type = '';
+$modalMessage = ''; // For Transfer Modal (This variable holds the message for the admin form field)
+$isActive = false;  // For Transfer Modal (This variable holds the active status for the admin form field)
+$cardModalMessage = ''; // For View My Cards Modal (NEW) (Admin form field)
+$showCardModal = false; // For View My Cards Modal (NEW) (Admin form field)
+$message = ''; // For displaying admin success/error messages
+$message_type = ''; // For styling admin success/error messages
 
 // Fetch all users for the dropdown
 $allUsers = [];
@@ -33,6 +41,11 @@ try {
 } catch (MongoDBDriverException $e) {
     $message = "Could not load the list of users.";
     $message_type = "error";
+    error_log("MongoDB Error in manage_modals.php (fetching users): " . $e->getMessage());
+} catch (Exception $e) {
+    $message = "An unexpected error occurred while fetching users.";
+    $message_type = "error";
+    error_log("General Error in manage_modals.php (fetching users): " . $e->getMessage());
 }
 
 $selectedUserId = $_GET['user_id'] ?? null; // Get the user ID from the URL
@@ -56,14 +69,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($updateResult->getModifiedCount() > 0) {
                     $message = "Transfer modal message removed successfully.";
                     $message_type = "success";
-                    $modalMessage = ''; // Reset variables to clear the form
+                    $modalMessage = ''; // Reset form variables to clear the form fields
                     $isActive = false;
                 } else {
-                    $message = "No custom transfer message found for this user.";
+                    $message = "No custom transfer message found for this user or no changes needed.";
                     $message_type = "info";
                 }
             } elseif (isset($_POST['save_transfer_message'])) {
                 $modalMessage = trim($_POST['modal_message'] ?? '');
+                // Ensure 'on' is converted to true boolean for MongoDB
                 $isActive = isset($_POST['is_active']) && $_POST['is_active'] === 'on';
 
                 $updateResult = $usersCollection->updateOne(
@@ -95,14 +109,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($updateResult->getModifiedCount() > 0) {
                     $message = "View My Cards modal message removed successfully.";
                     $message_type = "success";
-                    $cardModalMessage = ''; // Reset variables
+                    $cardModalMessage = ''; // Reset form variables
                     $showCardModal = false;
                 } else {
-                    $message = "No custom 'View My Cards' message found for this user.";
+                    $message = "No custom 'View My Cards' message found for this user or no changes needed.";
                     $message_type = "info";
                 }
             } elseif (isset($_POST['save_card_message'])) {
                 $cardModalMessage = trim($_POST['card_modal_message'] ?? '');
+                // Ensure 'on' is converted to true boolean for MongoDB
                 $showCardModal = isset($_POST['is_card_active']) && $_POST['is_card_active'] === 'on';
 
                 $updateResult = $usersCollection->updateOne(
@@ -127,12 +142,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Re-fetch user data to reflect changes immediately after update, in case multiple forms are on one page
             $selectedUser = $usersCollection->findOne(['_id' => new ObjectId($selectedUserId)]);
             if ($selectedUser) {
+                // Update form field variables from the fetched user data
                 $modalMessage = $selectedUser['transfer_modal_message'] ?? '';
                 $isActive = $selectedUser['show_transfer_modal'] ?? false;
                 $cardModalMessage = $selectedUser['card_modal_message'] ?? '';
                 $showCardModal = $selectedUser['show_card_modal'] ?? false;
             }
-
 
         } catch (MongoDBDriverException $e) {
             $message = "Database error: " . $e->getMessage();
@@ -154,15 +169,20 @@ if (!empty($selectedUserId)) {
     try {
         $selectedUser = $usersCollection->findOne(['_id' => new ObjectId($selectedUserId)]);
         if ($selectedUser) {
+            // Update form field variables from the fetched user data
             $modalMessage = $selectedUser['transfer_modal_message'] ?? '';
             $isActive = $selectedUser['show_transfer_modal'] ?? false;
-            $cardModalMessage = $selectedUser['card_modal_message'] ?? ''; // NEW
-            $showCardModal = $selectedUser['show_card_modal'] ?? false; // NEW
+            $cardModalMessage = $selectedUser['card_modal_message'] ?? '';
+            $showCardModal = $selectedUser['show_card_modal'] ?? false;
         }
     } catch (MongoDBDriverException $e) {
         $message = "Could not load current settings for the selected user.";
         $message_type = "error";
         error_log("Admin Manage Modals Load Error: " . $e->getMessage());
+    } catch (Exception $e) { // Catch general exceptions too
+        $message = "An unexpected error occurred while loading user settings.";
+        $message_type = "error";
+        error_log("Admin Manage Modals Load General Error: " . $e->getMessage());
     }
 }
 
@@ -177,10 +197,12 @@ if (!empty($selectedUserId)) {
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         /* ... (Your existing CSS styles remain the same) ... */
-        .dashboard-container { display: flex; flex-direction: column; min-height: 100vh; background-color: #fff; margin: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); overflow: hidden; }
+        body { font-family: 'Roboto', sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
+        .dashboard-container { display: flex; flex-direction: column; min-height: 100vh; background-color: #fff; margin: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); overflow: hidden; width: 100%; max-width: 900px; }
         .dashboard-header { background-color: #007bff; color: white; padding: 20px 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0056b3; }
         .dashboard-header .logo { max-height: 50px; width: auto; margin-right: 20px; }
         .dashboard-header h2 { margin: 0; font-size: 1.8em; flex-grow: 1; }
+        /* Corrected logout button href to point to logout.php within heritagebank_admin */
         .logout-button { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; }
         .logout-button:hover { background-color: #c82333; }
         .dashboard-content { padding: 30px; flex-grow: 1; }
@@ -211,7 +233,7 @@ if (!empty($selectedUserId)) {
             margin-left: 10px;
         }
         .form-group .btn-secondary:hover { background-color: #5a6268; }
-        
+
         .form-group .btn-primary {
             background-color: #28a745; /* Green for submit */
             color: white;
@@ -228,6 +250,34 @@ if (!empty($selectedUserId)) {
         .message-box.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .message-box.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         .message-box.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 768px) {
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 15px 20px;
+            }
+            .dashboard-header .logo {
+                margin-bottom: 10px;
+            }
+            .dashboard-header h2 {
+                margin-bottom: 10px;
+            }
+            .logout-button {
+                width: 100%;
+                text-align: center;
+            }
+            .dashboard-content {
+                padding: 20px;
+            }
+            .form-group .btn-primary,
+            .form-group .btn-secondary {
+                width: 100%;
+                margin-left: 0;
+                margin-top: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -235,7 +285,7 @@ if (!empty($selectedUserId)) {
         <div class="dashboard-header">
             <img src="https://i.imgur.com/YmC3kg3.png" alt="Hometown Bank Logo" class="logo">
             <h2>Manage User Modals</h2>
-            <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/logout'; ?>" class="logout-button">Logout</a>
+            <a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/logout.php'; ?>" class="logout-button">Logout</a>
         </div>
 
         <div class="dashboard-content">
@@ -266,7 +316,7 @@ if (!empty($selectedUserId)) {
                 <h3>Manage Transfer Modal Message for Selected User</h3>
                 <form action="" method="POST">
                     <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($selectedUserId); ?>">
-                    
+
                     <div class="form-group">
                         <label for="modal_message">Transfer Modal Message Content:</label>
                         <textarea id="modal_message" name="modal_message" rows="5" placeholder="Enter the message to display for transfers."><?php echo htmlspecialchars($modalMessage); ?></textarea>
@@ -286,7 +336,7 @@ if (!empty($selectedUserId)) {
                 <h3>Manage View My Cards Modal Message for Selected User</h3>
                 <form action="" method="POST">
                     <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($selectedUserId); ?>">
-                    
+
                     <div class="form-group">
                         <label for="card_modal_message">View My Cards Modal Message Content:</label>
                         <textarea id="card_modal_message" name="card_modal_message" rows="5" placeholder="Enter the message to display for 'View My Cards'."><?php echo htmlspecialchars($cardModalMessage); ?></textarea>
@@ -305,7 +355,7 @@ if (!empty($selectedUserId)) {
                 <p>Please select a user from the dropdown above to manage their modal messages.</p>
             <?php endif; ?>
 
-            <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin" style="display: inline-block; margin-top: 20px; color: #007bff; text-decoration: none;">&larr; Back to Dashboard</a></p>
+            <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/dashboard.php" style="display: inline-block; margin-top: 20px; color: #007bff; text-decoration: none;">&larr; Back to Admin Dashboard</a></p>
         </div>
     </div>
     <script src="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/script.js"></script>
