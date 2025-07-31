@@ -1,4 +1,3 @@
-
 <?php
 // C:\xampp_lite_8_4\www\phpfile-main\functions.php (REVISED AND FIXED)
 
