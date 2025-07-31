@@ -15,7 +15,10 @@ require_once __DIR__ . '/../../vendor/autoload.php'; // Make sure PHPMailer is l
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
+use MongoDB\Driver\Session; // 
 use MongoDB\Driver\Exception\Exception as MongoDBException;
+use Exception; // Also include this for general PHP exceptions
+
 
 // Admin authentication check
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
