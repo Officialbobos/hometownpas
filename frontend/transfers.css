@@ -10,9 +10,6 @@
     --border-color: #ddd;
     --glow-color: rgba(138, 0, 138, 0.5); /* Lighter purple for glow */
     --hover-purple: #5a005a;
-    --selected-account-bg: #e0f2f7; /* Light blue for selected account item */
-    --selected-account-border: #007bff; /* Primary blue for selected account border */
-    --success-color: #28a745; /* Green for balance */
 }
 
 /* Base styles for glowing effect */
@@ -191,25 +188,6 @@ body {
     box-shadow: 0 0 0 3px rgba(138, 0, 138, 0.2);
     outline: none;
 }
-
-/* --- Specific styling for source_account_id to act as a modal trigger on mobile --- */
-/* Hide default dropdown arrow and style it like a button/input */
-#source_account_id {
-    appearance: none; /* Remove default arrow on select */
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="%234a004a"><path d="M9.293 12.95l1.414 1.414L16.414 10l-1.414-1.414L10 12.121 5.879 8l-1.414 1.414L10 14.95z"/></svg>');
-    background-repeat: no-repeat;
-    background-position: right 15px center; /* Adjust position */
-    background-size: 1.2em; /* Adjust size */
-    cursor: pointer;
-    text-align: left; /* Ensure text aligns left */
-    padding-right: 40px; /* Make space for the icon */
-}
-#source_account_id:hover {
-    background-color: var(--light-gray);
-}
-
 
 .input-group {
     display: flex;
@@ -402,8 +380,8 @@ body {
     display: none !important;
 }
 
-/* Modal Styles - Base */
-.modal-overlay { /* Renamed from .modal for clarity, applied to #accountSelectionModal */
+/* Modal Styles */
+.modal {
     display: none; /* Hidden by default */
     position: fixed; /* Stay in place */
     z-index: 1000; /* Sit on top */
@@ -417,13 +395,6 @@ body {
     align-items: center;
     padding: 20px;
     box-sizing: border-box;
-    opacity: 0; /* For fade in/out transition */
-    transition: opacity 0.3s ease;
-}
-
-.modal-overlay.active {
-    display: flex; /* Changed to flex for centering content */
-    opacity: 1;
 }
 
 .modal-content {
@@ -443,6 +414,7 @@ body {
     from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
 
 .modal-content h2 {
     color: var(--purple-dark);
@@ -482,137 +454,23 @@ body {
     flex-grow: 1;
 }
 
-.modal-close-button { /* Renamed from .modal .close-button for consistency with JS */
-    background-color: var(--purple-dark);
-    color: white;
-    padding: 10px 15px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1em;
-    margin-top: 20px;
-    display: block; /* Make it a block element */
-    width: 100%; /* Make it full width */
-    text-align: center;
-    transition: background-color 0.3s ease;
-}
 
-.modal-close-button:hover {
-    background-color: var(--hover-purple);
-}
-
-/* --- NEW: Specific styles for Account Selection Modal --- */
-.account-selection-modal-content {
-    /* Specific overrides or additions for the account selection modal */
-    max-width: 600px; /* Make it a bit wider to accommodate two columns */
-}
-
-.account-selection-modal-content .modal-title {
-    text-align: center;
-    margin-bottom: 20px;
+.modal .close-button {
     color: var(--purple-dark);
-}
-
-.account-categories {
-    display: flex;
-    flex-direction: column; /* Stack categories vertically on mobile by default */
-    gap: 20px;
-}
-
-/* For larger screens, display categories side-by-side */
-@media (min-width: 768px) {
-    .account-categories {
-        flex-direction: row;
-        justify-content: space-around;
-    }
-    .account-category {
-        flex: 1; /* Distribute space equally */
-        padding: 0 10px; /* Add some internal padding */
-    }
-}
-
-.account-category .category-title {
-    color: var(--purple-dark); /* Use your purple for titles */
-    margin-bottom: 10px;
-    border-bottom: 2px solid var(--purple-light);
-    padding-bottom: 5px;
-    text-align: center;
-    font-size: 1.2em;
-}
-
-.account-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    max-height: 250px; /* Limit height and make scrollable for many accounts */
-    overflow-y: auto;
-    padding-right: 5px; /* Space for scrollbar */
-}
-/* Style scrollbar for better appearance */
-.account-list::-webkit-scrollbar {
-    width: 8px;
-}
-.account-list::-webkit-scrollbar-track {
-    background: var(--light-gray);
-    border-radius: 10px;
-}
-.account-list::-webkit-scrollbar-thumb {
-    background: var(--purple-medium);
-    border-radius: 10px;
-}
-.account-list::-webkit-scrollbar-thumb:hover {
-    background: var(--purple-dark);
-}
-
-
-.account-list-item {
-    background-color: var(--light-gray); /* Match your light-gray for list items */
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    padding: 10px 15px;
-    margin-bottom: 8px;
+    position: absolute;
+    top: 15px;
+    right: 25px;
+    font-size: 35px;
+    font-weight: bold;
     cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Subtle shadow */
+    transition: color 0.3s ease;
 }
 
-.account-list-item:hover {
-    background-color: #e9e9e9;
-    border-color: var(--purple-medium);
-    box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+.modal .close-button:hover,
+.modal .close-button:focus {
+    color: var(--purple-light);
+    text-decoration: none;
 }
-
-.account-list-item.selected {
-    background-color: var(--selected-account-bg); /* Light blue from variables */
-    border-color: var(--selected-account-border); /* Primary blue from variables */
-    font-weight: bold;
-    box-shadow: 0 0 8px rgba(0, 123, 255, 0.4); /* Blue glow for selected */
-}
-
-.account-list-item .account-info {
-    text-align: left;
-}
-
-.account-list-item .account-type {
-    font-weight: bold;
-    color: var(--dark-text);
-    font-size: 1.1em;
-}
-.account-list-item .account-number-display {
-    font-family: 'Consolas', 'Monaco', monospace; /* Monospaced font for numbers */
-    font-size: 0.9em;
-    color: #666;
-}
-.account-list-item .account-balance {
-    font-weight: bold;
-    color: var(--success-color); /* Green for balance */
-    font-size: 1.1em;
-}
-/* --- END NEW Account Selection Modal Styles --- */
-
 
 /* Responsive Design */
 @media (max-width: 768px) {
@@ -705,27 +563,10 @@ body {
     .modal-details p strong {
         margin-bottom: 3px;
     }
-    /* No longer applies to new modal close button directly */
-    /* .modal .close-button {
+    .modal .close-button {
         font-size: 30px;
         top: 10px;
         right: 15px;
-    } */
-
-    /* Specific adjustment for account selection modal on small screens */
-    .account-selection-modal-content {
-        padding: 15px; /* Adjust padding for smaller screens */
-    }
-    .account-category {
-        padding: 0; /* Remove horizontal padding on stacked categories */
-    }
-    .account-list {
-        max-height: 200px; /* Adjust max height for smaller screens */
-    }
-
-    .modal-close-button { /* Apply to both modals */
-        font-size: 0.95em;
-        padding: 10px;
     }
 }
 

@@ -1,4 +1,9 @@
 <?php
+<<<<<<< HEAD
+=======
+// Path: C:\xampp\htdocs\hometownbank\api\clear_card_modal_session.php
+
+>>>>>>> 9279b39ec00731d3162e0fb489128bbccc0f0f75
 session_start();
 require_once __DIR__ . '/../vendor/autoload.php'; // For Dotenv
 require_once __DIR__ . '/../Config.php'; // For BASE_URL etc.
@@ -27,4 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 } else {
     http_response_code(405); // Method Not Allowed
     echo json_encode(['status' => 'error', 'message' => 'Invalid request method. Only POST is allowed.']);
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 9279b39ec00731d3162e0fb489128bbccc0f0f75

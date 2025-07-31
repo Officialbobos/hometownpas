@@ -207,7 +207,7 @@ h2 {
     margin: 0; /* Remove default margins */
     font-size: 1em; /* Increased size to match screenshot prominence */
     font-weight: bold; /* Bold as in screenshot */
-    color: rgba(255,255,255,0.9); /* Slightly off-white for contrast on green */
+    color: red(255,255,255,0.9); /* Slightly off-white for contrast on green */
     position: absolute;
     top: 20px; /* Aligned with top padding */
     left: 20px; /* Aligned with left padding */
@@ -245,8 +245,8 @@ h2 {
 /* Card Number */
 .card-number {
     font-family: var(--font-family-card-number);
-    font-size: 1em; /* Significantly larger to match screenshot prominence */
-    letter-spacing: 2.8px; /* Increased spacing between numbers */
+    font-size: 0.8em; /* Significantly larger to match screenshot prominence */
+    letter-spacing: 2.5px; /* Increased spacing between numbers */
     line-height: 1.2em; /* Ensure lines are close for two-line number */
     color: #fff; /* White for dark card backgrounds */
     text-align: center; /* Centered horizontally */
@@ -979,6 +979,18 @@ p.card-cvv-mock {
     }
 }
 
+.modal-overlay.modal-success .modal-content {
+    border-top: 5px solid #28a745; /* Green */
+}
+.modal-overlay.modal-error .modal-content {
+    border-top: 5px solid #dc3545; /* Red */
+}
+.modal-overlay.modal-info .modal-content {
+    border-top: 5px solid #007bff; /* Blue */
+}
+.modal-overlay.modal-warning .modal-content {
+    border-top: 5px solid #ffc107; /* Orange */
+}
 
 /* Smaller Mobile Devices (Up to 400px) - Further refinements for very small screens */
 @media (max-width: 400px) {

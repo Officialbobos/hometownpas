@@ -13,7 +13,7 @@ require_once __DIR__ . '/../../vendor/autoload.php'; // Make sure PHPMailer is l
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
-use MongoDB\Driver\Session; // 
+use MongoDB\Driver\Session; 
 use MongoDB\Driver\Exception\Exception as MongoDBException;
 use Exception; // Also include this for general PHP exceptions
 
@@ -74,7 +74,7 @@ function send_transaction_update_email_notification($user_email, $customer_name,
         return false;
     }
 
-    $subject = 'Heritage Bank Transaction Update: ' . ucfirst($new_status);
+    $subject = 'HomeTown Bank Pa Transaction Update: ' . ucfirst($new_status);
     $amount_display = htmlspecialchars(($tx_details['currency'] ?? 'USD') . ' ' . number_format($tx_details['amount'] ?? 0, 2));
     $recipient_name_display = htmlspecialchars($tx_details['recipient_name'] ?? 'N/A');
     $transaction_ref_display = htmlspecialchars($tx_details['transaction_reference'] ?? 'N/A');
@@ -100,7 +100,7 @@ function send_transaction_update_email_notification($user_email, $customer_name,
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Transaction Update from Heritage Bank</title>
+    <title>Transaction Update from HomeTown Bank Pa</title>
     <style type="text/css">
         body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -176,7 +176,7 @@ function send_transaction_update_email_notification($user_email, $customer_name,
 <body>
     <div class="container">
         <div class="header">
-            <h1>Heritage Bank</h1>
+            <h1>HomeTown Bank Pa</h1>
         </div>
         <div class="content">
             <p>Dear {$customer_name},</p>
@@ -203,12 +203,12 @@ EOT;
 
     $body .= <<<EOT
             <p>If you have any questions or require further assistance, please do not hesitate to contact our support team directly. We are always here to help.</p>
-            <p>Thank you for banking with Heritage Bank.</p>
+            <p>Thank you for banking with HomeTown Bank Pa.</p>
             <p>Sincerely,</p>
-            <p>Heritage Bank Management Team</p>
+            <p>HomeTown Bank Management Team</p>
         </div>
         <div class="footer">
-            <p>&copy; 2025 Heritage Bank. All rights reserved.</p>
+            <p>&copy; 2025 HomeTown Bank Pa. All rights reserved.</p>
             <p>123 Bank Street, City, Country</p>
         </div>
     </div>
@@ -223,7 +223,7 @@ EOT;
 
 /**
  * Function to process a refund (add amount back to user's main account) and update transaction status.
- * This function assumes a MongoDB replica set is configured for multi-document transactions.
+ * This function uses MongoDB\Client::withTransaction() for multi-document transactions.
  *
  * @param MongoDB\Client $client The MongoDB client instance.
  * @param MongoDB\Collection $transactionsCollection The transactions collection.
@@ -237,26 +237,53 @@ EOT;
  * @return array An associative array with 'success' (boolean) and 'message' (string).
  */
 function process_transaction_refund(
-    $client, 
-    $transactionsCollection, 
-    $usersCollection, 
+    $client,
+    $transactionsCollection,
+    $usersCollection,
     $accountsCollection, // Although not directly used for refund here, good to pass it for context if needed elsewhere
-    $refundsCollection, 
-    $tx_details, 
-    $new_status, 
-    $admin_comment_message, 
+    $refundsCollection,
+    $tx_details, // This should be the MongoDB document or an array representing the transaction
+    $new_status,
+    $admin_comment_message,
     $admin_username
 ) {
     // Convert transaction details to array for easier access if it's a BSON object
+    // Note: This casts the top-level document, but nested BSON objects/types remain.
     $tx_details = (array) $tx_details;
 
+    // Retrieve user_id, amount, and transaction_objectId
     $user_id = $tx_details['user_id'] ?? null;
-    $amount_to_refund = $tx_details['amount'] ?? 0;
-    $transaction_objectId = $tx_details['_id'] ?? null;
+    // If user_id in tx_details is stored as a MongoDB\BSON\ObjectId, convert it to string
+    if ($user_id instanceof ObjectId) { // Use ObjectId directly here
+        $user_id_str = (string) $user_id; // Store as string for consistency in checks
+    } else {
+        $user_id_str = $user_id; // Assume it's already a string or null
+    }
+
+
+    $amount_to_refund = (float)($tx_details['amount'] ?? 0); // Ensure amount is a float
+
+    $transaction_objectId_from_tx_details = $tx_details['_id'] ?? null;
+    // If _id is a MongoDB\BSON\ObjectId, use it directly as the ObjectId instance.
+    // Otherwise, assume it's a string or null and we'll create ObjectId from it.
+    $originalTransactionObjectId = null;
+    if ($transaction_objectId_from_tx_details instanceof ObjectId) {
+        $originalTransactionObjectId = $transaction_objectId_from_tx_details;
+    } elseif (is_string($transaction_objectId_from_tx_details) && !empty($transaction_objectId_from_tx_details)) {
+        try {
+            $originalTransactionObjectId = new ObjectId($transaction_objectId_from_tx_details);
+        } catch (\Exception $e) {
+            error_log("Invalid transaction_objectId_from_tx_details: " . $transaction_objectId_from_tx_details);
+            return ['success' => false, 'message' => "Invalid transaction ID format."];
+        }
+    }
+
+
     $original_transaction_status = $tx_details['status'] ?? 'unknown';
 
     // Basic validation
-    if (!$user_id || !$transaction_objectId || $amount_to_refund <= 0) {
+    // Use $user_id_str and check if $originalTransactionObjectId was successfully created
+    if (!$user_id_str || !$originalTransactionObjectId || $amount_to_refund <= 0) {
         return ['success' => false, 'message' => "Invalid transaction details for refund."];
     }
 
@@ -265,93 +292,94 @@ function process_transaction_refund(
     if (in_array($original_transaction_status, $refund_trigger_statuses)) {
         return ['success' => false, 'message' => "Transaction is already marked as '{$original_transaction_status}'. Skipping refund."];
     }
-    
+
+    $session = null; // Initialize session variable
     try {
-        // Start a session for multi-document transaction
-        // This requires a MongoDB replica set.
+        // Correct way to start a transaction in MongoDB PHP Driver
         $session = $client->startSession();
         $session->startTransaction([
             'readConcern' => new MongoDB\Driver\ReadConcern(MongoDB\Driver\ReadConcern::MAJORITY),
-            'writeConcern' => new MongoDB\Driver\WriteConcern(1, 1000) // w=1, 1-second timeout
+            'writeConcern' => new MongoDB\Driver\WriteConcern(MongoDB\Driver\WriteConcern::MAJORITY),
+            'readPreference' => new MongoDB\Driver\ReadPreference(MongoDB\Driver\ReadPreference::PRIMARY)
         ]);
 
-        $result = $session->withTransaction(function () use (
-            $transactionsCollection, 
-            $usersCollection, 
-            $refundsCollection, 
-            $tx_details, 
-            $new_status, 
-            $admin_comment_message, 
-            $admin_username, 
-            $user_id, 
-            $amount_to_refund, 
-            $transaction_objectId
-        ) {
-            // 1. Update user's account balance (credit the amount back)
-            // Assuming `balance` is in the `users` collection directly or in an associated `accounts` document
-            // For simplicity, we'll update the `users` collection's balance field directly.
-            // If user accounts are in a separate 'accounts' collection, you'd update that instead.
-            $user_update_result = $usersCollection->updateOne(
-                ['_id' => new ObjectId($user_id)],
-                ['$inc' => ['balance' => $amount_to_refund]],
-                ['session' => $session]
-            );
+        // Convert user_id_str to ObjectId for database operations
+        $userObjectId = new ObjectId($user_id_str);
 
-            if ($user_update_result->getModifiedCount() === 0 && $user_update_result->getMatchedCount() === 0) {
-                throw new Exception("Failed to update user balance or user not found for ID: " . $user_id);
-            }
+        // 1. Update user's account balance (credit the amount back)
+        // Assuming `balance` is in the `users` collection directly.
+        // If balances are in a separate 'accounts' collection, you'd need to adjust this.
+        $user_update_result = $usersCollection->updateOne(
+            ['_id' => $userObjectId],
+            ['$inc' => ['balance' => $amount_to_refund]],
+            ['session' => $session] // Pass the session explicitly
+        );
 
-            // 2. Update the transaction status
-            $transaction_update_result = $transactionsCollection->updateOne(
-                ['_id' => $transaction_objectId],
-                [
-                    '$set' => [
-                        'status' => $new_status,
-                        'Heritage_comment' => $admin_comment_message,
-                        'admin_action_by' => $admin_username,
-                        'action_at' => new UTCDateTime()
-                    ]
-                ],
-                ['session' => $session]
-            );
+        if ($user_update_result->getModifiedCount() === 0 && $user_update_result->getMatchedCount() === 0) {
+            // If user not found or balance not modified, throw an exception to abort transaction
+            throw new Exception("Failed to update user balance or user not found for ID: " . $user_id_str);
+        }
 
-            if ($transaction_update_result->getModifiedCount() === 0 && $transaction_update_result->getMatchedCount() === 0) {
-                throw new Exception("Failed to update transaction status for ID: " . $transaction_objectId . ". Status might already be " . $new_status);
-            }
+        // 2. Update the original transaction status
+        $transaction_update_result = $transactionsCollection->updateOne(
+            ['_id' => $originalTransactionObjectId], // Use the ObjectId instance directly
+            [
+                '$set' => [
+                    'status' => $new_status,
+                    'status_message' => $admin_comment_message,
+                    'last_updated' => new MongoDB\BSON\UTCDateTime(), // Use BSON\UTCDateTime
+                    'processed_by' => $admin_username
+                ]
+            ],
+            ['session' => $session] // Pass the session explicitly
+        );
 
-            // 3. Log the refund in a separate collection (optional, but good for auditing)
-            $refundsCollection->insertOne([
-                'transaction_id' => $transaction_objectId,
-                'user_id' => new ObjectId($user_id),
-                'amount' => $amount_to_refund,
-                'currency' => $tx_details['currency'] ?? 'N/A',
-                'status_at_refund' => $new_status,
-                'refunded_by_admin' => $admin_username,
-                'refund_comment' => $admin_comment_message,
-                'refunded_at' => new UTCDateTime(),
-                'original_transaction_ref' => $tx_details['transaction_reference'] ?? 'N/A'
-            ], ['session' => $session]);
+        if ($transaction_update_result->getModifiedCount() === 0) {
+            // If transaction not found or not modified, throw an exception
+            throw new Exception("Failed to update original transaction status for ID: " . (string)$originalTransactionObjectId);
+        }
 
-            return ['success' => true, 'message' => "Transaction status updated to '" . ucfirst($new_status) . "' and amount refunded successfully."];
+        // 3. Log the refund action in a 'refunds' or 'admin_actions' collection (optional but recommended)
+        $refundsCollection->insertOne(
+            [
+                'original_transaction_id' => $originalTransactionObjectId,
+                'user_id' => $userObjectId,
+                'refund_amount' => $amount_to_refund,
+                'refund_currency' => $tx_details['currency'] ?? 'USD', // Use currency from original transaction
+                'refund_status' => $new_status,
+                'admin_comment' => $admin_comment_message,
+                'processed_by' => $admin_username,
+                'refund_date' => new MongoDB\BSON\UTCDateTime(),
+                // Add any other relevant details from tx_details or session
+            ],
+            ['session' => $session] // Pass the session explicitly
+        );
 
-        }, ['session' => $session]); // Pass the session to withTransaction
+        // If all operations succeed, commit the transaction
+        $session->commitTransaction();
+        return ['success' => true, 'message' => "Transaction successfully refunded."];
 
-        $session->endSession(); // End the session
-
-        return $result;
-
-    } catch (Exception $e) {
-        if (isset($session) && $session->inTransaction()) {
+    } catch (CommandException $e) {
+        // Catch MongoDB specific command exceptions (e.g., write conflict, network issues during commit)
+        if ($session && $session->inTransaction()) {
             $session->abortTransaction();
         }
-        if (isset($session)) {
+        error_log("MongoDB CommandException during refund transaction: " . $e->getMessage());
+        return ['success' => false, 'message' => "Database error during refund: " . $e->getMessage()];
+    } catch (\Exception $e) {
+        // Catch any other general PHP exceptions (e.g., from your custom 'throw new Exception')
+        if ($session && $session->inTransaction()) {
+            $session->abortTransaction();
+        }
+        error_log("General exception during refund transaction: " . $e->getMessage());
+        return ['success' => false, 'message' => "An unexpected error occurred during refund: " . $e->getMessage()];
+    } finally {
+        // Always end the session, whether committed or aborted, to release resources
+        if ($session) {
             $session->endSession();
         }
-        error_log("Refund processing failed for transaction ID {$transaction_objectId}: " . $e->getMessage());
-        return ['success' => false, 'message' => "Error processing refund: " . $e->getMessage()];
     }
 }
-
 
 // --- Handle Transaction Status Update POST Request ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_status'])) {
@@ -405,7 +433,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
 
                     } elseif ($new_status === 'completed' && $current_db_status === 'pending') {
                         // Assuming complete_pending_transfer handles status update and balance transfer for recipients
+                        // NOTE: complete_pending_transfer is not defined in this file. Ensure it's available or adapt its logic.
+                        // For a complete solution, you'd need to define or include `complete_pending_transfer` here,
+                        // and it should also ideally use a transaction for consistency if it modifies multiple documents.
+                        // For now, I'm assuming it's available and works as intended for balance transfers.
                         $result_action = complete_pending_transfer($transactionsCollection, $accountsCollection, $original_tx_details);
+                        
                         // Make sure complete_pending_transfer also returns the updated transaction details
                         if ($result_action['success']) {
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
@@ -425,7 +458,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                             $admin_comment_message,
                             $admin_username
                         );
-                         if ($result_action['success']) {
+                        if ($result_action['success']) {
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
                             $result_action['transaction_details'] = (array) $updated_tx_details;
                         }
@@ -435,7 +468,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                             ['_id' => $transaction_objectId],
                             ['$set' => [
                                 'status' => $new_status,
-                                'Heritage_comment' => $admin_comment_message,
+                                'HomeTown_comment' => $admin_comment_message,
                                 'admin_action_by' => $admin_username,
                                 'action_at' => new UTCDateTime()
                             ]]

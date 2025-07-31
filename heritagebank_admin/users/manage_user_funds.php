@@ -380,7 +380,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <button type="submit" class="button-primary">Process Funds</button>
             </form>
 
+<<<<<<< HEAD
 <p><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_users'; ?>" class="back-link">&larr; Back to Manage Users</a></p>        </div>
+=======
+            <p><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_users'; ?>" class="back-link">&larr; Back to Manage Users</a></p>
+        </div>
+>>>>>>> 9279b39ec00731d3162e0fb489128bbccc0f0f75
     </div>
 <script src="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/script.js'; ?>"></script>
 </body>

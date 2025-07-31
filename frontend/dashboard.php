@@ -114,6 +114,17 @@ unset($_SESSION['show_outstanding_payment_modal']);
 unset($_SESSION['outstanding_payment_modal_user_name']);
 unset($_SESSION['outstanding_payment_modal_message']);
 
+// NEW: Fetch session-based card modal message and type
+// These are set by the admin panel via set_session_for_card_modal.php
+$sessionCardModalDisplay = $_SESSION['display_card_modal_on_bank_cards'] ?? false;
+$sessionCardModalMessage = $_SESSION['card_modal_message_for_display'] ?? '';
+$sessionCardModalType = $_SESSION['card_modal_message_type'] ?? 'info'; // Default to 'info'
+
+// IMPORTANT: Clear these session variables immediately after fetching them to ensure they only show once
+unset($_SESSION['display_card_modal_on_bank_cards']);
+unset($_SESSION['card_modal_message_for_display']);
+unset($_SESSION['card_modal_message_type']);
+
 
 // 1. Fetch user's accounts from MongoDB
 if ($mongoClient) {
@@ -200,7 +211,7 @@ if (!function_exists('get_currency_symbol')) {
     <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/dashboard.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script>
-        const BASE_URL_JS = "<?php echo rtrim(BASE_URL, '/'); ?>";
+    const BASE_URL_JS = "<?php echo rtrim(BASE_URL, '/') . '/'; ?>";
     </script>
 </head>
 <body>
@@ -451,7 +462,7 @@ if (!function_exists('get_currency_symbol')) {
                 <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/accounts"><i class="fas fa-wallet"></i> Accounts</a></li>
                 <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer"><i class="fas fa-exchange-alt"></i> Transfers</a></li>
                 <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/statements"><i class="fas fa-file-invoice"></i> Statements</a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/profile"><i class="fas fa-user"></i> Profile</a></li>
+                <li><a href="<?php rtrim(BASE_URL, '/'); ?>/profile"><i class="fas fa-user"></i> Profile</a></li>
                 <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/settings"><i class="fas fa-cog"></i> Settings</a></li>
                 <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/bank_cards"><i class="fas fa-credit-card"></i> Bank Cards</a></li>
             </ul>
@@ -502,44 +513,96 @@ if (!function_exists('get_currency_symbol')) {
         const cardModalMessage = <?php echo json_encode($cardModalMessage); ?>;
         const showCardModal = <?php echo json_encode($showCardModal); ?>;
 
-        // You might need to update user.dashboard.js to utilize these or add new JS for them
-        // if they are meant to appear on dashboard load.
-        // For example, if showTransferModal is true, you could make user.dashboard.js open #dynamicMessageModal
-        // with transferModalMessage. Same for cardModalMessage.
-        // I'll add a simple example to show the `dynamicMessageModal` if `showTransferModal` or `showCardModal` is true,
-        // prioritizing the card message if both are true.
+        // NEW: Session-based card modal message, set by admin panel for one-time display
+        const sessionCardModalDisplay = <?php echo json_encode($sessionCardModalDisplay); ?>;
+        const sessionCardModalMessage = <?php echo json_encode($sessionCardModalMessage); ?>;
+        const sessionCardModalType = <?php echo json_encode($sessionCardModalType); ?>;
+
 
         document.addEventListener('DOMContentLoaded', function() {
             const dynamicMessageModal = document.getElementById('dynamicMessageModal');
-            const modalTitleElement = document.getElementById('modalTitle');
-            const modalMessageContentElement = document.getElementById('modalMessageContent');
+            const modalTitleElement = dynamicMessageModal ? dynamicMessageModal.querySelector('#modalTitle') : null; // Select inside the modal
+            const modalMessageContentElement = dynamicMessageModal ? dynamicMessageModal.querySelector('#modalMessageContent') : null; // Select inside the modal
             const closeButtonsDynamic = dynamicMessageModal ? dynamicMessageModal.querySelectorAll('.close-button, .modal-close-button-main') : [];
 
             let messageToShow = '';
             let titleToShow = '';
+            let typeToShow = ''; // To apply class for styling
 
-            if (showCardModal && cardModalMessage) {
+            // Prioritize session-based modal for immediate notifications
+            if (sessionCardModalDisplay && sessionCardModalMessage) {
+                messageToShow = sessionCardModalMessage;
+                titleToShow = "Important Card Update";
+                typeToShow = sessionCardModalType;
+            } else if (showCardModal && cardModalMessage) { // Then check persistent card message from DB
                 messageToShow = cardModalMessage;
                 titleToShow = "Card Activation Information";
-            } else if (showTransferModal && transferModalMessage) {
+                typeToShow = 'info'; // Assuming persistent card message is always 'info' type, or you can add a type field to DB
+            } else if (showTransferModal && transferModalMessage) { // Then check persistent transfer message from DB
                 messageToShow = transferModalMessage;
                 titleToShow = "Important Transfer Notice";
+                typeToShow = 'info'; // Assuming persistent transfer message is always 'info' type, or you can add a type field to DB
             }
 
             if (messageToShow && dynamicMessageModal && modalTitleElement && modalMessageContentElement) {
                 modalTitleElement.textContent = titleToShow;
                 modalMessageContentElement.innerHTML = messageToShow.replace(/\n/g, '<br>'); // Allow new lines
+
+                // Add type class to the modal content for styling
+                dynamicMessageModal.classList.remove('modal-success', 'modal-error', 'modal-info', 'modal-warning'); // Clear existing
+                if (typeToShow) {
+                    dynamicMessageModal.classList.add('modal-' + typeToShow);
+                }
+
                 dynamicMessageModal.style.display = 'flex'; // Show modal
 
                 closeButtonsDynamic.forEach(button => {
                     button.onclick = function() {
                         dynamicMessageModal.style.display = 'none';
+                        // If this was a session-based card modal, signal to clear it on dismissal
+                        if (sessionCardModalDisplay && sessionCardModalMessage) {
+                            fetch(BASE_URL_JS + '/api/clear_card_modal_session.php', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ action: 'clear' }), // A small payload, though the PHP doesn't strictly need it
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    console.log('Session card modal cleared on server.');
+                                } else {
+                                    console.error('Failed to clear session card modal:', data.message);
+                                }
+                            })
+                            .catch(error => console.error('Error clearing session card modal:', error));
+                        }
                     };
                 });
 
                 window.onclick = function(event) {
                     if (event.target == dynamicMessageModal) {
                         dynamicMessageModal.style.display = 'none';
+                        // Same logic for dismissing by clicking outside
+                        if (sessionCardModalDisplay && sessionCardModalMessage) {
+                            fetch(BASE_URL_JS + '/api/clear_card_modal_session.php', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ action: 'clear' }),
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    console.log('Session card modal cleared on server (click outside).');
+                                } else {
+                                    console.error('Failed to clear session card modal (click outside):', data.message);
+                                }
+                            })
+                            .catch(error => console.error('Error clearing session card modal (click outside):', error));
+                        }
                     }
                 };
             }

@@ -2,6 +2,13 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
+    // Ensure BASE_URL_JS is defined (it should be set in dashboard.php before this script)
+    if (typeof BASE_URL_JS === 'undefined') {
+        console.error("BASE_URL_JS is not defined. Please ensure it's set in dashboard.php.");
+        // Fallback or exit if crucial constant is missing
+        return;
+    }
+
     // --- Dynamic User Name Display ---
     const greetingElement = document.querySelector('.greeting h1');
     if (greetingElement) {
@@ -369,39 +376,53 @@ document.addEventListener('DOMContentLoaded', () => {
         viewCardButton.addEventListener('click', (event) => {
             event.preventDefault(); // Prevent default navigation initially
 
-            const message = window.cardModalMessage;
-            const show = window.showCardModal;
+            // These are constants that should be passed from dashboard.php PHP
+            // They hold the *current* state of the card modal settings from the database
+            const messageFromDashboardPHP = window.cardModalMessage; // e.g., "Your new card requires activation."
+            const showFromDashboardPHP = window.showCardModal;     // e.g., true or false
 
             const redirectToBankCards = () => {
-                // Function to handle the AJAX call and redirection
-                fetch(BASE_URL_JS + '/api/set_session_for_card_modal.php', {
+                // Make an AJAX call to set session variables for bank_cards.php
+                // This ensures bank_cards.php displays the modal if needed.
+                fetch(BASE_URL_JS + 'api/set_session_for_card_modal.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ message: message, show: show }) // Send current message/show status
+                    // Send the current message and show status from dashboard's PHP constants
+                    body: JSON.stringify({
+                        message_for_display: messageFromDashboardPHP, // Matches PHP session variable name
+                        display_modal: showFromDashboardPHP           // Matches PHP session variable name
+                    })
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok ' + response.statusText);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    console.log('Session set response:', data);
-                    window.location.href = `${BASE_URL_JS}/bank_cards`;
+                    console.log('Session set response for card modal:', data);
+                    // Redirect after session variables are set
+                    window.location.href = `${BASE_URL_JS}bank_cards`;
                 })
                 .catch(error => {
                     console.error('Error setting session for card modal:', error);
-                    // Still redirect even on error to avoid breaking user flow
-                    window.location.href = `${BASE_URL_JS}/bank_cards`;
+                    // In case of error, still redirect to avoid blocking the user
+                    window.location.href = `${BASE_URL_JS}bank_cards`;
                 });
             };
 
-            if (show && message) {
-                // If message should be shown, display the modal first
+            // If the modal should be shown *before* redirecting to bank_cards.php,
+            // display it using the dynamic message modal
+            if (showFromDashboardPHP && messageFromDashboardPHP) {
                 openDynamicMessageModal(
                     'My Cards Information',
-                    message,
-                    redirectToBankCards // Call the redirect function as a callback
+                    messageFromDashboardPHP,
+                    redirectToBankCards // Callback to redirect after modal is dismissed
                 );
             } else {
-                // If no message or message is turned off, proceed directly with setting session (to clear previous) and redirect
+                // If no message or message is turned off, proceed directly with setting session and redirect
                 redirectToBankCards();
             }
         });
