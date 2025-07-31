@@ -54,6 +54,7 @@ if (isset($_SESSION['message'])) {
 // --- NEW ADDITION: Check for card modal session messages set by set_session_for_card_modal.php ---
 $show_card_modal_from_session = false;
 $card_modal_message_from_session = '';
+$card_modal_message_type_from_session = ''; // Add this variable
 
 // Corrected: Use the specific session variables set in set_session_for_card_modal.php
 if (isset($_SESSION['display_card_modal_on_bank_cards']) && $_SESSION['display_card_modal_on_bank_cards'] === true) {
@@ -61,9 +62,13 @@ if (isset($_SESSION['display_card_modal_on_bank_cards']) && $_SESSION['display_c
     if (isset($_SESSION['card_modal_message_for_display'])) {
         $card_modal_message_from_session = $_SESSION['card_modal_message_for_display'];
     }
-    // Clear these session variables immediately after reading them for one-time display
-    unset($_SESSION['display_card_modal_on_bank_cards']);
-    unset($_SESSION['card_modal_message_for_display']);
+    if (isset($_SESSION['card_modal_message_type'])) { // Get the type as well
+        $card_modal_message_type_from_session = $_SESSION['card_modal_message_type'];
+    }
+    // IMPORTANT: DO NOT UNSET HERE. Let JavaScript handle the unsetting via AJAX
+    // after it confirms the modal is displayed.
+    // unset($_SESSION['display_card_modal_on_bank_cards']);
+    // unset($_SESSION['card_modal_message_for_display']);
 }
 // --- END NEW ADDITION ---
 
@@ -282,8 +287,7 @@ try {
     <div class="modal-overlay" id="cardActivationModal" style="display: none;">
         <div class="modal-content">
             <span class="close-button" id="closeCardActivationModalBtn">&times;</span>
-            <h3 id="cardActivationModalTitle">Card Activation Required</h3>
-            <p id="cardActivationModalMessage"></p>
+            <h3 id="cardActivationModalTitle"></h3> <p id="cardActivationModalMessage"></p>
             <button class="modal-close-button" id="cardActivationModalOkBtn">Dismiss</button>
         </div>
     </div>
@@ -305,6 +309,7 @@ try {
         // These now correctly read the session variables set by set_session_for_card_modal.php
         const initialCardModalMessage = <?php echo json_encode($card_modal_message_from_session); ?>;
         const initialShowCardModal = <?php echo json_encode($show_card_modal_from_session); ?>;
+        const initialCardModalMessageType = <?php echo json_encode($card_modal_message_type_from_session); ?>; // Pass the type
         // --- END NEW ADDITION ---
     </script>
     <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
