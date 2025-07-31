@@ -9,26 +9,35 @@ if (file_exists($dotenvPath . '/.env')) {
     Dotenv\Dotenv::createImmutable($dotenvPath)->load();
 }
 
+// Ensure the request is JSON
 header('Content-Type: application/json');
 
+// Check if the request method is POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Decode the JSON input
     $data = json_decode(file_get_contents('php://input'), true);
 
+    // Get message, show flag, and crucially, the message type from the POST data
     $message = $data['message'] ?? '';
     $show = $data['show'] ?? false;
+    $type = $data['type'] ?? 'info'; // Default to 'info' if not provided
 
-    // Only set if message and show flag are valid
+    // Validate and set session variables
     if (!empty($message) && $show) {
         $_SESSION['display_card_modal_on_bank_cards'] = true;
         $_SESSION['card_modal_message_for_display'] = $message;
-        echo json_encode(['status' => 'success', 'message' => 'Session variables set.']);
+        $_SESSION['card_modal_message_type'] = $type; // Store the message type
+        echo json_encode(['status' => 'success', 'message' => 'Session variables for card modal set.']);
     } else {
-        // Clear session variables if not meant to be shown (e.g., if admin turned it off)
+        // If 'show' is false or message is empty, clear the session variables
         unset($_SESSION['display_card_modal_on_bank_cards']);
         unset($_SESSION['card_modal_message_for_display']);
-        echo json_encode(['status' => 'success', 'message' => 'Session variables cleared/not set.']);
+        unset($_SESSION['card_modal_message_type']); // Clear the type as well
+        echo json_encode(['status' => 'success', 'message' => 'Session variables for card modal cleared/not set.']);
     }
 
 } else {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid request method.']);
+    // Respond with an error for unsupported methods
+    http_response_code(405); // Method Not Allowed
+    echo json_encode(['status' => 'error', 'message' => 'Invalid request method. Only POST is allowed.']);
 }
