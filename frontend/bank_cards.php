@@ -35,9 +35,9 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true || !isset($
     exit;
 }
 
-$user_id = $_SESSION['user_id']; // This should be a string representation of ObjectId from login
-$user_full_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'] ?? ''; // Use session first/last name
-$user_email = $_SESSION['email'] ?? ''; // Use session email
+$user_id = $_SESSION['user_id']; // Assuming user_id is always set after login validation
+$user_full_name = ($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''); // Safely use session first/last name, providing empty string if undefined
+$user_email = $_SESSION['email'] ?? ''; // Safely use session email
 
 $message = '';
 $message_type = '';
