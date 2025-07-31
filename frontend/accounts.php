@@ -258,6 +258,5 @@ if (!function_exists('get_currency_symbol')) {
         </div>
     </main>
     </div>
-    <script src="<?php echo BASE_URL; ?>/frontend/script.js"></script>
 </body>
 </html>
