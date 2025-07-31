@@ -7,48 +7,42 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 // Ensure session is started and Config/functions are available.
-// In a production setup with index.php as a router, these might be handled globally.
-// We'll keep them here for standalone testing flexibility, but comment out if index.php handles them.
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-// --- IMPORTANT: Ensure these are loaded if not handled by a global router (e.g., index.php) ---
-// If your index.php or a central file loads Config.php and functions.php, keep these commented.
-// If this file is accessed directly and Config.php/functions.php are not loaded globally, UNCOMMENT THEM.
-// For this example, I'll assume they are loaded globally as BASE_URL and MongoDB constants are used.
-// require_once __DIR__ . '/../Config.php';
-// require_once __DIR__ . '/../functions.php';
-require_once __DIR__ . '/../vendor/autoload.php'; // For MongoDB classes, if not loaded globally
+
+// Load Composer's autoloader for MongoDB classes
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// IMPORTANT: Ensure Config.php is loaded. In a production setup with an index.php router,
+// this might be handled globally. For standalone access, it's crucial here.
+if (!defined('BASE_URL')) {
+    require_once __DIR__ . '/../Config.php';
+}
+if (!function_exists('get_currency_symbol')) {
+    // This is just a fallback in case functions.php isn't loaded by a router.
+    // Ideally, functions.php would be loaded globally.
+    require_once __DIR__ . '/../functions.php';
+}
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // Check if the user is logged in. If not, redirect to login page.
-// Ensure BASE_URL is defined if Config.php is not globally loaded here.
-if (!defined('BASE_URL')) {
-    // Fallback if Config.php isn't loaded (e.g., for direct file access during testing)
-    // In a production app with a router, BASE_URL should always be defined.
-    // For now, let's assume it's defined globally, otherwise, include Config.php.
-    // If you are absolutely sure Config.php is loaded globally, you can remove this block.
-    // Otherwise, uncomment the require_once lines above.
-    echo "<h1>Configuration error: BASE_URL is not defined.</h1>";
-    exit;
-}
-
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true || !isset($_SESSION['user_id'])) {
-    header('Location: ' . BASE_URL . '/index.php'); // Or wherever your login page is
+    header('Location: ' . BASE_URL . '/'); // Redirect to base URL (login page)
     exit;
 }
 
 $user_id = $_SESSION['user_id']; // This should be a string representation of ObjectId from login
-$user_full_name = $_SESSION['user_full_name'] ?? '';
-$user_email = $_SESSION['user_email'] ?? '';
+$user_full_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'] ?? ''; // Use session first/last name
+$user_email = $_SESSION['email'] ?? ''; // Use session email
 
 $message = '';
 $message_type = '';
 
-// --- EXISTING: Check for general session messages ---
+// --- EXISTING: Check for general session messages (e.g., from card order processing) ---
 if (isset($_SESSION['message'])) {
     $message = $_SESSION['message'];
     $message_type = $_SESSION['message_type'] ?? 'info'; // Default to info if type not set
@@ -57,36 +51,41 @@ if (isset($_SESSION['message'])) {
     unset($_SESSION['message_type']);
 }
 
-// --- NEW ADDITION: Check for card modal session messages set by user.dashboard.js ---
+// --- NEW ADDITION: Check for card modal session messages set by set_session_for_card_modal.php ---
 $show_card_modal_from_session = false;
 $card_modal_message_from_session = '';
 
-// *** CORRECTED SESSION VARIABLE NAMES TO MATCH set_session_for_card_modal.php ***
-if (isset($_SESSION['card_modal_message_for_display'])) {
-    $card_modal_message_from_session = $_SESSION['card_modal_message_for_display'];
-    unset($_SESSION['card_modal_message_for_display']); // Clear it after reading
-}
-if (isset($_SESSION['display_card_modal_on_bank_cards'])) {
-    $show_card_modal_from_session = (bool)$_SESSION['display_card_modal_on_bank_cards'];
-    unset($_SESSION['display_card_modal_on_bank_cards']); // Clear it after reading
+// Corrected: Use the specific session variables set in set_session_for_card_modal.php
+if (isset($_SESSION['display_card_modal_on_bank_cards']) && $_SESSION['display_card_modal_on_bank_cards'] === true) {
+    $show_card_modal_from_session = true;
+    if (isset($_SESSION['card_modal_message_for_display'])) {
+        $card_modal_message_from_session = $_SESSION['card_modal_message_for_display'];
+    }
+    // Clear these session variables immediately after reading them for one-time display
+    unset($_SESSION['display_card_modal_on_bank_cards']);
+    unset($_SESSION['card_modal_message_for_display']);
 }
 // --- END NEW ADDITION ---
 
-// Assuming $mongoDb object is available from index.php's scope
-// If not, uncomment and initialize here:
-// $mongoDb = getMongoDBClient(); // Assuming getMongoDBClient() is in functions.php
-global $mongoDb; // Access the global variable set in index.php
+// MongoDB Connection
+$mongoClient = null;
+try {
+    // If Config.php is loaded, these constants will be available
+    $mongoClient = new Client(MONGODB_CONNECTION_URI);
+    $mongoDb = $mongoClient->selectDatabase(MONGODB_DB_NAME);
 
-if (!$mongoDb) {
-    // If getMongoDBClient() or a global definition is missing
-    // or if the connection failed to be established in index.php
-    error_log("CRITICAL ERROR: MongoDB connection not available in bank_cards.php. Check index.php or getMongoDBClient().");
-    die("<h1>Database connection error. Please try again later.</h1>");
+    $usersCollection = $mongoDb->selectCollection('users');
+    $accountsCollection = $mongoDb->selectCollection('accounts');
+    $bankCardsCollection = $mongoDb->selectCollection('bank_cards');
+
+} catch (MongoDBDriverException $e) {
+    error_log("CRITICAL ERROR: Could not connect to MongoDB in bank_cards.php. " . $e->getMessage());
+    die("<h1>A critical database connection error occurred. Please try again later.</h1>");
+} catch (Exception $e) {
+    error_log("General error during MongoDB client initialization in bank_cards.php: " . $e->getMessage());
+    die("<h1>An unexpected error occurred. Please try again later.</h1>");
 }
 
-$usersCollection = $mongoDb->selectCollection('users');
-$accountsCollection = $mongoDb->selectCollection('accounts');
-$bankCardsCollection = $mongoDb->selectCollection('bank_cards');
 
 try {
     // Convert user_id from session string to MongoDB ObjectId
@@ -94,14 +93,17 @@ try {
 
     // Fetch user's full name and email from the database if not already in session
     // This provides a fallback if session data is somehow lost or incomplete.
-    if (empty($user_full_name) || empty($user_email)) {
+    // We already populate $user_full_name and $user_email from $_SESSION,
+    // so this block is mainly for robustness or if session data is unreliable.
+    if (empty(trim($user_full_name)) || empty($user_email)) {
         $user_doc = $usersCollection->findOne(['_id' => $userObjectId]);
         if ($user_doc) {
             $user_full_name = trim(($user_doc['first_name'] ?? '') . ' ' . ($user_doc['last_name'] ?? ''));
             $user_email = $user_doc['email'] ?? '';
-            // Update session with fetched data for future requests
-            $_SESSION['user_full_name'] = $user_full_name;
-            $_SESSION['user_email'] = $user_email;
+            // Update session for consistency
+            $_SESSION['first_name'] = $user_doc['first_name'] ?? '';
+            $_SESSION['last_name'] = $user_doc['last_name'] ?? '';
+            $_SESSION['email'] = $user_doc['email'] ?? '';
         } else {
             error_log("User with ID " . $user_id . " not found in database for bank_cards.php.");
             $user_full_name = 'Bank Customer'; // Fallback if DB lookup fails
@@ -117,7 +119,7 @@ try {
     $message = "An unexpected error occurred during page setup. Please try again later.";
     $message_type = 'error';
     // If user_id is invalid, it's safer to redirect to login
-    header('Location: ' . BASE_URL . '/index.php?error=invalid_user_session'); // Redirect with an error indicator
+    header('Location: ' . BASE_URL . '/?error=invalid_user_session'); // Redirect with an error indicator
     exit;
 }
 
@@ -125,11 +127,9 @@ try {
 $user_full_name = $user_full_name ?: 'Bank Customer';
 $user_email = $user_email ?: 'default@example.com';
 
-// --- Non-AJAX request, render the HTML page ---
-// We need to fetch the accounts for the dropdown in the form
+// --- Fetch accounts for the "Link to Account" dropdown ---
 $user_accounts_for_dropdown = [];
 try {
-    // Re-use $userObjectId from the initial connection block
     $cursor = $accountsCollection->find(
         ['user_id' => $userObjectId],
         ['projection' => ['account_number' => 1, 'account_type' => 1, 'balance' => 1, 'currency' => 1]]
@@ -149,7 +149,7 @@ try {
     $message_type = 'error';
 } catch (Exception $e) {
     error_log("Error processing user ID for accounts dropdown (General): " . $e->getMessage());
-    $message = "Error loading user data.";
+    $message = "Error loading user account data.";
     $message_type = 'error';
 }
 
@@ -160,7 +160,7 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hometown Bank PA - Manage Cards</title>
-        <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -180,8 +180,8 @@ try {
         <?php
         // This PHP block is for displaying messages directly on the page,
         // it's distinct from the modal message box.
-        if (!empty($message) && !isset($_SESSION['message_displayed'])): // Only display once
-            $_SESSION['message_displayed'] = true; // Set a flag to prevent re-display on refresh
+        // Removed the $_SESSION['message_displayed'] logic, as the messages are unset above.
+        if (!empty($message)):
         ?>
             <p class="message <?php echo $message_type; ?>"><?php echo htmlspecialchars($message); ?></p>
         <?php endif; ?>
@@ -278,10 +278,20 @@ try {
             <button id="messageBoxButton">OK</button>
         </div>
     </div>
+
+    <div class="modal-overlay" id="cardActivationModal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-button" id="closeCardActivationModalBtn">&times;</span>
+            <h3 id="cardActivationModalTitle">Card Activation Required</h3>
+            <p id="cardActivationModalMessage"></p>
+            <button class="modal-close-button" id="cardActivationModalOkBtn">Dismiss</button>
+        </div>
+    </div>
+
+
     <script>
         // These variables must be defined before cards.js is loaded
-        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/'); ?>; // *** ADDED '/' to ensure API calls are correct ***
-        // Assuming 'frontend' is directly under your BASE_URL for frontend assets
+        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/'); ?>;
         const FRONTEND_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/frontend'); ?>;
         const currentUserId = <?php echo json_encode($user_id); ?>;
         const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
@@ -297,6 +307,6 @@ try {
         const initialShowCardModal = <?php echo json_encode($show_card_modal_from_session); ?>;
         // --- END NEW ADDITION ---
     </script>
-        <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
 </body>
 </html>
