@@ -1,8 +1,6 @@
 <?php
 // C:\xampp\htdocs\heritagebank\admin\transactions_management.php
 
-session_start(); // Ensure session is started at the very beginning
-
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
