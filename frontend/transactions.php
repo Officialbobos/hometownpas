@@ -29,6 +29,7 @@ $database = null;
 $transactionsCollection = null;
 $usersCollection = null;
 $accountsCollection = null; // Also need accounts collection for pending transfers
+$refundsCollection = null; // New: For logging refunds
 
 try {
     $client = new Client(MONGODB_CONNECTION_URI, [], [
@@ -40,6 +41,7 @@ try {
     $transactionsCollection = $database->selectCollection('transactions');
     $usersCollection = $database->selectCollection('users'); 
     $accountsCollection = $database->selectCollection('accounts');
+    $refundsCollection = $database->selectCollection('refunds'); // Initialize refunds collection
 } catch (MongoDBException $e) {
     error_log("MongoDB connection error: " . $e->getMessage());
     $_SESSION['error_message'] = "ERROR: Could not connect to the database. Please try again later.";
@@ -60,7 +62,7 @@ if (!in_array($status_filter, $allowed_filters)) {
  * Helper function to construct and send the transaction update email.
  * This function must be defined or included before it's called.
  */
-function send_transaction_update_email_notification($user_email, $tx_details, $new_status, $admin_comment) {
+function send_transaction_update_email_notification($user_email, $customer_name, $tx_details, $new_status, $admin_comment) {
     if (!function_exists('sendEmail')) {
         error_log("sendEmail function not found. Cannot send transaction update email.");
         return false;
@@ -87,10 +89,11 @@ function send_transaction_update_email_notification($user_email, $tx_details, $n
         case 'pending': 
         case 'on hold': 
         case 'restricted': $status_color = '#ffc107'; break; // Yellow/Orange
+        case 'refunded': $status_color = '#17a2b8'; break; // Teal
         default: $status_color = '#6c757d'; break; // Grey
     }
     
-   $body = <<<EOT
+    $body = <<<EOT
 <!DOCTYPE html>
 <html>
 <head>
@@ -183,21 +186,21 @@ function send_transaction_update_email_notification($user_email, $tx_details, $n
                 <p><strong>Amount:</strong> {$amount_display}</p>
                 <p><strong>Recipient:</strong> {$recipient_name_display}</p>
                 <p><strong>New Status:</strong> <span class="status-text" style="color: {$status_color};">
-                    EOT;
+EOT;
 
-                    // Dynamically set the status text color using the $status_color variable
-                    $body .= htmlspecialchars(ucfirst($new_status));
+    // Dynamically set the status text color using the $status_color variable
+    $body .= htmlspecialchars(ucfirst($new_status));
 
-                    $body .= <<<EOT
+    $body .= <<<EOT
                 </span></p>
             </div>
 EOT;
 
-if (!empty($admin_comment)) {
-    $body .= "<p><strong>Bank Comment:</strong> {$comment_display}</p>";
-}
+    if (!empty($admin_comment)) {
+        $body .= "<p><strong>Bank Comment:</strong> {$comment_display}</p>";
+    }
 
-$body .= <<<EOT
+    $body .= <<<EOT
             <p>If you have any questions or require further assistance, please do not hesitate to contact our support team directly. We are always here to help.</p>
             <p>Thank you for banking with Heritage Bank.</p>
             <p>Sincerely,</p>
@@ -212,13 +215,146 @@ $body .= <<<EOT
 </html>
 EOT;
 
-$altBody = strip_tags($body); // This generates a plain-text version for email clients that don't display HTML.
+    $altBody = strip_tags($body); // This generates a plain-text version for email clients that don't display HTML.
 
-return sendEmail($user_email, $subject, $body, $altBody);
+    return sendEmail($user_email, $subject, $body, $altBody);
+} // End of send_transaction_update_email_notification function
+
+/**
+ * Function to process a refund (add amount back to user's main account) and update transaction status.
+ * This function assumes a MongoDB replica set is configured for multi-document transactions.
+ *
+ * @param MongoDB\Client $client The MongoDB client instance.
+ * @param MongoDB\Collection $transactionsCollection The transactions collection.
+ * @param MongoDB\Collection $usersCollection The users collection.
+ * @param MongoDB\Collection $accountsCollection The accounts collection.
+ * @param MongoDB\Collection $refundsCollection The refunds collection for logging.
+ * @param array $tx_details The original transaction details.
+ * @param string $new_status The new status for the transaction (e.g., 'failed', 'declined', 'refunded').
+ * @param string $admin_comment_message Admin's comment.
+ * @param string $admin_username Admin's username.
+ * @return array An associative array with 'success' (boolean) and 'message' (string).
+ */
+function process_transaction_refund(
+    $client, 
+    $transactionsCollection, 
+    $usersCollection, 
+    $accountsCollection, // Although not directly used for refund here, good to pass it for context if needed elsewhere
+    $refundsCollection, 
+    $tx_details, 
+    $new_status, 
+    $admin_comment_message, 
+    $admin_username
+) {
+    // Convert transaction details to array for easier access if it's a BSON object
+    $tx_details = (array) $tx_details;
+
+    $user_id = $tx_details['user_id'] ?? null;
+    $amount_to_refund = $tx_details['amount'] ?? 0;
+    $transaction_objectId = $tx_details['_id'] ?? null;
+    $original_transaction_status = $tx_details['status'] ?? 'unknown';
+
+    // Basic validation
+    if (!$user_id || !$transaction_objectId || $amount_to_refund <= 0) {
+        return ['success' => false, 'message' => "Invalid transaction details for refund."];
+    }
+
+    // Prevent re-processing refunds for already refunded/failed/declined transactions
+    $refund_trigger_statuses = ['failed', 'declined', 'refunded'];
+    if (in_array($original_transaction_status, $refund_trigger_statuses)) {
+        return ['success' => false, 'message' => "Transaction is already marked as '{$original_transaction_status}'. Skipping refund."];
+    }
+    
+    try {
+        // Start a session for multi-document transaction
+        // This requires a MongoDB replica set.
+        $session = $client->startSession();
+        $session->startTransaction([
+            'readConcern' => new MongoDB\Driver\ReadConcern(MongoDB\Driver\ReadConcern::MAJORITY),
+            'writeConcern' => new MongoDB\Driver\WriteConcern(1, 1000) // w=1, 1-second timeout
+        ]);
+
+        $result = $session->withTransaction(function () use (
+            $transactionsCollection, 
+            $usersCollection, 
+            $refundsCollection, 
+            $tx_details, 
+            $new_status, 
+            $admin_comment_message, 
+            $admin_username, 
+            $user_id, 
+            $amount_to_refund, 
+            $transaction_objectId
+        ) {
+            // 1. Update user's account balance (credit the amount back)
+            // Assuming `balance` is in the `users` collection directly or in an associated `accounts` document
+            // For simplicity, we'll update the `users` collection's balance field directly.
+            // If user accounts are in a separate 'accounts' collection, you'd update that instead.
+            $user_update_result = $usersCollection->updateOne(
+                ['_id' => new ObjectId($user_id)],
+                ['$inc' => ['balance' => $amount_to_refund]],
+                ['session' => $session]
+            );
+
+            if ($user_update_result->getModifiedCount() === 0 && $user_update_result->getMatchedCount() === 0) {
+                throw new Exception("Failed to update user balance or user not found for ID: " . $user_id);
+            }
+
+            // 2. Update the transaction status
+            $transaction_update_result = $transactionsCollection->updateOne(
+                ['_id' => $transaction_objectId],
+                [
+                    '$set' => [
+                        'status' => $new_status,
+                        'Heritage_comment' => $admin_comment_message,
+                        'admin_action_by' => $admin_username,
+                        'action_at' => new UTCDateTime()
+                    ]
+                ],
+                ['session' => $session]
+            );
+
+            if ($transaction_update_result->getModifiedCount() === 0 && $transaction_update_result->getMatchedCount() === 0) {
+                throw new Exception("Failed to update transaction status for ID: " . $transaction_objectId . ". Status might already be " . $new_status);
+            }
+
+            // 3. Log the refund in a separate collection (optional, but good for auditing)
+            $refundsCollection->insertOne([
+                'transaction_id' => $transaction_objectId,
+                'user_id' => new ObjectId($user_id),
+                'amount' => $amount_to_refund,
+                'currency' => $tx_details['currency'] ?? 'N/A',
+                'status_at_refund' => $new_status,
+                'refunded_by_admin' => $admin_username,
+                'refund_comment' => $admin_comment_message,
+                'refunded_at' => new UTCDateTime(),
+                'original_transaction_ref' => $tx_details['transaction_reference'] ?? 'N/A'
+            ], ['session' => $session]);
+
+            return ['success' => true, 'message' => "Transaction status updated to '" . ucfirst($new_status) . "' and amount refunded successfully."];
+
+        }, ['session' => $session]); // Pass the session to withTransaction
+
+        $session->endSession(); // End the session
+
+        return $result;
+
+    } catch (Exception $e) {
+        if (isset($session) && $session->inTransaction()) {
+            $session->abortTransaction();
+        }
+        if (isset($session)) {
+            $session->endSession();
+        }
+        error_log("Refund processing failed for transaction ID {$transaction_objectId}: " . $e->getMessage());
+        return ['success' => false, 'message' => "Error processing refund: " . $e->getMessage()];
+    }
+}
+
 
 // --- Handle Transaction Status Update POST Request ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_status'])) {
-    if (!$transactionsCollection || !$usersCollection || !$accountsCollection) {
+    if (!$transactionsCollection || !$usersCollection || !$accountsCollection || !$refundsCollection) {
         $_SESSION['error_message'] = "Database collections not connected. Cannot process update.";
     } else {
         $transaction_id_str = filter_var($_POST['transaction_id'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
@@ -238,20 +374,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                 if (!$original_tx_details) {
                     $_SESSION['error_message'] = "Transaction not found for ID: " . htmlspecialchars($transaction_id_str) . ".";
                 } else {
-                    $original_tx_details = (array) $original_tx_details;
-                    $user_doc = $usersCollection->findOne(['_id' => new ObjectId($original_tx_details['user_id'])]);
+                    $original_tx_details_arr = (array) $original_tx_details; // Convert to array for easier access
+                    $user_doc = $usersCollection->findOne(['_id' => new ObjectId($original_tx_details_arr['user_id'])]);
                     $user_email = $user_doc['email'] ?? null;
-                    $current_db_status = $original_tx_details['status'];
+                    $customer_name = ($user_doc['first_name'] ?? 'Dear') . ' ' . ($user_doc['last_name'] ?? 'Customer'); // Get full name for email
+                    $current_db_status = $original_tx_details_arr['status'];
                     $result_action = ['success' => false, 'message' => 'An unexpected error occurred.', 'transaction_details' => null];
 
-                    // Logic for `complete_pending_transfer` and `reject_pending_transfer`
-                    // Ensure these functions exist in functions.php and handle DB updates and returns correctly
-                    if ($new_status === 'completed' && $current_db_status === 'pending') {
+                    $refund_trigger_statuses = ['failed', 'declined', 'refunded'];
+
+                    if (in_array($new_status, $refund_trigger_statuses)) {
+                        // --- Handle Refund Process ---
+                        $result_action = process_transaction_refund(
+                            $client,
+                            $transactionsCollection,
+                            $usersCollection,
+                            $accountsCollection,
+                            $refundsCollection,
+                            $original_tx_details,
+                            $new_status,
+                            $admin_comment_message,
+                            $admin_username
+                        );
+                        // After refund, fetch updated details to ensure email gets the latest status
+                        if ($result_action['success']) {
+                            $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
+                            $result_action['transaction_details'] = (array) $updated_tx_details;
+                        }
+
+                    } elseif ($new_status === 'completed' && $current_db_status === 'pending') {
+                        // Assuming complete_pending_transfer handles status update and balance transfer for recipients
                         $result_action = complete_pending_transfer($transactionsCollection, $accountsCollection, $original_tx_details);
+                        // Make sure complete_pending_transfer also returns the updated transaction details
+                        if ($result_action['success']) {
+                            $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
+                            $result_action['transaction_details'] = (array) $updated_tx_details;
+                        }
                     } elseif ($new_status === 'declined' && $current_db_status === 'pending') {
-                        $result_action = reject_pending_transfer($transactionsCollection, $accountsCollection, $original_tx_details, $admin_comment_message);
+                        // If 'declined' is chosen from a pending state, it's also a refund scenario.
+                        // We will use the generic refund function for this to ensure consistency.
+                        $result_action = process_transaction_refund(
+                            $client,
+                            $transactionsCollection,
+                            $usersCollection,
+                            $accountsCollection,
+                            $refundsCollection,
+                            $original_tx_details,
+                            $new_status, // This will be 'declined'
+                            $admin_comment_message,
+                            $admin_username
+                        );
+                         if ($result_action['success']) {
+                            $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
+                            $result_action['transaction_details'] = (array) $updated_tx_details;
+                        }
                     } else {
-                           // General status update logic
+                        // General status update logic (for statuses that don't involve a refund or special transfer)
                         $update_result = $transactionsCollection->updateOne(
                             ['_id' => $transaction_objectId],
                             ['$set' => [
@@ -272,23 +450,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                     }
 
                     if ($result_action['success']) {
-                        // Set the session variable for the user's modal (assuming this is picked up by frontend/dashboard.php or similar)
+                        // Use $original_tx_details_arr for email parameters that reflect the *original* transaction,
+                        // but use $result_action['transaction_details'] for the new status.
+                        // Ensure transaction_alert reflects the *new* status and any updated comment
                         $_SESSION['transaction_alert'] = [
                             'status' => $new_status,
                             'message' => $admin_comment_message,
-                            'ref_no' => $original_tx_details['transaction_reference'] ?? 'N/A',
-                            'recipient_name' => $original_tx_details['recipient_name'] ?? 'N/A',
-                            'amount' => $original_tx_details['amount'] ?? 0,
-                            'currency' => $original_tx_details['currency'] ?? 'N/A',
-                            'user_id' => (string)($original_tx_details['user_id'] ?? '') // Ensure this is a string
+                            'ref_no' => $original_tx_details_arr['transaction_reference'] ?? 'N/A',
+                            'recipient_name' => $original_tx_details_arr['recipient_name'] ?? 'N/A',
+                            'amount' => $original_tx_details_arr['amount'] ?? 0,
+                            'currency' => $original_tx_details_arr['currency'] ?? 'N/A',
+                            'user_id' => (string)($original_tx_details_arr['user_id'] ?? '')
                         ];
                         
-                        // Set admin-side messages
                         $_SESSION['success_message'] = $result_action['message'];
 
-                        // Send email notification
-                        if ($user_email) {
-                            if (send_transaction_update_email_notification($user_email, $original_tx_details, $new_status, $admin_comment_message)) {
+                        // Send email notification with the *updated* transaction details if available
+                        if ($user_email && $result_action['transaction_details']) {
+                            if (send_transaction_update_email_notification($user_email, $customer_name, $result_action['transaction_details'], $new_status, $admin_comment_message)) {
                                 $_SESSION['info_message'] = "Email notification sent to " . htmlspecialchars($user_email) . ".";
                             } else {
                                 $_SESSION['error_message'] = "Failed to send email notification to user.";
