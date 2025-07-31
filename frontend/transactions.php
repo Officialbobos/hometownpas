@@ -172,7 +172,7 @@ function formatCurrency($amount, $currency_code) {
         // Add more currencies as needed
         default: $symbol = ''; // Fallback, consider adding the code itself if symbol is unknown
     }
-    return $symbol . number_format((float)$amount, 2);
+    return $symbol . number_format((float)abs($amount), 2); // Always format absolute value, sign is prepended later
 }
 ?>
 
@@ -274,27 +274,76 @@ function formatCurrency($amount, $currency_code) {
                             </thead>
                             <tbody>
                                 <?php foreach ($transactions as $transaction):
-                                    // Determine if it's an incoming or outgoing transaction for display
-                                    // This logic is crucial and might need fine-tuning based on your exact schema
-                                    // and how 'user_id' and 'recipient_user_id' are used.
-                                    // The 'currency' field in 'transactions' document itself is the primary.
-                                    $is_incoming = ($transaction['recipient_user_id'] == $user_id_mongo && $transaction['user_id'] != $user_id_mongo);
-                                    
-                                    $display_amount_sign = ($is_incoming || $transaction['transaction_type'] == 'credit' || strpos($transaction['transaction_type'], 'deposit') !== false) ? '+' : '-';
+                                    // Initialize variables for the amount display and class
+                                    $amount_for_display = (float)$transaction['amount'];
+                                    $amount_class = '';
+                                    $display_amount_string = '';
 
-                                    // Determine the currency to display
-                                    // Prefer the currency of the account involved for the logged-in user
+                                    // Determine if the logged-in user is the sender (debit) or recipient (credit)
+                                    $is_user_sender = (isset($transaction['user_id']) && $transaction['user_id'] == $user_id_mongo);
+                                    $is_user_recipient = (isset($transaction['recipient_user_id']) && $transaction['recipient_user_id'] == $user_id_mongo);
+
+                                    // Determine if it's an incoming or outgoing transaction for the logged-in user
+                                    $is_incoming_for_user = false;
+                                    $is_outgoing_for_user = false;
+
+                                    if ($is_user_sender && $is_user_recipient && $transaction['transaction_type'] === 'internal_self_transfer') {
+                                        // This is a self-transfer affecting two of the user's own accounts
+                                        // How you display this is crucial. If 'amount' is always positive in DB for these,
+                                        // you might show it as neither red nor green, or require more logic based on account numbers.
+                                        // For simplicity here, if it's a self-transfer and the 'amount' field in DB is positive,
+                                        // we'll treat it as a neutral display for the amount itself, or based on its type's implied nature.
+                                        // If your DB stores amount as negative for the debiting side of a self-transfer, the 'else' block will handle it.
+                                        $amount_class = ''; // Neutral color if amount is always positive for self-transfers
+                                        $display_amount_string = formatCurrency($amount_for_display, $transaction['user_account_currency'] ?? 'EUR');
+                                        // You might still explicitly add '+' or '-' if it makes sense within the context of the account it affected.
+                                        // For now, relying on the 'amount' field's sign if it exists, otherwise neutral.
+                                        if ($amount_for_display > 0) {
+                                            $display_amount_string = '+' . $display_amount_string;
+                                            $amount_class = 'text-success'; // Assume positive amount for self-transfer is a 'credit' effect from a global view
+                                        } else if ($amount_for_display < 0) {
+                                            $display_amount_string = '-' . $display_amount_string;
+                                            $amount_class = 'text-danger'; // Assume negative amount for self-transfer is a 'debit' effect
+                                        }
+
+                                    } else if ($is_user_sender) {
+                                        // Logged-in user is the sender (initiator) of the transaction
+                                        $is_outgoing_for_user = true;
+                                    } else if ($is_user_recipient) {
+                                        // Logged-in user is the recipient of the transaction
+                                        $is_incoming_for_user = true;
+                                    }
+
+                                    // Assign amount class and display string based on transaction direction
+                                    if ($is_incoming_for_user || strtolower($transaction['transaction_type']) == 'credit' || strtolower($transaction['transaction_type']) == 'deposit') {
+                                        $amount_class = 'text-success';
+                                        $display_amount_string = '+' . formatCurrency($amount_for_display, $transaction['user_account_currency'] ?? 'EUR');
+                                    } else if ($is_outgoing_for_user || strtolower($transaction['transaction_type']) == 'debit' || strtolower($transaction['transaction_type']) == 'withdrawal') {
+                                        $amount_class = 'text-danger';
+                                        $display_amount_string = '-' . formatCurrency($amount_for_display, $transaction['user_account_currency'] ?? 'EUR');
+                                    } else {
+                                        // Fallback for cases not explicitly covered by sender/recipient logic
+                                        // (e.g., if 'amount' in DB already carries the sign and type isn't perfectly clear)
+                                        if ($amount_for_display >= 0) {
+                                            $amount_class = 'text-success';
+                                            $display_amount_string = '+' . formatCurrency($amount_for_display, $transaction['user_account_currency'] ?? 'EUR');
+                                        } else {
+                                            $amount_class = 'text-danger';
+                                            $display_amount_string = '-' . formatCurrency(abs($amount_for_display), $transaction['user_account_currency'] ?? 'EUR');
+                                        }
+                                    }
+
+
+                                    // Determine the display currency code
                                     $display_currency_code = $transaction['user_account_currency'] ?? ($transaction['currency'] ?? 'EUR');
-
-                                    $display_amount = $display_amount_sign . formatCurrency($transaction['amount'], $display_currency_code);
-                                    $amount_class = ($is_incoming || $transaction['transaction_type'] == 'credit' || strpos($transaction['transaction_type'], 'deposit') !== false) ? 'text-success' : 'text-danger';
 
                                     $display_description = htmlspecialchars($transaction['description']);
                                     $transaction_details = [];
 
+                                    // More detailed description based on transaction type and sender/recipient
                                     if ($transaction['transaction_type'] === 'internal_self_transfer') {
-                                        $display_description = "Transfer from " . htmlspecialchars($transaction['sender_account_number'] ?? 'N/A') . " to " . htmlspecialchars($transaction['recipient_account_number'] ?? 'N/A') . ". " . $display_description;
-                                    } elseif ($transaction['user_id'] == $user_id_mongo) { // This user is the sender
+                                        $transaction_details[] = "From Acc: " . htmlspecialchars($transaction['sender_account_number'] ?? 'N/A') . " to " . htmlspecialchars($transaction['recipient_account_number'] ?? 'N/A');
+                                    } elseif ($is_user_sender) { // This user is the sender (outgoing)
                                         $transaction_details[] = "From Acc: " . htmlspecialchars($transaction['sender_account_number'] ?? 'N/A');
                                         if (!empty($transaction['recipient_name'])) {
                                             $transaction_details[] = "To: " . htmlspecialchars($transaction['recipient_name']);
@@ -310,7 +359,7 @@ function formatCurrency($amount, $currency_code) {
                                         if (!empty($transaction['recipient_bank_name'])) {
                                             $transaction_details[] = "Bank: " . htmlspecialchars($transaction['recipient_bank_name'] ?? '');
                                         }
-                                    } elseif ($transaction['recipient_user_id'] == $user_id_mongo) { // This user is the recipient
+                                    } elseif ($is_user_recipient) { // This user is the recipient (incoming)
                                         $transaction_details[] = "To Acc: " . htmlspecialchars($transaction['recipient_account_number'] ?? 'N/A');
                                         if (!empty($transaction['sender_name'])) {
                                             $transaction_details[] = "From: " . htmlspecialchars($transaction['sender_name']);
@@ -319,17 +368,26 @@ function formatCurrency($amount, $currency_code) {
                                             $transaction_details[] = "Sender Acc: " . htmlspecialchars($transaction['sender_account_number']);
                                         }
                                     }
+
+                                    // Status Class Logic
+                                    $status_class_base = 'status-' . strtolower($transaction['status']);
+                                    $status_class = '';
+                                    if ($status_class_base === 'status-failed' || $status_class_base === 'status-cancelled') {
+                                        $status_class = 'status-failed'; // Group failed and cancelled for red color
+                                    } else {
+                                        $status_class = $status_class_base;
+                                    }
                                 ?>
                                     <tr>
                                         <td><?php echo $transaction['initiated_at']->format('Y-m-d H:i'); ?></td>
                                         <td><?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $transaction['transaction_type']))); ?></td>
                                         <td><?php echo $display_description; ?></td>
                                         <td class="<?php echo $amount_class; ?>">
-                                            <?php echo $display_amount; ?>
+                                            <?php echo $display_amount_string; ?>
                                             <br><small>(<?php echo htmlspecialchars($display_currency_code); ?>)</small>
                                         </td>
                                         <td><?php echo htmlspecialchars($transaction['transaction_reference']); ?></td>
-                                        <td><span class="status-<?php echo htmlspecialchars($transaction['status']); ?>"><?php echo htmlspecialchars(ucfirst($transaction['status'])); ?></span></td>
+                                        <td><span class="<?php echo $status_class; ?>"><?php echo htmlspecialchars(ucfirst($transaction['status'])); ?></span></td>
                                         <td><?php echo implode('<br>', $transaction_details); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
