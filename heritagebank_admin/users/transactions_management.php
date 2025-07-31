@@ -991,7 +991,7 @@ try {
             }
             ?>
 
-         <form action="transactions_management.php" method="GET">
+         <form action="/admin/transactions_management.php" method="POST">
     <label for="filter_status">Filter by Status:</label>
     <select name="status_filter" id="filter_status" onchange="this.form.submit()">
         <option value="all" <?php echo ($status_filter == 'all') ? 'selected' : ''; ?>>All</option>
@@ -1053,7 +1053,7 @@ try {
                                         </span>
                                     </td>
                                     <td data-label="Comment">
-                                        <?php echo !empty($tx['Heritage_comment']) ? htmlspecialchars($tx['Heritage_comment']) : 'N/A'; ?>
+                                        <?php echo !empty($tx['Hometown_comment']) ? htmlspecialchars($tx['Hometown_comment']) : 'N/A'; ?>
                                     </td>
                                     <td data-label="Action By">
                                         <?php echo !empty($tx['admin_action_by']) ? htmlspecialchars($tx['admin_action_by']) : 'N/A'; ?>
@@ -1074,7 +1074,7 @@ try {
                                                 }
                                                 ?>
                                             </select>
-                                            <textarea name="message" rows="3" placeholder="Reason/Comment (optional)" class="admin-comment-textarea"><?php echo htmlspecialchars($tx['Heritage_comment'] ?? ''); ?></textarea>
+                                            <textarea name="message" rows="3" placeholder="Reason/Comment (optional)" class="admin-comment-textarea"><?php echo htmlspecialchars($tx['Hometown_comment'] ?? ''); ?></textarea>
                                             <button type="submit" name="update_transaction_status" class="button-small button-edit">Update</button>
                                         </form>
                                     </td>
