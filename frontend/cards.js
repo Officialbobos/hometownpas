@@ -131,8 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error clearing card modal session:', error);
         }
 
-        // --- NEW: Redirect user to the dashboard after closing the modal ---
-        window.location.href = `${FRONTEND_BASE_URL}dashboard.php`;
+        // *** UPDATED LINE: Redirect user to the dashboard after closing the modal ***
+        window.location.href = `${FRONTEND_BASE_URL}/dashboard.php`; // Added /frontend to path, assuming dashboard is not under frontend/
     }
 
     // Event listeners for the Card Activation/Info Modal
