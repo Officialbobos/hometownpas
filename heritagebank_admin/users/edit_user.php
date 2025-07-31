@@ -2,9 +2,9 @@
 
 // The following lines are for debugging and should not be used on a live production site.
 // Since we are on a live site on Render, I've commented these out for security.
-// ini_set('display_errors', 1);
-// ini_set('display_startup_errors', 1);
-// error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
 require_once __DIR__ . '/../../Config.php'; 
 
