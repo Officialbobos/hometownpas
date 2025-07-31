@@ -1,4 +1,6 @@
 <?php
+// Path: C:\xampp\htdocs\hometownbank\api\set_session_for_card_modal.php
+
 session_start();
 require_once __DIR__ . '/../vendor/autoload.php'; // For Dotenv
 require_once __DIR__ . '/../Config.php'; // For BASE_URL etc.
