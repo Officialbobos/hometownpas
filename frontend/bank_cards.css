@@ -979,6 +979,18 @@ p.card-cvv-mock {
     }
 }
 
+.modal-overlay.modal-success .modal-content {
+    border-top: 5px solid #28a745; /* Green */
+}
+.modal-overlay.modal-error .modal-content {
+    border-top: 5px solid #dc3545; /* Red */
+}
+.modal-overlay.modal-info .modal-content {
+    border-top: 5px solid #007bff; /* Blue */
+}
+.modal-overlay.modal-warning .modal-content {
+    border-top: 5px solid #ffc107; /* Orange */
+}
 
 /* Smaller Mobile Devices (Up to 400px) - Further refinements for very small screens */
 @media (max-width: 400px) {
