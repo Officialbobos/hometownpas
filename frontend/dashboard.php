@@ -340,7 +340,7 @@ if (!function_exists('get_currency_symbol')) {
             <div class="accounts-header-row">
                 <h2>Accounts</h2>
                 <div class="view-all-link">
-                    <a href="<?php echo rtrim(BASE_URL, '/'); ?>/accounts">View all</a>
+                 <a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/accounts.php">View all</a>
                 </div>
             </div>
             <div class="account-cards-container">
