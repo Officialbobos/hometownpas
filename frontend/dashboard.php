@@ -211,7 +211,7 @@ if (!function_exists('get_currency_symbol')) {
     <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/dashboard.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script>
-        const BASE_URL_JS = "<?php echo rtrim(BASE_URL, '/'); ?>";
+    const BASE_URL_JS = "<?php echo rtrim(BASE_URL, '/') . '/'; ?>";
     </script>
 </head>
 <body>
