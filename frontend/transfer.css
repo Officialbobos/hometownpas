@@ -1,737 +1,801 @@
-/* style.css (or transfer.css) */
+/* Path: C:\xampp\htdocs\hometownbank\frontend\transfer.css */
 
-:root {
-    --purple-dark: #4a004a;
-    --purple-medium: #6a006a;
-    --purple-light: #8a008a;
-    --white: #ffffff;
-    --light-gray: #f0f0f0;
-    --dark-text: #333333;
-    --border-color: #ddd;
-    --glow-color: rgba(138, 0, 138, 0.5); /* Lighter purple for glow */
-    --hover-purple: #5a005a;
-    --selected-account-bg: #e0f2f7; /* Light blue for selected account item */
-    --selected-account-border: #007bff; /* Primary blue for selected account border */
-    --success-color: #28a745; /* Green for balance */
-}
-
-/* Base styles for glowing effect */
-@keyframes glow {
-    0% { box-shadow: 0 0 5px var(--glow-color); }
-    50% { box-shadow: 0 0 15px var(--glow-color), 0 0 25px var(--glow-color); }
-    100% { box-shadow: 0 0 5px var(--glow-color); }
-}
-
+/* General Body and Container Styling */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
     padding: 0;
-    background-color: var(--light-gray);
-    color: var(--dark-text);
-    line-height: 1.6;
-    box-sizing: border-box;
+    background: linear-gradient(135deg, #2c003e, #0a011d); /* Dark purple to very dark purple/blue */
+    color: #e0e0e0; /* Light grey for text */
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
 }
 
-/* Header */
-.dashboard-header {
-    background-color: var(--purple-dark);
-    color: var(--white);
-    padding: 15px 20px;
+.container {
+    display: flex;
+    flex-direction: column; /* Stack header, main, sidebar */
+    min-height: 100vh;
+    width: 100%;
+    max-width: 1400px; /* Max width for the entire layout */
+    margin: 0 auto; /* Center the container */
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5); /* Stronger shadow for depth */
+}
+
+/* Header Styling (assuming .dashboard-header or .header) */
+.header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 15px 25px;
+    background-color: rgba(30, 0, 45, 0.8); /* Slightly lighter, transparent dark purple */
+    border-bottom: 1px solid rgba(150, 0, 255, 0.3); /* Purple border */
+    color: #ffffff;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
-.dashboard-header .logo .logo-barclays {
-    height: 40px; /* Adjust as needed */
-    width: auto;
-}
-
-.dashboard-header .user-info {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.dashboard-header .user-info .profile-icon {
+.menu-icon {
     font-size: 24px;
-    color: var(--white);
+    cursor: pointer;
+    color: #c9a0dc; /* Soft purple */
+    transition: color 0.3s ease;
 }
 
-.dashboard-header .user-info span {
-    font-weight: bold;
+.menu-icon:hover {
+    color: #e6b3ff; /* Lighter purple on hover */
 }
 
-.dashboard-header .user-info a {
-    color: var(--white);
-    text-decoration: none;
-    padding: 5px 10px;
-    border: 1px solid var(--white);
-    border-radius: 5px;
-    transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-.dashboard-header .user-info a:hover {
-    background-color: var(--white);
-    color: var(--purple-dark);
-}
-
-/* Main Content Wrapper */
-.transfer-content {
-    flex-grow: 1;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start; /* Align to top */
-    padding: 20px;
-}
-
-/* Transfer Card */
-.transfer-card {
-    background-color: var(--white);
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1), 0 0 30px var(--glow-color); /* Initial glow */
-    width: 100%;
-    max-width: 700px;
-    box-sizing: border-box;
-    animation: glow 3s infinite alternate; /* Apply glowing animation */
-}
-
-.transfer-card h2 {
-    text-align: center;
-    color: var(--purple-dark);
-    margin-bottom: 25px;
-    font-size: 2em;
-    font-weight: 700;
-}
-
-/* Current Balance Display */
-.current-balance {
-    background-color: var(--purple-light);
-    color: var(--white);
-    padding: 15px 20px;
-    border-radius: 8px;
-    margin-bottom: 25px;
-    text-align: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.current-balance h3 {
+.greeting h1 {
     margin: 0;
-    font-size: 1.3em;
+    font-size: 24px;
+    color: #ffffff;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5); /* Subtle white glow */
 }
 
-#display_current_balance {
-    font-weight: bold;
-    font-size: 1.5em;
-    margin-right: 5px;
+.profile-pic img {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    border: 2px solid #a052c9; /* Purple border */
+    object-fit: cover;
+    transition: transform 0.3s ease;
 }
+
+.profile-pic img:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(200, 100, 255, 0.7); /* Purple glow on hover */
+}
+
+
+/* Main Content / Form Area */
+.main-content {
+    flex-grow: 1; /* Allows main content to take available space */
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* Center content vertically too */
+    z-index: 1; /* Ensure it's above background but below sidebar overlay */
+}
+
+/* MODIFIED: Glowing white and purple background for the transfer form container */
+.transfer-form-container {
+    /* Base background: White with a subtle purple tint */
+    background-color: #ffffff; /* Pure white base */
+    background: linear-gradient(160deg, #ffffff 0%, #f0f0ff 30%, #e8e8ff 70%, #f5edff 100%); /* Very light gradient */
+    
+    /* Frosted glass effect */
+    backdrop-filter: blur(15px); /* Stronger blur for a more ethereal look */
+    -webkit-backdrop-filter: blur(15px); /* Safari support */
+
+    border-radius: 20px; /* More rounded corners for a modern feel */
+    padding: 40px 50px; /* Generous padding */
+    width: 100%;
+    max-width: 700px; /* Slightly wider for transfer forms */
+    /* margin: 40px auto; Remove margin here if main-content handles centering */
+    
+    /* Glowing effect */
+    box-shadow: 
+        0 0 40px rgba(160, 82, 201, 0.4), /* Primary purple glow */
+        0 0 80px rgba(255, 255, 255, 0.6), /* Secondary white glow for luminosity */
+        0 15px 30px rgba(0, 0, 0, 0.2); /* Soft drop shadow for depth */
+    
+    border: 2px solid rgba(160, 82, 201, 0.3); /* Subtle purple border */
+    animation: fadeInGlow 1s ease-out forwards; /* Fade in with glow */
+    color: #333; /* Darker text for readability on light background */
+    position: relative; /* For pseudo-elements or inner glows */
+    overflow: hidden; /* Important for inner glow effects */
+}
+
+/* Keyframe for the new fade in with glow animation */
+@keyframes fadeInGlow {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+        box-shadow: 0 0 0 rgba(160, 82, 201, 0), 0 0 0 rgba(255, 255, 255, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        box-shadow: 
+            0 0 40px rgba(160, 82, 201, 0.4), 
+            0 0 80px rgba(255, 255, 255, 0.6),
+            0 15px 30px rgba(0, 0, 0, 0.2);
+    }
+}
+
+/* Inner glow effect for .transfer-form-container (optional, makes it more "glowing from within") */
+.transfer-form-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 20px;
+    box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.5), /* Inner white glow */
+                inset 0 0 15px rgba(160, 82, 201, 0.3); /* Inner purple glow */
+    pointer-events: none; /* Allows clicks to pass through */
+    z-index: 1; /* Above background, below content */
+}
+
+
+.transfer-form-container h2 {
+    color: #6a0dad; /* Deep purple for headings */
+    text-align: center;
+    margin-bottom: 35px;
+    font-size: 32px;
+    text-shadow: 0 0 15px rgba(160, 82, 201, 0.3); /* Soft purple text shadow */
+    position: relative;
+    z-index: 2; /* Ensure heading is above inner glow */
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #444; /* Darker grey for labels */
+    font-weight: 600; /* Slightly bolder labels */
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select,
+.form-group textarea {
+    width: calc(100% - 20px); /* Adjust for padding */
+    padding: 12px;
+    background-color: rgba(255, 255, 255, 0.9); /* Opaque white input background */
+    border: 1px solid #ccc; /* Lighter border for inputs */
+    border-radius: 8px;
+    color: #333; /* Dark text for input content */
+    font-size: 16px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    outline: none;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); /* Subtle inner shadow for depth */
+}
+
+.form-group input[type="text"]::placeholder,
+.form-group input[type="number"]::placeholder,
+.form-group textarea::placeholder {
+    color: #888; /* Darker placeholder text */
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    border-color: #8a2be2; /* Vibrant purple on focus */
+    box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.2), inset 0 1px 3px rgba(0,0,0,0.1); /* Soft glowing ring on focus */
+}
+
+.form-group select option {
+    background-color: #ffffff; /* White background for dropdown options */
+    color: #333; /* Dark text for options */
+}
+
+.currency-symbol {
+    color: #6a0dad; /* Deep purple for currency symbol */
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+#display_current_balance, #current_currency_display {
+    font-weight: bold;
+    color: #6a0dad; /* Deep purple for balance */
+}
+
+/* --- NEW / MODIFIED RULES FOR TRANSACTION DISPLAY --- */
+
+/* Style for individual transaction items to display side-by-side */
+.transaction-item {
+    display: flex;
+    justify-content: space-between; /* Pushes description to left, amount to right */
+    align-items: center; /* Vertically aligns them */
+    margin-bottom: 10px; /* Space between each transaction item */
+    padding: 10px 0;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1); /* Subtle separator */
+}
+
+.transaction-description {
+    flex-grow: 1; /* Allows description to take available space */
+    color: #e0e0e0;
+    font-size: 1rem; /* Base font size for description */
+    margin-right: 15px; /* Space between description and amount */
+}
+
+/* Reduced font size for the transaction amount */
+.transaction-amount {
+    font-size: 1.1rem; /* Smaller font size for the amount */
+    font-weight: bold;
+    color: #c9a0dc; /* Consistent purple color */
+    white-space: nowrap; /* Prevents the amount from wrapping to next line */
+}
+
+/* --- END NEW / MODIFIED RULES --- */
+
 
 /* Messages */
 .message {
-    padding: 12px 20px;
-    border-radius: 8px;
+    padding: 18px; /* Slightly more padding */
     margin-bottom: 20px;
+    border-radius: 10px; /* Slightly more rounded */
     font-weight: bold;
     text-align: center;
-}
-
-.message.error {
-    background-color: #ffe0e0;
-    color: #cc0000;
-    border: 1px solid #ff9999;
+    animation: slideInFromTop 0.5s ease-out;
+    border-left: 5px solid; /* Emphasize border */
+    font-size: 1.05em; /* Slightly larger text */
 }
 
 .message.success {
-    background-color: #e0ffe0;
-    color: #008000;
-    border: 1px solid #99ff99;
+    background-color: rgba(220, 255, 220, 0.9); /* Lighter success green */
+    color: #28a745; /* Darker green text */
+    border-color: #28a745;
+    box-shadow: 0 0 15px rgba(40, 167, 69, 0.2);
 }
 
-.message.info {
-    background-color: #e0f0ff;
-    color: #0056b3;
-    border: 1px solid #99ccff;
+.message.error {
+    background-color: rgba(255, 220, 220, 0.9); /* Lighter error red */
+    color: #dc3545; /* Darker red text */
+    border-color: #dc3545;
+    box-shadow: 0 0 15px rgba(220, 53, 69, 0.2);
 }
 
-/* Form Styling */
-.form-standard .form-group {
-    margin-bottom: 20px;
+/* Add an info message style for the warning from PHP email failure */
+.message.warning { /* Renamed from 'info' to 'warning' for consistency with PHP */
+    background-color: rgba(255, 245, 200, 0.9); /* Light yellow */
+    color: #ffc107; /* Orange/Yellow text */
+    border-color: #ffc107;
+    box-shadow: 0 0 15px rgba(255, 193, 7, 0.2);
 }
 
-.form-standard label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--purple-dark);
+@keyframes slideInFromTop {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.form-standard input[type="text"],
-.form-standard input[type="number"],
-.form-standard select,
-.form-standard textarea {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    font-size: 1em;
-    box-sizing: border-box;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-.form-standard input[type="text"]:focus,
-.form-standard input[type="number"]:focus,
-.form-standard select:focus,
-.form-standard textarea:focus {
-    border-color: var(--purple-light);
-    box-shadow: 0 0 0 3px rgba(138, 0, 138, 0.2);
-    outline: none;
-}
-
-/* --- Specific styling for source_account_id to act as a modal trigger on mobile --- */
-/* Hide default dropdown arrow and style it like a button/input */
-#source_account_id {
-    appearance: none; /* Remove default arrow on select */
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="%234a004a"><path d="M9.293 12.95l1.414 1.414L16.414 10l-1.414-1.414L10 12.121 5.879 8l-1.414 1.414L10 14.95z"/></svg>');
-    background-repeat: no-repeat;
-    background-position: right 15px center; /* Adjust position */
-    background-size: 1.2em; /* Adjust size */
-    cursor: pointer;
-    text-align: left; /* Ensure text aligns left */
-    padding-right: 40px; /* Make space for the icon */
-}
-#source_account_id:hover {
-    background-color: var(--light-gray);
-}
-
-
-.input-group {
-    display: flex;
-    align-items: center;
-}
-
-.input-group .input-group-addon {
-    background-color: var(--light-gray);
-    border: 1px solid var(--border-color);
-    border-right: none;
-    padding: 12px 15px;
-    border-radius: 8px 0 0 8px;
-    font-weight: bold;
-    color: var(--purple-dark);
-}
-
-.input-group input {
-    border-radius: 0 8px 8px 0;
-}
-
-.form-standard small {
-    display: block;
-    margin-top: 5px;
-    color: #666;
-    font-size: 0.9em;
-}
-
-/* Transfer Type Selector Buttons */
-.transfer-type-selector {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 25px;
-    justify-content: center;
-}
-
-.type-button {
-    flex: 1;
-    background-color: var(--light-gray);
-    border: 2px solid var(--border-color);
-    border-radius: 10px;
-    padding: 20px 15px;
-    text-align: center;
-    cursor: pointer;
-    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100px; /* Ensure a decent size */
-}
-
-.type-button i {
-    font-size: 3em;
-    color: var(--purple-medium);
-    margin-bottom: 10px;
-    transition: color 0.3s ease;
-}
-
-.type-button p {
-    margin: 0;
-    font-weight: 600;
-    color: var(--dark-text);
-    font-size: 1.1em;
-    transition: color 0.3s ease;
-}
-
-.type-button:hover {
-    border-color: var(--purple-medium);
-    box-shadow: 0 0 10px rgba(138, 0, 138, 0.3);
-}
-
-.type-button.selected {
-    background-color: var(--purple-medium);
-    border-color: var(--purple-dark);
-    color: var(--white);
-    box-shadow: 0 0 15px var(--glow-color); /* More intense glow when selected */
-}
-
-.type-button.selected i,
-.type-button.selected p {
-    color: var(--white);
-}
-
-/* Sub-method selection */
-.sub-method-selection {
-    background-color: var(--light-gray);
-    padding: 20px;
-    border-radius: 10px;
-    margin-bottom: 25px;
-    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.05);
-}
-
-.sub-method-selection h4 {
-    margin-top: 0;
-    color: var(--purple-dark);
-    margin-bottom: 15px;
-    text-align: center;
-}
-
-.radio-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.radio-group label {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    color: var(--dark-text);
-    font-weight: normal; /* Override general label bold */
-    transition: color 0.2s ease;
-}
-
-.radio-group input[type="radio"] {
-    margin-right: 10px;
-    accent-color: var(--purple-medium); /* Style radio button itself */
-}
-
-.radio-group label:hover {
-    color: var(--purple-medium);
-}
-
-/* Specific Transfer Method Fields */
-.transfer-method-fields {
-    padding-top: 20px;
-    border-top: 1px solid var(--border-color);
-    margin-top: 25px;
-}
-
-.transfer-method-fields h4 {
-    color: var(--purple-dark);
-    margin-top: 0;
-    margin-bottom: 20px;
-    text-align: center;
-    border-bottom: 2px solid var(--purple-light);
-    padding-bottom: 10px;
-}
-
-/* Recipient Name Group (dynamic visibility) */
-.recipient-name-group {
-    /* Base style, will be hidden/shown by JS */
-}
-
-/* Submit Button */
+/* Button Styling */
 .button-primary {
-    background-color: var(--purple-dark);
-    color: var(--white);
-    padding: 15px 25px;
+    display: block;
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(45deg, #8a2be2, #a052c9); /* Consistent purple gradient */
+    color: #ffffff;
     border: none;
     border-radius: 8px;
-    font-size: 1.1em;
+    font-size: 18px;
+    font-weight: bold;
     cursor: pointer;
-    width: 100%;
     transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-    margin-top: 20px;
-    font-weight: 600;
+    box-shadow: 0 8px 25px rgba(138, 43, 226, 0.5); /* Stronger button shadow */
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 
 .button-primary:hover {
-    background-color: var(--hover-purple);
+    background: linear-gradient(45deg, #9933ff, #b862e3);
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2), 0 0 20px var(--glow-color);
+    box-shadow: 0 12px 30px rgba(138, 43, 226, 0.7);
 }
 
-.button-primary:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-    box-shadow: none;
-    transform: none;
+.button-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 15px rgba(160, 82, 201, 0.4);
 }
 
 .back-link {
-    display: block;
-    text-align: center;
-    margin-top: 25px;
-    color: var(--purple-medium);
+    color: #c9a0dc; /* Purple color */
     text-decoration: none;
-    font-weight: 600;
+    font-size: 16px;
+    margin-top: 20px;
+    display: inline-block;
     transition: color 0.3s ease;
 }
 
 .back-link:hover {
-    color: var(--purple-dark);
+    color: #e6b3ff; /* Lighter purple on hover */
     text-decoration: underline;
 }
 
-/* Hidden Utility Class */
-.hidden {
-    display: none !important;
-}
-
-/* Modal Styles - Base */
-.modal-overlay { /* Renamed from .modal for clarity, applied to #accountSelectionModal */
-    display: none; /* Hidden by default */
-    position: fixed; /* Stay in place */
-    z-index: 1000; /* Sit on top */
-    left: 0;
+/* Sidebar Styling (from previous context, ensure consistency) */
+.sidebar-overlay {
+    position: fixed;
     top: 0;
-    width: 100%; /* Full width */
-    height: 100%; /* Full height */
-    overflow: auto; /* Enable scroll if needed */
-    background-color: rgba(0, 0, 0, 0.6); /* Black w/ opacity */
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-    box-sizing: border-box;
-    opacity: 0; /* For fade in/out transition */
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    display: none; /* Hidden by default */
     transition: opacity 0.3s ease;
+    opacity: 0;
 }
 
-.modal-overlay.active {
-    display: flex; /* Changed to flex for centering content */
+.sidebar-overlay.active {
+    display: block;
     opacity: 1;
 }
 
-.modal-content {
-    background-color: var(--white);
-    margin: auto;
-    padding: 30px;
-    border-radius: 12px;
-    position: relative;
-    max-width: 500px;
-    width: 90%;
-    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.2), 0 0 40px var(--glow-color);
-    text-align: center;
-    animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.modal-content h2 {
-    color: var(--purple-dark);
-    margin-top: 0;
-    margin-bottom: 20px;
-    font-size: 1.8em;
-}
-
-.modal-content p {
-    margin-bottom: 10px;
-    color: var(--dark-text);
-}
-
-.modal-details {
-    background-color: var(--light-gray);
-    border-radius: 8px;
-    padding: 15px 20px;
-    margin-top: 20px;
-    margin-bottom: 25px;
-    text-align: left;
-}
-
-.modal-details p {
-    margin: 8px 0;
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px; /* Start off-screen */
+    width: 260px;
+    height: 100%;
+    background: linear-gradient(180deg, #1a002a, #000000); /* Dark gradient for sidebar */
+    color: #ffffff;
+    box-shadow: 2px 0 15px rgba(0, 0, 0, 0.5);
+    z-index: 101;
+    transition: left 0.3s ease-out;
+    padding: 20px;
+    box-sizing: border-box; /* Include padding in width */
     display: flex;
-    justify-content: space-between;
-    font-weight: 500;
+    flex-direction: column;
 }
 
-.modal-details p strong {
-    color: var(--purple-dark);
-    min-width: 120px;
-}
-.modal-details p span {
-    font-weight: normal;
-    text-align: right;
-    flex-grow: 1;
+.sidebar.active {
+    left: 0; /* Slide in */
 }
 
-.modal-close-button { /* Renamed from .modal .close-button for consistency with JS */
-    background-color: var(--purple-dark);
-    color: white;
-    padding: 10px 15px;
+.close-sidebar-button {
+    background: none;
     border: none;
-    border-radius: 5px;
+    color: #e6b3ff; /* Light purple */
+    font-size: 24px;
+    position: absolute;
+    top: 15px;
+    right: 15px;
     cursor: pointer;
-    font-size: 1em;
-    margin-top: 20px;
-    display: block; /* Make it a block element */
-    width: 100%; /* Make it full width */
+    transition: color 0.3s ease;
+}
+
+.close-sidebar-button:hover {
+    color: #ffffff;
+}
+
+.sidebar-header {
     text-align: center;
-    transition: background-color 0.3s ease;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.modal-close-button:hover {
-    background-color: var(--hover-purple);
-}
-
-/* --- NEW: Specific styles for Account Selection Modal --- */
-.account-selection-modal-content {
-    /* Specific overrides or additions for the account selection modal */
-    max-width: 600px; /* Make it a bit wider to accommodate two columns */
-}
-
-.account-selection-modal-content .modal-title {
-    text-align: center;
-    margin-bottom: 20px;
-    color: var(--purple-dark);
-}
-
-.account-categories {
-    display: flex;
-    flex-direction: column; /* Stack categories vertically on mobile by default */
-    gap: 20px;
-}
-
-/* For larger screens, display categories side-by-side */
-@media (min-width: 768px) {
-    .account-categories {
-        flex-direction: row;
-        justify-content: space-around;
-    }
-    .account-category {
-        flex: 1; /* Distribute space equally */
-        padding: 0 10px; /* Add some internal padding */
-    }
-}
-
-.account-category .category-title {
-    color: var(--purple-dark); /* Use your purple for titles */
+.sidebar-profile-pic {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
     margin-bottom: 10px;
-    border-bottom: 2px solid var(--purple-light);
-    padding-bottom: 5px;
-    text-align: center;
-    font-size: 1.2em;
+    border: 3px solid #a052c9; /* Purple border */
 }
 
-.account-list {
+.sidebar-header h3 {
+    margin: 10px 0 5px;
+    color: #ffffff;
+    font-size: 20px;
+}
+
+.sidebar-header p {
+    color: #bbbbbb;
+    font-size: 14px;
+}
+
+.sidebar-nav ul {
     list-style: none;
     padding: 0;
     margin: 0;
-    max-height: 250px; /* Limit height and make scrollable for many accounts */
-    overflow-y: auto;
-    padding-right: 5px; /* Space for scrollbar */
-}
-/* Style scrollbar for better appearance */
-.account-list::-webkit-scrollbar {
-    width: 8px;
-}
-.account-list::-webkit-scrollbar-track {
-    background: var(--light-gray);
-    border-radius: 10px;
-}
-.account-list::-webkit-scrollbar-thumb {
-    background: var(--purple-medium);
-    border-radius: 10px;
-}
-.account-list::-webkit-scrollbar-thumb:hover {
-    background: var(--purple-dark);
+    flex-grow: 1; /* Allows nav to take up remaining space */
 }
 
+.sidebar-nav ul li {
+    margin-bottom: 10px;
+}
 
-.account-list-item {
-    background-color: var(--light-gray); /* Match your light-gray for list items */
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    padding: 10px 15px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+.sidebar-nav ul li a {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Subtle shadow */
+    padding: 12px 15px;
+    color: #e0e0e0;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.account-list-item:hover {
-    background-color: #e9e9e9;
-    border-color: var(--purple-medium);
-    box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+.sidebar-nav ul li a i {
+    margin-right: 15px;
+    font-size: 18px;
+    color: #c9a0dc; /* Purple icon */
 }
 
-.account-list-item.selected {
-    background-color: var(--selected-account-bg); /* Light blue from variables */
-    border-color: var(--selected-account-border); /* Primary blue from variables */
+.sidebar-nav ul li a:hover {
+    background-color: rgba(160, 82, 201, 0.2); /* Light purple hover background */
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(160, 82, 201, 0.4); /* Subtle glow on hover */
+}
+
+.sidebar-nav ul li a.active {
+    background-color: #a052c9; /* Stronger purple for active */
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(160, 82, 201, 0.6);
     font-weight: bold;
-    box-shadow: 0 0 8px rgba(0, 123, 255, 0.4); /* Blue glow for selected */
 }
 
-.account-list-item .account-info {
-    text-align: left;
+.sidebar-nav ul li a.active i {
+    color: #ffffff; /* White icon for active */
 }
 
-.account-list-item .account-type {
+.logout-button {
+    background: linear-gradient(45deg, #8a2be2, #a052c9); /* Purple gradient for logout */
+    color: #ffffff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
     font-weight: bold;
-    color: var(--dark-text);
+    margin-top: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 15px rgba(160, 82, 201, 0.4);
+}
+
+.logout-button:hover {
+    background: linear-gradient(45deg, #9933ff, #b862e3); /* Lighter gradient on hover */
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(160, 82, 201, 0.6);
+}
+
+/* Modal Styling (for success/error messages) */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* MODIFIED: Modal Styling to inherit or match the glowing style */
+.modal-content {
+    /* Existing background: linear-gradient(135deg, #3a0050, #1a002a); (dark purple gradient) */
+    /* To make it white and purple glow, you need to override these */
+    background-color: #ffffff; /* Pure white base */
+    background: linear-gradient(160deg, #ffffff 0%, #f0f0ff 30%, #e8e8ff 70%, #f5edff 100%); /* Very light gradient */
+    backdrop-filter: blur(15px); /* Stronger blur for a more ethereal look */
+    -webkit-backdrop-filter: blur(15px); /* Safari support */
+
+    border-radius: 20px; /* More rounded */
+    padding: 40px; /* Generous padding */
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+    /* Updated glow for modal */
+    box-shadow: 
+        0 0 40px rgba(160, 82, 201, 0.6), /* Stronger purple glow */
+        0 0 80px rgba(255, 255, 255, 0.8), /* Stronger white glow */
+        0 15px 30px rgba(0, 0, 0, 0.3); /* More pronounced depth shadow */
+    
+    position: relative;
+    transform: translateY(-50px);
+    opacity: 0;
+    transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+    border: 2px solid rgba(160, 82, 201, 0.5); /* Stronger border */
+    color: #333; /* Dark text for readability */
+    overflow: hidden;
+}
+
+/* Inner glow for modal-content */
+.modal-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 20px;
+    box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.6), /* Inner white glow */
+                inset 0 0 20px rgba(160, 82, 201, 0.4); /* Inner purple glow */
+    pointer-events: none;
+    z-index: 1;
+}
+
+.modal-content h3 {
+    color: #6a0dad; /* Deep purple for heading */
+    margin-top: 0;
+    font-size: 30px; /* Larger */
+    text-shadow: 0 0 15px rgba(160, 82, 201, 0.4); /* Stronger purple text shadow */
+    margin-bottom: 25px;
+    position: relative;
+    z-index: 2;
+}
+
+.modal-content p {
+    color: #555; /* Slightly darker text for paragraphs */
+    margin-bottom: 15px;
+    line-height: 1.8;
+}
+
+.modal-content strong {
+    color: #6a0dad; /* Deep purple for strong text in modal */
+}
+
+.modal-content .status-pending {
+    color: #FFA500; /* Orange for pending status */
+    font-weight: bold;
     font-size: 1.1em;
 }
-.account-list-item .account-number-display {
-    font-family: 'Consolas', 'Monaco', monospace; /* Monospaced font for numbers */
-    font-size: 0.9em;
-    color: #666;
+
+.modal-content .modal-reference {
+    font-family: 'Courier New', Courier, monospace;
+    background-color: rgba(160, 82, 201, 0.1); /* Light purple background for reference */
+    padding: 8px 12px;
+    border-radius: 5px;
+    display: inline-block;
+    margin-top: 15px;
+    color: #90ee90; /* Greenish glow for reference */
+    box-shadow: 0 0 10px rgba(144, 238, 144, 0.4); /* Stronger glow */
+    border: 1px solid rgba(144, 238, 144, 0.3);
 }
-.account-list-item .account-balance {
+
+.modal-button {
+    background: linear-gradient(45deg, #8a2be2, #a052c9); /* Consistent purple gradient */
+    color: #ffffff;
+    border: none;
+    padding: 14px 30px; /* Larger padding */
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px; /* Larger font */
     font-weight: bold;
-    color: var(--success-color); /* Green for balance */
-    font-size: 1.1em;
+    margin-top: 30px; /* More space */
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 8px 25px rgba(138, 43, 226, 0.5);
 }
-/* --- END NEW Account Selection Modal Styles --- */
+
+.modal-button:hover {
+    background: linear-gradient(45deg, #9933ff, #b862e3);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(138, 43, 226, 0.7);
+}
+
+/* Styling for the transfer type selection buttons/radios */
+.transfer-type-selection {
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    justify-content: center; /* Center buttons */
+    margin-bottom: 30px;
+    gap: 15px; /* Space between buttons */
+}
+
+.transfer-type-selection label {
+    background-color: rgba(255, 255, 255, 0.95); /* Nearly opaque white */
+    border: 1px solid #e0e0e0; /* Light grey border */
+    border-radius: 12px; /* Slightly more rounded */
+    padding: 18px 25px; /* More padding */
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 18px rgba(0,0,0,0.08); /* Stronger normal shadow */
+    color: #444; /* Darker text */
+    font-weight: bold;
+    text-align: center;
+    flex: 1; /* Distribute space evenly */
+    min-width: 150px; /* Ensure buttons don't get too small */
+    display: flex; /* Use flex for icon and text alignment */
+    flex-direction: column; /* Stack icon and text */
+    align-items: center;
+    font-size: 1.05em;
+}
+
+.transfer-type-selection label i {
+    font-size: 1.8em; /* Larger icons */
+    margin-bottom: 8px; /* Space below icon */
+    color: #a052c9; /* Purple icon color */
+    transition: color 0.3s ease;
+}
+
+.transfer-type-selection input[type="radio"] {
+    display: none; /* Hide native radio button */
+}
+
+.transfer-type-selection input[type="radio"]:checked + label {
+    background: linear-gradient(45deg, #a052c9, #8a2be2); /* Purple gradient when checked */
+    color: #ffffff; /* White text when checked */
+    border-color: #8a2be2;
+    box-shadow: 0 8px 25px rgba(138, 43, 226, 0.45); /* Stronger glow when checked */
+    transform: translateY(-5px); /* Lift effect */
+}
+
+.transfer-type-selection input[type="radio"]:checked + label i {
+    color: #ffffff; /* White icon when checked */
+}
+
+.transfer-type-selection label:hover {
+    background-color: rgba(245, 245, 255, 0.95); /* Lighter hover background */
+    box-shadow: 0 7px 20px rgba(0,0,0,0.12); /* Slightly stronger hover shadow */
+    transform: translateY(-2px); /* Subtle lift on hover */
+}
+
+.transfer-type-selection input[type="radio"]:checked + label:hover {
+    background: linear-gradient(45deg, #b862e3, #9933ff); /* Lighter gradient on hover when checked */
+    box-shadow: 0 10px 28px rgba(138, 43, 226, 0.6); /* Even stronger glow */
+}
 
 
 /* Responsive Design */
 @media (max-width: 768px) {
-    .dashboard-header {
-        flex-direction: column;
-        gap: 10px;
-        text-align: center;
-    }
-    .dashboard-header .user-info {
-        flex-direction: column;
-        gap: 8px;
-    }
-    .dashboard-header .user-info a {
-        padding: 3px 8px;
-        font-size: 0.9em;
+    .header {
+        padding: 10px 15px;
     }
 
-    .transfer-card {
-        padding: 20px;
-        border-radius: 10px;
+    .greeting h1 {
+        font-size: 20px;
     }
 
-    .transfer-card h2 {
-        font-size: 1.8em;
-        margin-bottom: 20px;
+    .menu-icon {
+        font-size: 20px;
     }
 
-    .current-balance {
-        padding: 12px 15px;
-        margin-bottom: 20px;
-    }
-    .current-balance h3 {
-        font-size: 1.1em;
-    }
-    #display_current_balance {
-        font-size: 1.3em;
+    .profile-pic img {
+        width: 40px;
+        height: 40px;
     }
 
-    .form-standard input,
-    .form-standard select,
-    .form-standard textarea,
-    .input-group .input-group-addon {
-        padding: 10px;
-        font-size: 0.95em;
+    .transfer-form-container {
+        padding: 30px 35px; /* Adjust padding */
     }
 
-    .transfer-type-selector {
-        flex-direction: column;
-        gap: 10px;
+    .transfer-form-container h2 {
+        font-size: 28px;
     }
 
-    .type-button {
-        padding: 15px 10px;
-        min-height: 80px;
-    }
-    .type-button i {
-        font-size: 2.5em;
-        margin-bottom: 5px;
-    }
-    .type-button p {
-        font-size: 1em;
-    }
-
-    .sub-method-selection {
-        padding: 15px;
-    }
-
-    .sub-method-selection h4,
-    .transfer-method-fields h4 {
-        font-size: 1.2em;
-    }
-
+    .form-group input,
+    .form-group select,
+    .form-group textarea,
     .button-primary {
-        padding: 12px 20px;
-        font-size: 1em;
+        font-size: 15px;
+        padding: 10px;
+    }
+
+    /* Responsive adjustments for transaction display */
+    .transaction-amount {
+        font-size: 1rem; /* Smaller on tablets */
+    }
+
+    .sidebar {
+        width: 230px;
+        left: -250px;
     }
 
     .modal-content {
-        padding: 20px;
-        width: 95%; /* Make modal slightly wider on small screens */
-    }
-    .modal-content h2 {
-        font-size: 1.6em;
-    }
-    .modal-details p {
-        flex-direction: column; /* Stack details on small screens */
-        align-items: flex-start;
-        margin-bottom: 10px;
-    }
-    .modal-details p strong {
-        margin-bottom: 3px;
-    }
-    /* No longer applies to new modal close button directly */
-    /* .modal .close-button {
-        font-size: 30px;
-        top: 10px;
-        right: 15px;
-    } */
-
-    /* Specific adjustment for account selection modal on small screens */
-    .account-selection-modal-content {
-        padding: 15px; /* Adjust padding for smaller screens */
-    }
-    .account-category {
-        padding: 0; /* Remove horizontal padding on stacked categories */
-    }
-    .account-list {
-        max-height: 200px; /* Adjust max height for smaller screens */
+        padding: 30px;
     }
 
-    .modal-close-button { /* Apply to both modals */
-        font-size: 0.95em;
-        padding: 10px;
+    .modal-content h3 {
+        font-size: 26px;
     }
 }
 
-/* Accessibility: Focus styles */
-*:focus-visible {
-    outline: 3px solid var(--purple-light);
-    outline-offset: 2px;
-    border-radius: 5px;
+@media (max-width: 480px) {
+    .header {
+        flex-wrap: wrap;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .greeting {
+        width: 100%;
+        order: 1; /* Move greeting below icons */
+        margin-top: 10px;
+    }
+
+    .menu-icon, .profile-pic {
+        order: 0; /* Keep icons at the top */
+        flex-basis: 50%;
+        text-align: center;
+    }
+    .profile-pic {
+        text-align: right;
+    }
+    .menu-icon {
+        text-align: left;
+    }
+
+    .transfer-form-container {
+        padding: 25px;
+        box-shadow: 0 0 15px rgba(150, 0, 255, 0.3), 0 0 25px rgba(255, 255, 255, 0.1); /* Smaller glow for small screens */
+        border-radius: 15px; /* Slightly less rounded for small screens */
+    }
+
+    .transfer-form-container h2 {
+        font-size: 24px;
+        margin-bottom: 25px;
+    }
+
+    .modal-content {
+        padding: 25px;
+        border-radius: 15px;
+    }
+
+    .modal-content h3 {
+        font-size: 22px;
+        margin-bottom: 20px;
+    }
+
+    .modal-button {
+        padding: 12px 25px;
+        font-size: 16px;
+    }
+
+    /* Stack description and amount vertically on very small screens */
+    .transaction-item {
+        flex-direction: column; /* Stack them vertically on very small screens */
+        align-items: flex-start; /* Align text to the left */
+    }
+    .transaction-description {
+        margin-bottom: 5px; /* Add small space when stacked */
+        margin-right: 0;
+    }
+    .transaction-amount {
+        font-size: 0.9rem; /* Even smaller on mobile */
+    }
+
+    /* Responsive adjustment for transfer type selection */
+    .transfer-type-selection {
+        flex-direction: column; /* Stack buttons vertically on very small screens */
+        gap: 10px;
+    }
+    .transfer-type-selection label {
+        width: 100%; /* Full width when stacked */
+        min-width: unset;
+        padding: 15px 20px;
+        font-size: 1em;
+    }
+    .transfer-type-selection label i {
+        font-size: 1.5em;
+        margin-bottom: 5px;
+    }
 }
