@@ -228,7 +228,7 @@ switch ($active_transfer_method) {
                         </select>
                     </div>
 
-                     <div class="form-group">
+                   div class="form-group">
     <label for="source_account_id">From Account:</label>
     <select id="source_account_id" name="source_account_id" class="form-control" required>
         <option value="">-- Select Your Account --</option>
@@ -243,26 +243,20 @@ switch ($active_transfer_method) {
     </select>
     <p>Available Balance: <span id="amount_currency_symbol_for_balance"></span><span id="display_current_balance">N/A</span> <span id="current_currency_display"></span></p>
 </div>
-
-                    <div class="form-group external-fields common-external-fields">
-                        <label for="recipient_name">Recipient Full Name:</label>
-                        <input type="text" id="recipient_name" name="recipient_name" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_name'] ?? ''); ?>">
-                    </div>
-
-                    <div id="fields_internal_self" class="external-fields">
-                        <div class="form-group">
-                            <label for="destination_account_id_self">To My Account:</label>
-                            <select id="destination_account_id_self" name="destination_account_id_self" class="form-control">
-                                <option value="">-- Select Your Other Account --</option>
-                                <?php foreach ($user_accounts as $account): ?>
-                                    <option value="<?php echo htmlspecialchars($account['id']); ?>"
-                                        <?php echo ((string)($form_data['destination_account_id_self'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <?php echo number_format(abs((float)$account['balance']), 2); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    </div>
+                   <div id="fields_internal_self" class="external-fields">
+    <div class="form-group">
+        <label for="destination_account_id_self">To My Account:</label>
+        <select id="destination_account_id_self" name="destination_account_id_self" class="form-control">
+            <option value="">-- Select Your Other Account --</option>
+            <?php foreach ($user_accounts as $account): ?>
+                <option value="<?php echo htmlspecialchars($account['id']); ?>"
+                    <?php echo ((string)($form_data['destination_account_id_self'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <?php echo number_format(abs((float)$account['balance']), 2); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+</div>
 
                     <div id="fields_internal_heritage" class="external-fields">
                         <div class="form-group">
@@ -368,7 +362,7 @@ switch ($active_transfer_method) {
                 <i class="fas fa-times"></i>
             </button>
             <div class="sidebar-profile">
-                <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
+               <img src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
                 <h3><span id="sidebarUserName"><?php echo htmlspecialchars($full_name); ?></span></h3>
                 <p><span id="sidebarUserEmail"><?php echo htmlspecialchars($user_email); ?></span></p>
             </div>
