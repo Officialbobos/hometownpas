@@ -12,15 +12,30 @@ error_reporting(E_ALL);
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-// These might be handled by your main index.php router already
-//require_once __DIR__ . '/../Config.php'; // Uncomment if not handled by index.php
-//require_once __DIR__ . '/../functions.php'; // Uncomment if not handled by index.php
+// --- IMPORTANT: Ensure these are loaded if not handled by a global router (e.g., index.php) ---
+// If your index.php or a central file loads Config.php and functions.php, keep these commented.
+// If this file is accessed directly and Config.php/functions.php are not loaded globally, UNCOMMENT THEM.
+// For this example, I'll assume they are loaded globally as BASE_URL and MongoDB constants are used.
+// require_once __DIR__ . '/../Config.php';
+// require_once __DIR__ . '/../functions.php';
+require_once __DIR__ . '/../vendor/autoload.php'; // For MongoDB classes, if not loaded globally
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // Check if the user is logged in. If not, redirect to login page.
+// Ensure BASE_URL is defined if Config.php is not globally loaded here.
+if (!defined('BASE_URL')) {
+    // Fallback if Config.php isn't loaded (e.g., for direct file access during testing)
+    // In a production app with a router, BASE_URL should always be defined.
+    // For now, let's assume it's defined globally, otherwise, include Config.php.
+    // If you are absolutely sure Config.php is loaded globally, you can remove this block.
+    // Otherwise, uncomment the require_once lines above.
+    echo "<h1>Configuration error: BASE_URL is not defined.</h1>";
+    exit;
+}
+
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true || !isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . '/index.php'); // Or wherever your login page is
     exit;
@@ -46,13 +61,14 @@ if (isset($_SESSION['message'])) {
 $show_card_modal_from_session = false;
 $card_modal_message_from_session = '';
 
-if (isset($_SESSION['card_modal_message'])) {
-    $card_modal_message_from_session = $_SESSION['card_modal_message'];
-    unset($_SESSION['card_modal_message']); // Clear it after reading
+// *** CORRECTED SESSION VARIABLE NAMES TO MATCH set_session_for_card_modal.php ***
+if (isset($_SESSION['card_modal_message_for_display'])) {
+    $card_modal_message_from_session = $_SESSION['card_modal_message_for_display'];
+    unset($_SESSION['card_modal_message_for_display']); // Clear it after reading
 }
-if (isset($_SESSION['show_card_modal'])) {
-    $show_card_modal_from_session = (bool)$_SESSION['show_card_modal'];
-    unset($_SESSION['show_card_modal']); // Clear it after reading
+if (isset($_SESSION['display_card_modal_on_bank_cards'])) {
+    $show_card_modal_from_session = (bool)$_SESSION['display_card_modal_on_bank_cards'];
+    unset($_SESSION['display_card_modal_on_bank_cards']); // Clear it after reading
 }
 // --- END NEW ADDITION ---
 
@@ -62,6 +78,8 @@ if (isset($_SESSION['show_card_modal'])) {
 global $mongoDb; // Access the global variable set in index.php
 
 if (!$mongoDb) {
+    // If getMongoDBClient() or a global definition is missing
+    // or if the connection failed to be established in index.php
     error_log("CRITICAL ERROR: MongoDB connection not available in bank_cards.php. Check index.php or getMongoDBClient().");
     die("<h1>Database connection error. Please try again later.</h1>");
 }
@@ -274,6 +292,7 @@ try {
         const initialMessageType = <?php echo json_encode($message_type); ?>;
 
         // --- NEW ADDITION: Pass card modal messages from session to JavaScript ---
+        // These now correctly read the session variables set by set_session_for_card_modal.php
         const initialCardModalMessage = <?php echo json_encode($card_modal_message_from_session); ?>;
         const initialShowCardModal = <?php echo json_encode($show_card_modal_from_session); ?>;
         // --- END NEW ADDITION ---
