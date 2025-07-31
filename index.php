@@ -129,6 +129,7 @@ $authenticated_routes = [
     'api/order_card',
     'api/set_card_pin',
     'api/deposit_check',
+    'api/set_session_for_card_modal',
     // ... potentially other API/frontend routes that require authentication
 ];
 
@@ -246,6 +247,10 @@ switch ($path) {
     case 'api/deposit_check':
         require __DIR__ . '/api/deposit_check.php';
         break;
+    case 'api/set_session_for_card_modal':
+        require __DIR__ . '/api/set_session_for_card_modal.php';
+        break;
+
 
     // --- ADMIN PANEL ROUTES ---
     case 'admin':
