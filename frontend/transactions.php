@@ -1,544 +1,179 @@
 <?php
-// C:\xampp\htdocs\heritagebank\admin\transactions_management.php
 
-session_start(); // Ensure session is started at the very beginning
-
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-// CORRECTED PATHS: Use __DIR__ to build a reliable path
-require_once __DIR__ . '/../../Config.php'; 
-require_once __DIR__ . '/../../functions.php'; 
-require_once __DIR__ . '/../../vendor/autoload.php'; // Make sure PHPMailer is loaded
+require_once __DIR__ . '/../Config.php'; // Correct path
+require_once __DIR__.'/../vendor/autoload.php'; // Correct path
+require_once __DIR__.'/../functions.php'; // Correct path
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
-use MongoDB\BSON\UTCDateTime;
-use MongoDB\Driver\Exception\Exception as MongoDBException;
 
-// Admin authentication check
-if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
+// Check if the user is logged in. If not, redirect to login page.
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
+    header('Location: login.php');
     exit;
 }
 
-// --- MongoDB Connection ---
-$client = null;
-$database = null;
-$transactionsCollection = null;
-$usersCollection = null;
-$accountsCollection = null; // Also need accounts collection for pending transfers
-$refundsCollection = null; // New: For logging refunds
+$user_id = $_SESSION['user_id'];
+$full_name = ''; // Will be fetched from DB
 
+$user_id_mongo = null;
 try {
-    $client = new Client(MONGODB_CONNECTION_URI, [], [
-        'connectTimeoutMS' => 10000,
-        'socketTimeoutMS' => 30000
-    ]);
-    
-    $database = $client->selectDatabase(MONGODB_DB_NAME);
-    $transactionsCollection = $database->selectCollection('transactions');
-    $usersCollection = $database->selectCollection('users'); 
-    $accountsCollection = $database->selectCollection('accounts');
-    $refundsCollection = $database->selectCollection('refunds'); // Initialize refunds collection
-} catch (MongoDBException $e) {
-    error_log("MongoDB connection error: " . $e->getMessage());
-    $_SESSION['error_message'] = "ERROR: Could not connect to the database. Please try again later.";
-    header('Location: admin_dashboard.php'); // Redirect to a suitable admin page
-    exit;
-}
-
-$allowed_filters = ['approved', 'declined', 'completed', 'pending', 'restricted', 'failed', 'on hold', 'refunded', 'all'];
-$settable_statuses = ['pending', 'approved', 'completed', 'declined', 'restricted', 'failed', 'refunded', 'on hold'];
-$recommended_currencies = ['GBP', 'EUR', 'USD'];
-$status_filter = $_GET['status_filter'] ?? 'pending';
-
-if (!in_array($status_filter, $allowed_filters)) {
-    $status_filter = 'pending';
-}
-
-/**
- * Helper function to construct and send the transaction update email.
- * This function must be defined or included before it's called.
- */
-function send_transaction_update_email_notification($user_email, $customer_name, $tx_details, $new_status, $admin_comment) {
-    if (!function_exists('sendEmail')) {
-        error_log("sendEmail function not found. Cannot send transaction update email.");
-        return false;
-    }
-
-    if (!$user_email) {
-        error_log("Attempted to send email but user_email was empty for transaction ID: " . ($tx_details['_id'] ?? 'N/A'));
-        return false;
-    }
-
-    $subject = 'Heritage Bank Transaction Update: ' . ucfirst($new_status);
-    $amount_display = htmlspecialchars(($tx_details['currency'] ?? 'USD') . ' ' . number_format($tx_details['amount'] ?? 0, 2));
-    $recipient_name_display = htmlspecialchars($tx_details['recipient_name'] ?? 'N/A');
-    $transaction_ref_display = htmlspecialchars($tx_details['transaction_reference'] ?? 'N/A');
-    $comment_display = !empty($admin_comment) ? htmlspecialchars($admin_comment) : 'N/A';
-    
-    // Status-specific styling for the email body
-    $status_color = '';
-    switch ($new_status) {
-        case 'completed': $status_color = '#28a745'; break; // Green
-        case 'approved': $status_color = '#007bff'; break; // Blue
-        case 'declined': 
-        case 'failed': $status_color = '#dc3545'; break; // Red
-        case 'pending': 
-        case 'on hold': 
-        case 'restricted': $status_color = '#ffc107'; break; // Yellow/Orange
-        case 'refunded': $status_color = '#17a2b8'; break; // Teal
-        default: $status_color = '#6c757d'; break; // Grey
-    }
-    
-    $body = <<<EOT
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Transaction Update from Heritage Bank</title>
-    <style type="text/css">
-        body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            color: #333333;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
-        }
-        .container {
-            max-width: 600px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e0e0e0;
-        }
-        .header {
-            text-align: center;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #eeeeee;
-            margin-bottom: 25px;
-        }
-        .header img {
-            max-width: 150px;
-            height: auto;
-            margin-bottom: 10px;
-        }
-        .header h1 {
-            color: #004d40; /* Heritage Bank primary color example */
-            font-size: 24px;
-            margin: 0;
-            padding: 0;
-        }
-        .content p {
-            margin-bottom: 15px;
-            font-size: 16px;
-        }
-        .content strong {
-            color: #004d40; /* Match header color for strong tags */
-        }
-        .transaction-details {
-            background-color: #f9f9f9;
-            border-left: 4px solid #004d40;
-            padding: 15px 20px;
-            margin: 25px 0;
-            border-radius: 4px;
-        }
-        .transaction-details p {
-            margin: 8px 0;
-            font-size: 15px;
-        }
-        .footer {
-            text-align: center;
-            padding-top: 20px;
-            border-top: 1px solid #eeeeee;
-            margin-top: 25px;
-            font-size: 14px;
-            color: #777777;
-        }
-        .footer p {
-            margin: 5px 0;
-        }
-        .status-text {
-            font-weight: bold;
-        }
-        .green-status { color: #28a745; }
-        .red-status { color: #dc3545; }
-        .orange-status { color: #ffc107; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Heritage Bank</h1>
-        </div>
-        <div class="content">
-            <p>Dear {$customer_name},</p>
-            <p>This is to inform you about an update regarding your recent transaction:</p>
-
-            <div class="transaction-details">
-                <p><strong>Transaction Reference:</strong> {$transaction_ref_display}</p>
-                <p><strong>Amount:</strong> {$amount_display}</p>
-                <p><strong>Recipient:</strong> {$recipient_name_display}</p>
-                <p><strong>New Status:</strong> <span class="status-text" style="color: {$status_color};">
-EOT;
-
-    // Dynamically set the status text color using the $status_color variable
-    $body .= htmlspecialchars(ucfirst($new_status));
-
-    $body .= <<<EOT
-                </span></p>
-            </div>
-EOT;
-
-    if (!empty($admin_comment)) {
-        $body .= "<p><strong>Bank Comment:</strong> {$comment_display}</p>";
-    }
-
-    $body .= <<<EOT
-            <p>If you have any questions or require further assistance, please do not hesitate to contact our support team directly. We are always here to help.</p>
-            <p>Thank you for banking with Heritage Bank.</p>
-            <p>Sincerely,</p>
-            <p>Heritage Bank Management Team</p>
-        </div>
-        <div class="footer">
-            <p>&copy; 2025 Heritage Bank. All rights reserved.</p>
-            <p>123 Bank Street, City, Country</p>
-        </div>
-    </div>
-</body>
-</html>
-EOT;
-
-    $altBody = strip_tags($body); // This generates a plain-text version for email clients that don't display HTML.
-
-    return sendEmail($user_email, $subject, $body, $altBody);
-} // End of send_transaction_update_email_notification function
-
-/**
- * Function to process a refund (add amount back to user's main account) and update transaction status.
- * This function assumes a MongoDB replica set is configured for multi-document transactions.
- *
- * @param MongoDB\Client $client The MongoDB client instance.
- * @param MongoDB\Collection $transactionsCollection The transactions collection.
- * @param MongoDB\Collection $usersCollection The users collection.
- * @param MongoDB\Collection $accountsCollection The accounts collection.
- * @param MongoDB\Collection $refundsCollection The refunds collection for logging.
- * @param array $tx_details The original transaction details.
- * @param string $new_status The new status for the transaction (e.g., 'failed', 'declined', 'refunded').
- * @param string $admin_comment_message Admin's comment.
- * @param string $admin_username Admin's username.
- * @return array An associative array with 'success' (boolean) and 'message' (string).
- */
-function process_transaction_refund(
-    $client, 
-    $transactionsCollection, 
-    $usersCollection, 
-    $accountsCollection, // Although not directly used for refund here, good to pass it for context if needed elsewhere
-    $refundsCollection, 
-    $tx_details, 
-    $new_status, 
-    $admin_comment_message, 
-    $admin_username
-) {
-    // Convert transaction details to array for easier access if it's a BSON object
-    $tx_details = (array) $tx_details;
-
-    $user_id = $tx_details['user_id'] ?? null;
-    $amount_to_refund = $tx_details['amount'] ?? 0;
-    $transaction_objectId = $tx_details['_id'] ?? null;
-    $original_transaction_status = $tx_details['status'] ?? 'unknown';
-
-    // Basic validation
-    if (!$user_id || !$transaction_objectId || $amount_to_refund <= 0) {
-        return ['success' => false, 'message' => "Invalid transaction details for refund."];
-    }
-
-    // Prevent re-processing refunds for already refunded/failed/declined transactions
-    $refund_trigger_statuses = ['failed', 'declined', 'refunded'];
-    if (in_array($original_transaction_status, $refund_trigger_statuses)) {
-        return ['success' => false, 'message' => "Transaction is already marked as '{$original_transaction_status}'. Skipping refund."];
-    }
-    
-    try {
-        // Start a session for multi-document transaction
-        // This requires a MongoDB replica set.
-        $session = $client->startSession();
-        $session->startTransaction([
-            'readConcern' => new MongoDB\Driver\ReadConcern(MongoDB\Driver\ReadConcern::MAJORITY),
-            'writeConcern' => new MongoDB\Driver\WriteConcern(1, 1000) // w=1, 1-second timeout
-        ]);
-
-        $result = $session->withTransaction(function () use (
-            $transactionsCollection, 
-            $usersCollection, 
-            $refundsCollection, 
-            $tx_details, 
-            $new_status, 
-            $admin_comment_message, 
-            $admin_username, 
-            $user_id, 
-            $amount_to_refund, 
-            $transaction_objectId
-        ) {
-            // 1. Update user's account balance (credit the amount back)
-            // Assuming `balance` is in the `users` collection directly or in an associated `accounts` document
-            // For simplicity, we'll update the `users` collection's balance field directly.
-            // If user accounts are in a separate 'accounts' collection, you'd update that instead.
-            $user_update_result = $usersCollection->updateOne(
-                ['_id' => new ObjectId($user_id)],
-                ['$inc' => ['balance' => $amount_to_refund]],
-                ['session' => $session]
-            );
-
-            if ($user_update_result->getModifiedCount() === 0 && $user_update_result->getMatchedCount() === 0) {
-                throw new Exception("Failed to update user balance or user not found for ID: " . $user_id);
-            }
-
-            // 2. Update the transaction status
-            $transaction_update_result = $transactionsCollection->updateOne(
-                ['_id' => $transaction_objectId],
-                [
-                    '$set' => [
-                        'status' => $new_status,
-                        'Heritage_comment' => $admin_comment_message,
-                        'admin_action_by' => $admin_username,
-                        'action_at' => new UTCDateTime()
-                    ]
-                ],
-                ['session' => $session]
-            );
-
-            if ($transaction_update_result->getModifiedCount() === 0 && $transaction_update_result->getMatchedCount() === 0) {
-                throw new Exception("Failed to update transaction status for ID: " . $transaction_objectId . ". Status might already be " . $new_status);
-            }
-
-            // 3. Log the refund in a separate collection (optional, but good for auditing)
-            $refundsCollection->insertOne([
-                'transaction_id' => $transaction_objectId,
-                'user_id' => new ObjectId($user_id),
-                'amount' => $amount_to_refund,
-                'currency' => $tx_details['currency'] ?? 'N/A',
-                'status_at_refund' => $new_status,
-                'refunded_by_admin' => $admin_username,
-                'refund_comment' => $admin_comment_message,
-                'refunded_at' => new UTCDateTime(),
-                'original_transaction_ref' => $tx_details['transaction_reference'] ?? 'N/A'
-            ], ['session' => $session]);
-
-            return ['success' => true, 'message' => "Transaction status updated to '" . ucfirst($new_status) . "' and amount refunded successfully."];
-
-        }, ['session' => $session]); // Pass the session to withTransaction
-
-        $session->endSession(); // End the session
-
-        return $result;
-
-    } catch (Exception $e) {
-        if (isset($session) && $session->inTransaction()) {
-            $session->abortTransaction();
-        }
-        if (isset($session)) {
-            $session->endSession();
-        }
-        error_log("Refund processing failed for transaction ID {$transaction_objectId}: " . $e->getMessage());
-        return ['success' => false, 'message' => "Error processing refund: " . $e->getMessage()];
-    }
-}
-
-
-// --- Handle Transaction Status Update POST Request ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_status'])) {
-    if (!$transactionsCollection || !$usersCollection || !$accountsCollection || !$refundsCollection) {
-        $_SESSION['error_message'] = "Database collections not connected. Cannot process update.";
-    } else {
-        $transaction_id_str = filter_var($_POST['transaction_id'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $new_status = filter_var($_POST['new_status'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $admin_comment_message = filter_var($_POST['message'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $admin_username = $_SESSION['admin_username'] ?? 'Admin'; 
-
-        if (empty($transaction_id_str) || empty($new_status)) {
-            $_SESSION['error_message'] = "Transaction ID and New Status are required.";
-        } elseif (!in_array($new_status, $settable_statuses)) {
-            $_SESSION['error_message'] = "Invalid status provided for update.";
-        } else {
-            try {
-                $transaction_objectId = new ObjectId($transaction_id_str);
-                $original_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
-
-                if (!$original_tx_details) {
-                    $_SESSION['error_message'] = "Transaction not found for ID: " . htmlspecialchars($transaction_id_str) . ".";
-                } else {
-                    $original_tx_details_arr = (array) $original_tx_details; // Convert to array for easier access
-                    $user_doc = $usersCollection->findOne(['_id' => new ObjectId($original_tx_details_arr['user_id'])]);
-                    $user_email = $user_doc['email'] ?? null;
-                    $customer_name = ($user_doc['first_name'] ?? 'Dear') . ' ' . ($user_doc['last_name'] ?? 'Customer'); // Get full name for email
-                    $current_db_status = $original_tx_details_arr['status'];
-                    $result_action = ['success' => false, 'message' => 'An unexpected error occurred.', 'transaction_details' => null];
-
-                    $refund_trigger_statuses = ['failed', 'declined', 'refunded'];
-
-                    if (in_array($new_status, $refund_trigger_statuses)) {
-                        // --- Handle Refund Process ---
-                        $result_action = process_transaction_refund(
-                            $client,
-                            $transactionsCollection,
-                            $usersCollection,
-                            $accountsCollection,
-                            $refundsCollection,
-                            $original_tx_details,
-                            $new_status,
-                            $admin_comment_message,
-                            $admin_username
-                        );
-                        // After refund, fetch updated details to ensure email gets the latest status
-                        if ($result_action['success']) {
-                            $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
-                            $result_action['transaction_details'] = (array) $updated_tx_details;
-                        }
-
-                    } elseif ($new_status === 'completed' && $current_db_status === 'pending') {
-                        // Assuming complete_pending_transfer handles status update and balance transfer for recipients
-                        $result_action = complete_pending_transfer($transactionsCollection, $accountsCollection, $original_tx_details);
-                        // Make sure complete_pending_transfer also returns the updated transaction details
-                        if ($result_action['success']) {
-                            $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
-                            $result_action['transaction_details'] = (array) $updated_tx_details;
-                        }
-                    } elseif ($new_status === 'declined' && $current_db_status === 'pending') {
-                        // If 'declined' is chosen from a pending state, it's also a refund scenario.
-                        // We will use the generic refund function for this to ensure consistency.
-                        $result_action = process_transaction_refund(
-                            $client,
-                            $transactionsCollection,
-                            $usersCollection,
-                            $accountsCollection,
-                            $refundsCollection,
-                            $original_tx_details,
-                            $new_status, // This will be 'declined'
-                            $admin_comment_message,
-                            $admin_username
-                        );
-                         if ($result_action['success']) {
-                            $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
-                            $result_action['transaction_details'] = (array) $updated_tx_details;
-                        }
-                    } else {
-                        // General status update logic (for statuses that don't involve a refund or special transfer)
-                        $update_result = $transactionsCollection->updateOne(
-                            ['_id' => $transaction_objectId],
-                            ['$set' => [
-                                'status' => $new_status,
-                                'Heritage_comment' => $admin_comment_message,
-                                'admin_action_by' => $admin_username,
-                                'action_at' => new UTCDateTime()
-                            ]]
-                        );
-                        if ($update_result->getModifiedCount() > 0 || $update_result->getMatchedCount() > 0) {
-                            $result_action['success'] = true;
-                            $result_action['message'] = "Transaction status updated directly to " . ucfirst($new_status) . ".";
-                            $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
-                            $result_action['transaction_details'] = (array) $updated_tx_details;
-                        } else {
-                            $result_action['message'] = "Transaction update had no effect (status might already be " . ucfirst($new_status) . ").";
-                        }
-                    }
-
-                    if ($result_action['success']) {
-                        // Use $original_tx_details_arr for email parameters that reflect the *original* transaction,
-                        // but use $result_action['transaction_details'] for the new status.
-                        // Ensure transaction_alert reflects the *new* status and any updated comment
-                        $_SESSION['transaction_alert'] = [
-                            'status' => $new_status,
-                            'message' => $admin_comment_message,
-                            'ref_no' => $original_tx_details_arr['transaction_reference'] ?? 'N/A',
-                            'recipient_name' => $original_tx_details_arr['recipient_name'] ?? 'N/A',
-                            'amount' => $original_tx_details_arr['amount'] ?? 0,
-                            'currency' => $original_tx_details_arr['currency'] ?? 'N/A',
-                            'user_id' => (string)($original_tx_details_arr['user_id'] ?? '')
-                        ];
-                        
-                        $_SESSION['success_message'] = $result_action['message'];
-
-                        // Send email notification with the *updated* transaction details if available
-                        if ($user_email && $result_action['transaction_details']) {
-                            if (send_transaction_update_email_notification($user_email, $customer_name, $result_action['transaction_details'], $new_status, $admin_comment_message)) {
-                                $_SESSION['info_message'] = "Email notification sent to " . htmlspecialchars($user_email) . ".";
-                            } else {
-                                $_SESSION['error_message'] = "Failed to send email notification to user.";
-                            }
-                        }
-                    } else {
-                        $_SESSION['error_message'] = $result_action['message'];
-                    }
-                }
-            } catch (MongoDBException | Exception $e) {
-                $_SESSION['error_message'] = "Error processing request: " . $e->getMessage();
-                error_log("Transaction update error: " . $e->getMessage());
-            }
-        }
-    }
-    header("Location: transactions_management.php?status_filter=" . urlencode($status_filter));
-    exit;
-}
-
-// --- Fetch Transactions for Display ---
-$filter_query = [];
-if ($status_filter !== 'all') {
-    $filter_query['status'] = $status_filter;
-}
-
-$transactions = [];
-try {
-    if ($transactionsCollection) {
-        // Fetch transactions from MongoDB
-        $cursor = $transactionsCollection->find(
-            $filter_query,
-            ['sort' => ['transaction_date' => -1]] // Sort by latest transactions first
-        );
-        $transactions = $cursor->toArray();
-
-        // Populate sender details for each transaction
-        foreach ($transactions as $key => $tx) {
-            if (isset($tx['user_id'])) {
-                try {
-                    $user = $usersCollection->findOne(['_id' => new ObjectId($tx['user_id'])]);
-                    $transactions[$key]['sender_fname'] = $user['first_name'] ?? 'Unknown';
-                    $transactions[$key]['sender_lname'] = $user['last_name'] ?? 'User';
-                } catch (MongoDB\Driver\Exception\InvalidArgumentException $e) {
-                    error_log("Invalid user ID for transaction " . ($tx['_id'] ?? 'N/A') . ": " . $e->getMessage());
-                    $transactions[$key]['sender_fname'] = 'Invalid';
-                    $transactions[$key]['sender_lname'] = 'User ID';
-                }
-            }
-            // Ensure dates are formatted correctly for display
-            if (isset($tx['initiated_at']) && $tx['initiated_at'] instanceof UTCDateTime) {
-                $transactions[$key]['initiated_at'] = $tx['initiated_at']->toDateTime()->format('Y-m-d H:i:s');
-            } else {
-                $transactions[$key]['initiated_at'] = null; // Or 'N/A'
-            }
-            if (isset($tx['action_at']) && $tx['action_at'] instanceof UTCDateTime) {
-                $transactions[$key]['action_at'] = $tx['action_at']->toDateTime()->format('Y-m-d H:i:s');
-            } else {
-                $transactions[$key]['action_at'] = null; // Or 'N/A'
-            }
-        }
-    } else {
-        $_SESSION['error_message'] = "Transactions collection not available.";
-    }
-} catch (MongoDBException $e) {
-    error_log("Error fetching transactions: " . $e->getMessage());
-    $_SESSION['error_message'] = "Error fetching transactions: " . $e->getMessage();
+    // Convert session user_id to MongoDB ObjectId
+    $user_id_mongo = new ObjectId($user_id);
 } catch (Exception $e) {
-    error_log("General error fetching transactions: " . $e->getMessage());
-    $_SESSION['error_message'] = "An unexpected error occurred while fetching transactions.";
+    error_log("Invalid user ID in session for transactions.php: " . $user_id . " - " . $e->getMessage());
+    $_SESSION['message'] = "Invalid session. Please log in again.";
+    $_SESSION['message_type'] = "error";
+    header('Location: login.php');
+    exit;
 }
 
+$mongoClient = null;
+$database = null;
+
+try {
+    // Establish MongoDB connection
+    $mongoClient = new Client(MONGODB_CONNECTION_URI);
+    $database = $mongoClient->selectDatabase(MONGODB_DB_NAME);
+
+    // Fetch user's name for display in header
+    $usersCollection = $database->users;
+    $user_doc = $usersCollection->findOne(['_id' => $user_id_mongo], ['projection' => ['first_name' => 1, 'last_name' => 1]]);
+
+    if ($user_doc) {
+        $full_name = trim(($user_doc['first_name'] ?? '') . ' ' . ($user_doc['last_name'] ?? ''));
+    } else {
+        // Fallback if user data not found
+        $full_name = $_SESSION['username'] ?? 'User';
+    }
+
+    // --- Transaction Filtering and Pagination ---
+    $records_per_page = 10;
+    $current_page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+    $offset = ($current_page - 1) * $records_per_page;
+
+    $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
+    $filter_type = isset($_GET['type']) ? trim($_GET['type']) : '';
+    $filter_status = isset($_GET['status']) ? trim($_GET['status']) : '';
+    $start_date = isset($_GET['start_date']) ? trim($_GET['start_date']) : '';
+    $end_date = isset($_GET['end_date']) ? trim($_GET['end_date']) : '';
+
+    $filter = [
+        '$or' => [
+            ['user_id' => $user_id_mongo],
+            ['recipient_user_id' => $user_id_mongo]
+        ]
+    ];
+
+    if (!empty($search_query)) {
+        $search_regex = new MongoDB\BSON\Regex($search_query, 'i'); // Case-insensitive search
+        $filter['$or'][] = [
+            '$or' => [
+                ['description' => $search_regex],
+                ['transaction_reference' => $search_regex],
+                ['recipient_name' => $search_regex],
+                ['sender_name' => $search_regex]
+            ]
+        ];
+    }
+
+    if (!empty($filter_type)) {
+        $filter['transaction_type'] = $filter_type;
+    }
+
+    if (!empty($filter_status)) {
+        $filter['status'] = $filter_status;
+    }
+
+    if (!empty($start_date) || !empty($end_date)) {
+        $date_filter = [];
+        if (!empty($start_date)) {
+            $date_filter['$gte'] = new MongoDB\BSON\UTCDateTime(strtotime($start_date . ' 00:00:00') * 1000);
+        }
+        if (!empty($end_date)) {
+            $date_filter['$lte'] = new MongoDB\BSON\UTCDateTime(strtotime($end_date . ' 23:59:59') * 1000);
+        }
+        $filter['initiated_at'] = $date_filter;
+    }
+
+    $transactionsCollection = $database->transactions;
+    $accountsCollection = $database->accounts; // Assuming 'accounts' collection exists for currency info
+
+    // Count total transactions for pagination
+    $total_transactions = $transactionsCollection->countDocuments($filter);
+    $total_pages = ceil($total_transactions / $records_per_page);
+
+    // Fetch transactions with pagination and sorting
+    $options = [
+        'sort' => ['initiated_at' => -1],
+        'limit' => $records_per_page,
+        'skip' => $offset,
+        'projection' => [
+            'initiated_at' => 1, 'description' => 1, 'amount' => 1, 'currency' => 1,
+            'transaction_type' => 1, 'status' => 1, 'transaction_reference' => 1,
+            'user_id' => 1, 'recipient_user_id' => 1, 'sender_account_number' => 1,
+            'recipient_account_number' => 1, 'recipient_name' => 1, 'sender_name' => 1,
+            'recipient_iban' => 1, 'recipient_sort_code' => 1,
+            'recipient_external_account_number' => 1, 'recipient_bank_name' => 1,
+            'account_id' => 1, // User's own account ID for source currency
+        ]
+    ];
+
+    $transactions = [];
+    $transactions_cursor = $transactionsCollection->find($filter, $options);
+
+    foreach ($transactions_cursor as $transaction_doc) {
+        // Convert MongoDB\BSON\UTCDateTime to PHP DateTime object
+        if ($transaction_doc['initiated_at'] instanceof MongoDB\BSON\UTCDateTime) {
+            $transaction_doc['initiated_at'] = $transaction_doc['initiated_at']->toDateTime();
+        }
+
+        // Fetch user's account currency for this transaction if available
+        $user_account_currency = $transaction_doc['currency'] ?? 'EUR'; // Default
+
+        if (isset($transaction_doc['account_id']) && $transaction_doc['account_id'] instanceof ObjectId) {
+            $account_doc = $accountsCollection->findOne(['_id' => $transaction_doc['account_id']]);
+            if ($account_doc && isset($account_doc['currency'])) {
+                $user_account_currency = $account_doc['currency'];
+            }
+        } elseif (isset($transaction_doc['recipient_user_id']) && $transaction_doc['recipient_user_id'] == $user_id_mongo && isset($transaction_doc['recipient_account_number'])) {
+            // If the current user is the recipient, try to find the currency of their *receiving* account
+            // This assumes recipient_account_number can link to an account document for the logged-in user
+            $recipient_acc_doc = $accountsCollection->findOne([
+                'user_id' => $user_id_mongo,
+                'account_number' => $transaction_doc['recipient_account_number']
+            ]);
+            if ($recipient_acc_doc && isset($recipient_acc_doc['currency'])) {
+                $user_account_currency = $recipient_acc_doc['currency'];
+            }
+        }
+        $transaction_doc['user_account_currency'] = $user_account_currency;
+
+        $transactions[] = (array) $transaction_doc; // Cast to array for consistent access
+    }
+
+} catch (Exception $e) {
+    error_log("MongoDB Error in transactions.php: " . $e->getMessage());
+    $_SESSION['message'] = "Error fetching transaction history. Please try again later.";
+    $_SESSION['message_type'] = "error";
+    $transactions = []; // Ensure transactions array is empty on error
+} finally {
+    $mongoClient = null; // No explicit close needed for MongoDB PHP Client
+}
+
+// Helper to format currency
+function formatCurrency($amount, $currency_code) {
+    $symbol = '';
+    switch (strtoupper($currency_code)) {
+        case 'GBP': $symbol = '£'; break;
+        case 'USD': $symbol = '$'; break;
+        case 'EUR': $symbol = '€'; break;
+        case 'NGN': $symbol = '₦'; break; // Added Nigerian Naira
+        // Add more currencies as needed
+        default: $symbol = ''; // Fallback, consider adding the code itself if symbol is unknown
+    }
+    return $symbol . number_format((float)$amount, 2);
+}
 ?>
 
 <!DOCTYPE html>
@@ -546,529 +181,179 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - Transaction Management</title>
-    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/admin_style.css'; ?>">
-    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/transaction.css'; ?>">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <title>Transaction History - Heritage Bank</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transactions.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        /* General Body and Container Styling */
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: #f4f7f6;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-
-        .admin-container {
-            display: flex;
-            flex: 1; /* Allows it to take up remaining space */
-            width: 100%;
-            max-width: 1400px; /* Max width for content */
-            margin: 0 auto;
-            box-sizing: border-box;
-        }
-
-        /* Admin Header */
-        .admin-header {
-            background-color: #004494; /* Heritage Blue */
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-        .admin-header .logo {
-            height: 35px; /* Adjusted logo size */
-            width: auto;
-        }
-        .admin-header h1 {
-            margin: 0;
-            font-size: 1.5em; /* Adjusted font size */
-            color: white;
-        }
-        .admin-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .admin-info span {
-            font-size: 1em;
-        }
-        .admin-info a {
-            background-color: #ffcc29; /* Heritage Gold */
-            color: #004494;
-            padding: 8px 15px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: background-color 0.3s ease;
-        }
-        .admin-info a:hover {
-            background-color: #e0b821;
-        }
-
-        /* Admin Sidebar */
-        .admin-sidebar {
-            width: 250px;
-            background-color: #ffffff;
-            padding: 20px;
-            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
-            flex-shrink: 0; /* Prevent shrinking */
-        }
-        .admin-sidebar ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .admin-sidebar ul li {
-            margin-bottom: 10px;
-        }
-        .admin-sidebar ul li a {
-            display: block;
-            padding: 10px 15px;
-            text-decoration: none;
-            color: #333;
-            font-weight: 500;
-            border-radius: 5px;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-        .admin-sidebar ul li a:hover {
-            background-color: #e9ecef;
-            color: #004494;
-        }
-        .admin-sidebar ul li a.active {
-            background-color: #004494;
-            color: white;
-        }
-
-        /* Main Content Area */
-        .admin-main-content {
-            flex-grow: 1; /* Takes up remaining space */
-            padding: 30px;
-            background-color: #f4f7f6;
-        }
-
-        .section-header {
-            color: #004494;
-            margin-bottom: 25px;
-            font-size: 2em;
-            font-weight: 700;
-        }
-
-        /* Messages */
-        .message {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            font-weight: bold;
-            text-align: center;
-            word-wrap: break-word;
-            border: 1px solid transparent;
-        }
-        .message.success {
-            background-color: #d4edda;
-            color: #155724;
-            border-color: #c3e6cb;
-        }
-        .message.error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border-color: #f5c6cb;
-        }
-        .message.info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border-color: #bee5eb;
-        }
-
-        /* Filter Form */
-        form {
-            margin-bottom: 20px;
-            background-color: #ffffff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        form label {
-            font-weight: bold;
-            color: #333;
-        }
-        form select {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 1em;
-            min-width: 150px;
-        }
-
-        /* Table Styling */
-        .table-responsive {
-            overflow-x: auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-            margin-top: 20px;
-        }
-        .transaction-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 0;
-        }
-        .transaction-table th,
-        .transaction-table td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #dee2e6;
-        }
-        .transaction-table th {
-            background-color: #e9ecef;
-            color: #333;
-            font-weight: 600;
-            white-space: nowrap; /* Prevent headers from wrapping */
-        }
-        .transaction-table tbody tr:hover {
-            background-color: #f2f2f2;
-        }
-
-        /* Status Badges */
-        .status-pending { background-color: #ffc107; color: #333; padding: 5px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; } /* Yellow */
-        .status-approved { background-color: #007bff; color: white; padding: 5px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; } /* Blue */
-        .status-completed { background-color: #28a745; color: white; padding: 5px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; } /* Green */
-        .status-declined, .status-failed, .status-restricted { background-color: #dc3545; color: white; padding: 5px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; } /* Red */
-        .status-on-hold { background-color: #6c757d; color: white; padding: 5px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; } /* Gray */
-        .status-refunded { background-color: #17a2b8; color: white; padding: 5px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; } /* Teal */
-        .currency-warning {
-            color: #dc3545;
-            font-weight: bold;
-            cursor: help;
-            font-size: 1.2em;
-        }
-
-        /* Action Forms in Table Cells */
-        .transaction-table td form {
-            display: flex;
-            flex-direction: column; /* Stack elements vertically */
-            gap: 5px; /* Space between elements */
-            margin: 0; /* Remove default form margin */
-            padding: 0;
-            background-color: transparent; /* Override parent form background */
-            box-shadow: none; /* Override parent form shadow */
-        }
-        .transaction-table td select,
-        .transaction-table td textarea {
-            width: 100%; /* Take full width of cell */
-            box-sizing: border-box; /* Include padding/border in width */
-            margin: 0; /* Remove default margin */
-        }
-        .transaction-table td textarea {
-            resize: vertical; /* Allow vertical resizing */
-            min-height: 50px; /* Minimum height for textarea */
-            max-height: 150px; /* Maximum height for textarea */
-            overflow-y: auto;
-        }
-        .button-small {
-            padding: 6px 12px;
-            font-size: 0.9em;
-            border-radius: 4px;
-            cursor: pointer;
-            border: none;
-            white-space: nowrap; /* Prevent button text from wrapping */
-        }
-        .button-edit {
-            background-color: #007bff; /* Blue */
-            color: white;
-            transition: background-color 0.2s ease;
-        }
-        .button-edit:hover {
-            background-color: #0056b3;
-        }
-
-        /* --- Responsive Design --- */
-        @media (max-width: 992px) { /* Tablets and smaller desktops */
-            .admin-container {
-                flex-direction: column; /* Stack sidebar and main content */
-            }
-            .admin-sidebar {
-                width: 100%; /* Sidebar takes full width */
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); /* Shadow on bottom */
-                padding: 10px 0;
-            }
-            .admin-sidebar ul {
-                display: flex; /* Arrange links horizontally */
-                flex-wrap: wrap; /* Allow wrapping */
-                justify-content: center; /* Center links */
-                gap: 5px; /* Space between links */
-            }
-            .admin-sidebar ul li {
-                margin-bottom: 0; /* Remove vertical margin */
-            }
-            .admin-sidebar ul li a {
-                padding: 8px 12px; /* Smaller padding for links */
-                font-size: 0.9em;
-            }
-            .admin-main-content {
-                padding: 20px;
-            }
-        }
-
-        @media (max-width: 768px) { /* Smaller tablets and mobile */
-            .admin-header {
-                flex-direction: column;
-                padding: 10px 15px;
-                gap: 10px;
-            }
-            .admin-header h1 {
-                font-size: 1.3em;
-            }
-            .admin-info {
-                width: 100%;
-                justify-content: center;
-            }
-            .admin-info a {
-                padding: 6px 10px;
-                font-size: 0.9em;
-            }
-
-            /* Table responsive behavior */
-            .transaction-table, .transaction-table tbody, .transaction-table tr, .transaction-table td {
-                display: block;
-                width: 100%;
-            }
-            .transaction-table thead {
-                display: none; /* Hide table headers on small screens */
-            }
-            .transaction-table tr {
-                margin-bottom: 15px;
-                border: 1px solid #dee2e6;
-                border-radius: 8px;
-                overflow: hidden; /* For rounded corners */
-                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            }
-            .transaction-table td {
-                text-align: right;
-                padding-left: 50%; /* Space for the data-label */
-                position: relative;
-                border: none; /* Remove individual cell borders */
-            }
-            .transaction-table td::before {
-                content: attr(data-label);
-                position: absolute;
-                left: 15px;
-                width: calc(50% - 30px);
-                text-align: left;
-                font-weight: bold;
-                color: #555;
-            }
-
-            .transaction-table td:last-child {
-                border-bottom: none;
-            }
-
-            /* Adjust action forms within responsive table */
-            .transaction-table td form {
-                align-items: flex-end; /* Align elements to the right */
-            }
-            .transaction-table td select,
-            .transaction-table td textarea,
-            .transaction-table td .button-small {
-                width: auto; /* Allow elements to size naturally */
-                max-width: 100%; /* Prevent overflow */
-                margin-left: auto; /* Push to right */
-                margin-right: 0;
-            }
-            .transaction-table td textarea {
-                text-align: left; /* Keep text aligned left within textarea */
-            }
-        }
-
-        @media (max-width: 480px) { /* Extra small devices */
-            .admin-main-content {
-                padding: 15px;
-            }
-            .section-header {
-                font-size: 1.6em;
-            }
-            form {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            form select {
-                width: 100%;
-                min-width: unset;
-            }
-            .admin-sidebar ul {
-                flex-direction: column; /* Stack links vertically on tiny screens */
-            }
-            .admin-sidebar ul li a {
-                text-align: center;
-            }
-        }
-    </style>
 </head>
-<body>
-    <header class="admin-header">
-        <img src="https://i.imgur.com/UeqGGSn.png" alt="Heritage Bank Logo" class="logo">
-        <h1>Admin Dashboard</h1> <div class="admin-info">
-            <span>Welcome, Admin!</span> <a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/admin_logout.php'; ?>">Logout</a>
+<body class="dashboard-page">
+    <header class="dashboard-header">
+        <div class="logo">
+            <img src="../images/logo.png" alt="Heritage Bank Logo" class="logo-barclays">
+        </div>
+        <div class="user-info">
+            <i class="fa-solid fa-user profile-icon"></i>
+            <span><?php echo htmlspecialchars($full_name); ?></span>
+            <a href="logout.php">Logout</a>
         </div>
     </header>
 
-    <div class="admin-container">
-        <nav class="admin-sidebar">
+    <div class="dashboard-container">
+        <aside class="sidebar">
             <ul>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/create_user.php'; ?>">Create New User</a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/manage_users.php'; ?>">Manage Users (Edit/Delete)</a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/manage_user_funds.php'; ?>">Manage User Funds (Credit/Debit)</a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/account_status_management.php'; ?>">Manage Account Status</a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/transactions_management.php'; ?>" class="active">Transactions Management</a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/generate_bank_card.php'; ?>">Generate Bank Card (Mock)</a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/generate_mock_transaction.php'; ?>">Generate Mock Transaction</a></li>
+                <li><a href="dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+                <li><a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a></li>
+                <li><a href="statements.php"><i class="fas fa-file-alt"></i> <span>Statements</span></a></li>
+                <li><a href="transfer.php"><i class="fas fa-exchange-alt"></i> <span>Transfers</span></a></li>
+                <li class="active"><a href="transactions.php"><i class="fas fa-history"></i> <span>Transaction History</span></a></li>
+                <li><a href="#"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
+                <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
             </ul>
-        </nav>
+        </aside>
 
-        <main class="admin-main-content">
-            <h1 class="section-header">Transaction Management</h1>
+        <main class="transaction-history-content">
+            <div class="card">
+                <h2>Your Transaction History</h2>
 
-            <?php
-            // Display success/error/info messages from session
-            if (isset($_SESSION['success_message'])) {
-                echo '<div class="message success">' . htmlspecialchars($_SESSION['success_message']) . '</div>';
-                unset($_SESSION['success_message']);
-            }
-            if (isset($_SESSION['error_message'])) {
-                echo '<div class="message error">' . htmlspecialchars($_SESSION['error_message']) . '</div>';
-                unset($_SESSION['error_message']);
-            }
-            if (isset($_SESSION['info_message'])) {
-                echo '<div class="message info">' . htmlspecialchars($_SESSION['info_message']) . '</div>';
-                unset($_SESSION['info_message']);
-            }
-            ?>
+                <form method="GET" action="transactions.php" class="filter-form">
+                    <div class="form-group">
+                        <label for="search">Search Description/Reference:</label>
+                        <input type="text" id="search" name="search" value="<?php echo htmlspecialchars($search_query); ?>" placeholder="e.g., electricity bill">
+                    </div>
+                    <div class="form-group">
+                        <label for="type">Transaction Type:</label>
+                        <select id="type" name="type">
+                            <option value="">All Types</option>
+                            <option value="debit" <?php echo ($filter_type == 'debit') ? 'selected' : ''; ?>>Debit</option>
+                            <option value="credit" <?php echo ($filter_type == 'credit') ? 'selected' : ''; ?>>Credit</option>
+                            <option value="transfer" <?php echo ($filter_type == 'transfer') ? 'selected' : ''; ?>>General Transfer</option>
+                            <option value="internal_self_transfer" <?php echo ($filter_type == 'internal_self_transfer') ? 'selected' : ''; ?>>Internal Self Transfer</option>
+                            <option value="internal_heritage" <?php echo ($filter_type == 'internal_heritage') ? 'selected' : ''; ?>>Heritage Internal Transfer</option>
+                            <option value="external_iban" <?php echo ($filter_type == 'external_iban') ? 'selected' : ''; ?>>International (IBAN)</option>
+                            <option value="external_sort_code" <?php echo ($filter_type == 'external_sort_code') ? 'selected' : ''; ?>>UK Sort Code</option>
+                            <option value="deposit" <?php echo ($filter_type == 'deposit') ? 'selected' : ''; ?>>Deposit</option>
+                            <option value="withdrawal" <?php echo ($filter_type == 'withdrawal') ? 'selected' : ''; ?>>Withdrawal</option>
+                            </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Status:</label>
+                        <select id="status" name="status">
+                            <option value="">All Statuses</option>
+                            <option value="completed" <?php echo ($filter_status == 'completed') ? 'selected' : ''; ?>>Completed</option>
+                            <option value="pending" <?php echo ($filter_status == 'pending') ? 'selected' : ''; ?>>Pending</option>
+                            <option value="failed" <?php echo ($filter_status == 'failed') ? 'selected' : ''; ?>>Failed</option>
+                            <option value="cancelled" <?php echo ($filter_status == 'cancelled') ? 'selected' : ''; ?>>Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="start_date">From Date:</label>
+                        <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($start_date); ?>">
+                    </div>
+                    <div class="form-group">
+                        <label for="end_date">To Date:</label>
+                        <input type="date" id="end_date" name="end_date" value="<?php echo htmlspecialchars($end_date); ?>">
+                    </div>
+                    <div class="form-group">
+                        <button type="submit">Apply Filters</button>
+                    </div>
+                </form>
 
-            <form action="transactions_management" method="GET">
-                <label for="filter_status">Filter by Status:</label>
-                <select name="status_filter" id="filter_status" onchange="this.form.submit()">
-                    <option value="all" <?php echo ($status_filter == 'all') ? 'selected' : ''; ?>>All</option>
-                    <option value="pending" <?php echo ($status_filter == 'pending') ? 'selected' : ''; ?>>Pending</option>
-                    <option value="approved" <?php echo ($status_filter == 'approved') ? 'selected' : ''; ?>>Approved</option>
-                    <option value="declined" <?php echo ($status_filter == 'declined') ? 'selected' : ''; ?>>Declined</option>
-                    <option value="completed" <?php echo ($status_filter == 'completed') ? 'selected' : ''; ?>>Completed</option>
-                    <option value="restricted" <?php echo ($status_filter == 'restricted') ? 'selected' : ''; ?>>Restricted</option>
-                    <option value="failed" <?php echo ($status_filter == 'failed') ? 'selected' : ''; ?>>Failed</option>
-                    <option value="on hold" <?php echo ($status_filter == 'on hold') ? 'selected' : ''; ?>>On Hold</option>
-                    <option value="refunded" <?php echo ($status_filter == 'refunded') ? 'selected' : ''; ?>>Refunded</option>
-                </select>
-            </form>
-
-            <div class="table-responsive">
-                <table class="transaction-table">
-                    <thead>
-                        <tr>
-                            <th>Ref. No.</th>
-                            <th>Sender</th>
-                            <th>Recipient</th>
-                            <th>Amount</th>
-                            <th>Description</th>
-                            <th>Initiated At</th>
-                            <th>Status</th>
-                            <th>Comment</th>
-                            <th>Action By</th>
-                            <th>Action At</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($transactions)): ?>
-                            <tr>
-                                <td colspan="11" style="text-align: center; padding: 20px;">No transactions found for the selected filter.</td>
-                            </tr>
-                        <?php else: ?>
-                            <?php foreach ($transactions as $tx): ?>
+                <?php if (!empty($transactions)): ?>
+                    <div class="table-responsive">
+                        <table class="transactions-table">
+                            <thead>
                                 <tr>
-                                    <td data-label="Ref. No."><?php echo htmlspecialchars($tx['transaction_reference'] ?? 'N/A'); ?></td>
-                                    <td data-label="Sender"><?php echo htmlspecialchars(($tx['sender_fname'] ?? 'Unknown') . ' ' . ($tx['sender_lname'] ?? 'User')); ?></td>
-                                    <td data-label="Recipient"><?php echo htmlspecialchars(($tx['recipient_name'] ?? 'N/A') . ' (' . ($tx['recipient_account_number'] ?? 'N/A') . ')'); ?></td>
-                                    <td data-label="Amount">
-                                        <?php echo htmlspecialchars(($tx['currency'] ?? 'N/A') . ' ' . number_format($tx['amount'] ?? 0, 2)); ?>
-                                        <?php 
-                                        if (!in_array(strtoupper($tx['currency'] ?? ''), $recommended_currencies)) {
-                                            echo ' <span class="currency-warning" title="Not a recommended currency">!</span>';
-                                        }
-                                        ?>
-                                    </td>
-                                    <td data-label="Description"><?php echo htmlspecialchars($tx['description'] ?? 'N/A'); ?></td>
-                                    <td data-label="Initiated At">
-                                        <?php 
-                                            echo (isset($tx['initiated_at']) && !empty($tx['initiated_at'])) ? date('M d, Y H:i', strtotime($tx['initiated_at'])) : 'N/A';
-                                        ?>
-                                    </td>
-                                    <td data-label="Status">
-                                        <span class="status-<?php echo htmlspecialchars(str_replace(' ', '-', strtolower($tx['status'] ?? 'default'))); ?>">
-                                            <?php echo htmlspecialchars(ucfirst($tx['status'] ?? 'N/A')); ?>
-                                        </span>
-                                    </td>
-                                    <td data-label="Comment">
-                                        <?php echo !empty($tx['Heritage_comment']) ? htmlspecialchars($tx['Heritage_comment']) : 'N/A'; ?>
-                                    </td>
-                                    <td data-label="Action By">
-                                        <?php echo !empty($tx['admin_action_by']) ? htmlspecialchars($tx['admin_action_by']) : 'N/A'; ?>
-                                    </td>
-                                    <td data-label="Action At">
-                                        <?php 
-                                            echo (isset($tx['action_at']) && !empty($tx['action_at'])) ? date('M d, Y H:i', strtotime($tx['action_at'])) : 'N/A';
-                                        ?>
-                                    </td>
-                                    <td data-label="Actions">
-                                        <form action="transactions_management?status_filter=<?php echo htmlspecialchars($status_filter); ?>" method="POST">
-                                            <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
-                                            <select name="new_status">
-                                                <option value="">Set Status</option>
-                                                <?php
-                                                foreach ($settable_statuses as $status_option) {
-                                                    $selected = (isset($tx['status']) && $tx['status'] == $status_option) ? 'selected' : '';
-                                                    echo "<option value=\"" . htmlspecialchars($status_option) . "\" " . $selected . ">" . htmlspecialchars(ucfirst($status_option)) . "</option>";
-                                                }
-                                                ?>
-                                            </select>
-                                            <textarea name="message" rows="3" placeholder="Reason/Comment (optional)" class="admin-comment-textarea"><?php echo htmlspecialchars($tx['Heritage_comment'] ?? ''); ?></textarea>
-                                            <button type="submit" name="update_transaction_status" class="button-small button-edit">Update</button>
-                                        </form>
-                                    </td>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                    <th>Reference</th>
+                                    <th>Status</th>
+                                    <th>Details</th>
                                 </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($transactions as $transaction):
+                                    // Determine if it's an incoming or outgoing transaction for display
+                                    // This logic is crucial and might need fine-tuning based on your exact schema
+                                    // and how 'user_id' and 'recipient_user_id' are used.
+                                    // The 'currency' field in 'transactions' document itself is the primary.
+                                    $is_incoming = ($transaction['recipient_user_id'] == $user_id_mongo && $transaction['user_id'] != $user_id_mongo);
+                                    
+                                    $display_amount_sign = ($is_incoming || $transaction['transaction_type'] == 'credit' || strpos($transaction['transaction_type'], 'deposit') !== false) ? '+' : '-';
+
+                                    // Determine the currency to display
+                                    // Prefer the currency of the account involved for the logged-in user
+                                    $display_currency_code = $transaction['user_account_currency'] ?? ($transaction['currency'] ?? 'EUR');
+
+                                    $display_amount = $display_amount_sign . formatCurrency($transaction['amount'], $display_currency_code);
+                                    $amount_class = ($is_incoming || $transaction['transaction_type'] == 'credit' || strpos($transaction['transaction_type'], 'deposit') !== false) ? 'text-success' : 'text-danger';
+
+                                    $display_description = htmlspecialchars($transaction['description']);
+                                    $transaction_details = [];
+
+                                    if ($transaction['transaction_type'] === 'internal_self_transfer') {
+                                        $display_description = "Transfer from " . htmlspecialchars($transaction['sender_account_number'] ?? 'N/A') . " to " . htmlspecialchars($transaction['recipient_account_number'] ?? 'N/A') . ". " . $display_description;
+                                    } elseif ($transaction['user_id'] == $user_id_mongo) { // This user is the sender
+                                        $transaction_details[] = "From Acc: " . htmlspecialchars($transaction['sender_account_number'] ?? 'N/A');
+                                        if (!empty($transaction['recipient_name'])) {
+                                            $transaction_details[] = "To: " . htmlspecialchars($transaction['recipient_name']);
+                                        }
+                                        if (!empty($transaction['recipient_account_number'])) {
+                                            $transaction_details[] = "Acc No: " . htmlspecialchars($transaction['recipient_account_number']);
+                                        } elseif (!empty($transaction['recipient_iban'])) {
+                                            $transaction_details[] = "IBAN: " . htmlspecialchars($transaction['recipient_iban'] ?? '');
+                                        } elseif (!empty($transaction['recipient_sort_code'])) {
+                                            $transaction_details[] = "Sort Code: " . htmlspecialchars($transaction['recipient_sort_code'] ?? '');
+                                            $transaction_details[] = "Ext Acc No: " . htmlspecialchars($transaction['recipient_external_account_number'] ?? '');
+                                        }
+                                        if (!empty($transaction['recipient_bank_name'])) {
+                                            $transaction_details[] = "Bank: " . htmlspecialchars($transaction['recipient_bank_name'] ?? '');
+                                        }
+                                    } elseif ($transaction['recipient_user_id'] == $user_id_mongo) { // This user is the recipient
+                                        $transaction_details[] = "To Acc: " . htmlspecialchars($transaction['recipient_account_number'] ?? 'N/A');
+                                        if (!empty($transaction['sender_name'])) {
+                                            $transaction_details[] = "From: " . htmlspecialchars($transaction['sender_name']);
+                                        }
+                                        if (!empty($transaction['sender_account_number'])) {
+                                            $transaction_details[] = "Sender Acc: " . htmlspecialchars($transaction['sender_account_number']);
+                                        }
+                                    }
+                                ?>
+                                    <tr>
+                                        <td><?php echo $transaction['initiated_at']->format('Y-m-d H:i'); ?></td>
+                                        <td><?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $transaction['transaction_type']))); ?></td>
+                                        <td><?php echo $display_description; ?></td>
+                                        <td class="<?php echo $amount_class; ?>">
+                                            <?php echo $display_amount; ?>
+                                            <br><small>(<?php echo htmlspecialchars($display_currency_code); ?>)</small>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($transaction['transaction_reference']); ?></td>
+                                        <td><span class="status-<?php echo htmlspecialchars($transaction['status']); ?>"><?php echo htmlspecialchars(ucfirst($transaction['status'])); ?></span></td>
+                                        <td><?php echo implode('<br>', $transaction_details); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="pagination">
+                        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                            <?php
+                                $query_params = $_GET; // Get current filter params
+                                $query_params['page'] = $i; // Set current page
+                                $pagination_link = '?' . http_build_query($query_params);
+                            ?>
+                            <a href="<?php echo $pagination_link; ?>" class="<?php echo ($i == $current_page) ? 'current-page' : ''; ?>"><?php echo $i; ?></a>
+                        <?php endfor; ?>
+                    </div>
+                <?php else: ?>
+                    <p class="no-transactions">No transactions found for the selected criteria.</p>
+                <?php endif; ?>
+
             </div>
         </main>
     </div>
-    <script>
-    // Optional: JavaScript to dynamically adjust textarea height if needed
-    document.querySelectorAll('.admin-comment-textarea').forEach(textarea => {
-        // Event listener for dynamic resizing on input
-        textarea.addEventListener('input', function() {
-            // 'this' inside the event listener correctly refers to the textarea element
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-        });
-
-        // Adjust height on load for *this specific textarea*
-        // Use the 'textarea' variable which correctly refers to the current element in the forEach loop
-        textarea.style.height = 'auto';
-        textarea.style.height = (textarea.scrollHeight) + 'px';
-    });
-</script>
+    <script src="script.js"></script>
 </body>
 </html>
