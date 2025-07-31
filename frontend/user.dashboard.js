@@ -11,23 +11,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Logic for Account Cards Carousel ---
-    const accountCardsWrapper = document.querySelector('.account-cards-wrapper'); // Added wrapper for better targeting
+    const accountCardsWrapper = document.querySelector('.account-cards-wrapper');
     const accountCardsContainer = document.querySelector('.account-cards-container');
     const accountCards = accountCardsContainer ? Array.from(accountCardsContainer.querySelectorAll('.account-card')) : [];
     const accountPagination = document.querySelector('.account-pagination');
-    // Select all toggle indicators
     const accountToggleIndicators = accountCardsContainer ? Array.from(accountCardsContainer.querySelectorAll('.account-toggle-indicator')) : [];
-
 
     let currentAccountIndex = 0; // Index of the currently displayed card
 
-    // Helper to get computed styles for card dimensions including margin
+    // Helper to get computed styles for card dimensions including margin/gap
     function getCardDimensions() {
-        if (accountCards.length === 0) return { cardWidth: 0, cardMarginRight: 0, totalCardWidth: 0 };
-        const cardStyle = getComputedStyle(accountCards[0]);
-        const cardWidth = accountCards[0].offsetWidth; // Includes padding and border
-        const gap = parseFloat(cardStyle.marginRight) || 0; // If using margin for gap
-        const totalCardWidth = cardWidth + gap; // Card width + space after it
+        if (accountCards.length === 0) return { cardWidth: 0, gap: 0, totalCardWidth: 0 };
+
+        const cardElement = accountCards[0];
+        const cardStyle = getComputedStyle(cardElement);
+        const cardWidth = cardElement.offsetWidth; // Includes padding and border
+
+        let gap = 0;
+        // Try to get gap from the container (CSS gap/column-gap property)
+        if (accountCardsContainer) {
+            const containerStyle = getComputedStyle(accountCardsContainer);
+            gap = parseFloat(containerStyle.columnGap) || parseFloat(containerStyle.gap) || 0;
+        }
+
+        // Fallback to margin-right if container gap is not set (legacy/different CSS approach)
+        if (gap === 0) {
+            gap = parseFloat(cardStyle.marginRight) || 0;
+        }
+
+        const totalCardWidth = cardWidth + gap;
         return { cardWidth, gap, totalCardWidth };
     }
 
@@ -87,7 +99,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Only show dots if more than one card
         if (accountCards.length <= 1) {
+            accountPagination.style.display = 'none'; // Hide dots if only one card
             return;
+        } else {
+            accountPagination.style.display = 'flex'; // Show dots if multiple cards
         }
 
         accountCards.forEach((_, index) => {
@@ -147,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Apply the drag visually by directly manipulating transform
             accountCardsContainer.style.transform = `translateX(${currentOffset + diff}px)`;
-        });
+        }, { passive: true });
 
         accountCardsContainer.addEventListener('touchend', (e) => {
             if (!isSwiping) return;
@@ -188,6 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentTranslate = transformMatch ? parseFloat(transformMatch[1]) : 0;
             accountCardsContainer.style.transition = 'none'; // Disable transition during drag
             accountCardsContainer.style.cursor = 'grabbing'; // Change cursor
+            e.preventDefault(); // Prevent default drag behavior (e.g., image drag)
         });
 
         accountCardsContainer.addEventListener('mousemove', (e) => {
@@ -240,7 +256,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeTransferModal = document.getElementById('closeTransferModal');
 
     if (transferButton && transferModalOverlay && closeTransferModal) {
-        transferButton.addEventListener('click', () => {
+        transferButton.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent default link/button action if it's a link
             transferModalOverlay.classList.add('active');
         });
 
@@ -262,26 +279,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeSidebarBtn = document.getElementById('closeSidebarBtn');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
 
-    if (menuIcon && sidebar && closeSidebarBtn && sidebarOverlay) {
-        menuIcon.addEventListener('click', () => {
-            sidebar.classList.add('active');
-            sidebarOverlay.classList.add('active');
-        });
-
-        closeSidebarBtn.addEventListener('click', () => {
-            sidebar.classList.remove('active');
-            sidebarOverlay.classList.remove('active');
-        });
-
-        // Close sidebar if clicking on the overlay
-        sidebarOverlay.addEventListener('click', () => {
-            sidebar.classList.remove('active');
-            sidebarOverlay.classList.remove('active');
-        });
+    // Consolidated sidebar toggle logic into a single function for reusability
+    function toggleSidebar() {
+        sidebar.classList.toggle('active');
+        sidebarOverlay.classList.toggle('active');
     }
 
+    if (menuIcon) menuIcon.addEventListener('click', toggleSidebar);
+    if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', toggleSidebar);
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', toggleSidebar);
+
+
     // --- View My Cards Logic ---
-    // Make sure the <a> tag in dashboard.php has id="viewMyCardsButton"
     const viewMyCardsButton = document.getElementById('viewMyCardsButton');
 
     if (viewMyCardsButton) {
@@ -290,7 +299,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Check if BASE_URL_JS is defined (it should be, via the PHP script block)
             if (typeof BASE_URL_JS !== 'undefined') {
-                window.location.href = `${BASE_URL_JS}/bank_cards`; // Ensure this matches your router
+                // Ensure this path matches your router/file structure.
+                // Assuming `bank_cards` route leads to `my_cards.php`
+                window.location.href = `${BASE_URL_JS}/bank_cards`;
             } else {
                 console.error("BASE_URL_JS is not defined. Cannot navigate to bank cards.");
                 // Fallback to relative path, though relying on BASE_URL_JS is better
