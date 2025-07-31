@@ -237,7 +237,7 @@ switch ($active_transfer_method) {
                                     data-balance="<?php echo htmlspecialchars($account['balance']); ?>"
                                     data-currency="<?php echo htmlspecialchars($account['currency']); ?>"
                                     <?php echo ((string)($form_data['source_account_id'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <?php echo number_format((float)$account['balance'], 2); ?>
+                                    <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> **<?php echo number_format(abs((float)$account['balance']), 2); ?>**
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -257,7 +257,7 @@ switch ($active_transfer_method) {
                                 <?php foreach ($user_accounts as $account): ?>
                                     <option value="<?php echo htmlspecialchars($account['id']); ?>"
                                         <?php echo ((string)($form_data['destination_account_id_self'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <?php echo number_format((float)$account['balance'], 2); ?>
+                                        <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> **<?php echo number_format(abs((float)$account['balance']), 2); ?>**
                                     </option>
                                 <?php endforeach; ?>
                             </select>
