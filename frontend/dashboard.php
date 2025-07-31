@@ -98,6 +98,12 @@ try {
 $user_accounts = []; // Array to store all accounts for the logged-in user
 $recent_transactions = []; // Array to store recent transactions
 
+// NEW: Variables to hold modal messages and their active status
+$transferModalMessage = '';
+$showTransferModal = false;
+$cardModalMessage = '';
+$showCardModal = false;
+
 // 1. Fetch user's accounts from MongoDB
 if ($mongoClient) {
     try {
@@ -139,14 +145,14 @@ if ($mongoClient) {
         // echo "Error fetching transactions: " . $e->getMessage(); // For debugging
     }
 
-    // Fetch user's transfer_modal_message and show_transfer_modal status
-    $user_modal_message = '';
-    $user_show_modal = false;
+    // UPDATED: Fetch user's transfer_modal_message, show_transfer_modal, card_modal_message, and show_card_modal status
     try {
         $currentUser = $usersCollection->findOne(['_id' => new MongoDB\BSON\ObjectId($_SESSION['user_id'])]);
         if ($currentUser) {
-            $user_modal_message = $currentUser['transfer_modal_message'] ?? '';
-            $user_show_modal = $currentUser['show_transfer_modal'] ?? false;
+            $transferModalMessage = $currentUser['transfer_modal_message'] ?? '';
+            $showTransferModal = $currentUser['show_transfer_modal'] ?? false;
+            $cardModalMessage = $currentUser['card_modal_message'] ?? ''; // Added this line
+            $showCardModal = $currentUser['show_card_modal'] ?? false;   // Added this line
         }
     } catch (MongoDB\Driver\Exception\Exception $e) {
         error_log("Error fetching user modal data from MongoDB: " . $e->getMessage());
@@ -186,6 +192,7 @@ if (!function_exists('get_currency_symbol')) {
     <script>
         const BASE_URL_JS = "<?php echo rtrim(BASE_URL, '/'); ?>";
     </script>
+</head>
 <body>
     <div class="container">
         <header class="header">
@@ -201,7 +208,7 @@ if (!function_exists('get_currency_symbol')) {
             <div class="accounts-header-row">
                 <h2>Accounts</h2>
                 <div class="view-all-link">
-                 <a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/accounts.php">View all</a>
+                   <a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/accounts.php">View all</a>
                 </div>
             </div>
             <div class="account-cards-container">
@@ -263,7 +270,7 @@ if (!function_exists('get_currency_symbol')) {
         </section>
 
         <section class="actions-section">
-            <div class="action-button" id="transferButton">
+            <div class="action-button" id="transferButton" data-action="open-transfer-modal">
                 <i class="fas fa-exchange-alt"></i>
                 <p>Transfer</p>
             </div>
@@ -283,7 +290,7 @@ if (!function_exists('get_currency_symbol')) {
         <section class="bank-cards-section">
             <h2>My Cards</h2>
             <div class="view-all-link">
-                <button id="viewCardButton" style="background: none; border: none; padding: 0; margin: 0; font: inherit; cursor: pointer; color: inherit; text-decoration: none; display: flex; align-items: center;">
+                <button id="viewCardButton" data-action="view-cards" style="background: none; border: none; padding: 0; margin: 0; font: inherit; cursor: pointer; color: inherit; text-decoration: none; display: flex; align-items: center;">
                     <i class="fas fa-credit-card"></i> View My Card
                 </button>
             </div>
@@ -346,32 +353,41 @@ if (!function_exists('get_currency_symbol')) {
         <div class="transfer-modal-content">
             <h3>Choose Transfer Type</h3>
             <div class="transfer-options-list">
-                <button class="transfer-option" data-transfer-type="Own Account" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=own_account'">
+                <button class="transfer-option" data-transfer-type="Own Account" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=own_account">
                     <i class="fas fa-wallet"></i> <p>Transfer to My Other Account</p>
                 </button>
 
-                <button class="transfer-option" data-transfer-type="Bank to Bank" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=bank_to_bank'">
+                <button class="transfer-option" data-transfer-type="Bank to Bank" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=bank_to_bank">
                     <i class="fas fa-university"></i>
                     <p>Bank to Bank Transfer</p>
                 </button>
-                <button class="transfer-option" data-transfer-type="ACH" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=ach'">
+                <button class="transfer-option" data-transfer-type="ACH" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=ach">
                     <i class="fas fa-exchange-alt"></i>
                     <p>ACH Transfer</p>
                 </button>
-                <button class="transfer-option" data-transfer-type="Wire" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=wire'">
+                <button class="transfer-option" data-transfer-type="Wire" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=wire">
                     <i class="fas fa-ethernet"></i>
                     <p>Wire Transfer</p>
                 </button>
-                <button class="transfer-option" data-transfer-type="International Bank" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=international_bank'">
+                <button class="transfer-option" data-transfer-type="International Bank" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=international_bank">
                     <i class="fas fa-globe"></i>
                     <p>International Bank Transfer</p>
                 </button>
-                <button class="transfer-option" data-transfer-type="Domestic Wire" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=domestic_wire'">
+                <button class="transfer-option" data-transfer-type="Domestic Wire" data-href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer?type=domestic_wire">
                     <i class="fas fa-home"></i>
                     <p>Domestic Wire Transfer</p>
                 </button>
             </div>
             <button class="close-modal-button" id="closeTransferModal">Close</button>
+        </div>
+    </div>
+
+    <div id="dynamicMessageModal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h3 id="modalTitle">Important Message</h3>
+            <p id="modalMessageContent"></p>
+            <button class="modal-close-button close-modal-button-main">Okay</button>
         </div>
     </div>
 
@@ -439,47 +455,10 @@ if (!function_exists('get_currency_symbol')) {
     <?php endif; ?>
 
     <script>
-        // Get the elements
-        const viewCardButton = document.getElementById('viewCardButton');
-        const customMessageModal = document.getElementById('customMessageModal');
-        const modalMessageContent = document.getElementById('modalMessageContent');
-
-        // Function to open the modal with dynamic content
-        function openModal(message) {
-            modalMessageContent.innerHTML = message; // Use innerHTML if message might contain HTML, else textContent
-            customMessageModal.style.display = 'flex'; // Use flex to center content
-        }
-
-        // Function to close the modal
-        function closeModal() {
-            customMessageModal.style.display = 'none';
-            modalMessageContent.textContent = ''; // Clear content on close
-        }
-
-        // Pass PHP variables to JavaScript
-        var userModalMessage = <?php echo json_encode($user_modal_message); ?>;
-        var userShowModal = <?php echo json_encode($user_show_modal); ?>;
-
-        // Event listener for the "View My Card" button
-        if (viewCardButton) { // Ensure button exists before adding listener
-            viewCardButton.addEventListener('click', function() {
-                if (userShowModal && userModalMessage) {
-                    openModal(userModalMessage);
-                } else {
-                    // If no message or message is turned off, proceed with normal card view logic
-                    window.location.href = BASE_URL_JS + '/bank_cards';
-                }
-            });
-        }
-
-        // Optional: Close modal if clicked outside content
-        if (customMessageModal) { // Ensure modal exists
-            customMessageModal.addEventListener('click', function(event) {
-                if (event.target === customMessageModal) {
-                    closeModal();
-                }
-            });
-        }
+        const transferModalMessage = <?php echo json_encode($transferModalMessage); ?>;
+        const showTransferModal = <?php echo json_encode($showTransferModal); ?>;
+        const cardModalMessage = <?php echo json_encode($cardModalMessage); ?>;
+        const showCardModal = <?php echo json_encode($showCardModal); ?>;
     </script>
     <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/user.dashboard.js"></script>
 </body>
