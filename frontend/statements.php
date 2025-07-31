@@ -1,14 +1,22 @@
 <?php
-session_start();
-require_once '../Config.php'; // Essential for MONGO_URI, MONGO_DB_NAME
-require_once '../vendor/autoload.php'; // Make sure Composer's autoloader is included for MongoDB classes
+session_start(); // Keep session_start() at the very top of each script that uses sessions.
 
-use MongoDB\Client;
-use MongoDB\BSON\ObjectId;
+// 1. Load Composer's autoloader FIRST. This makes Dotenv and MongoDB classes available.
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// 2. Now load your Config.php. This file now handles Dotenv loading and error reporting settings.
+require_once __DIR__ . '/../Config.php';
+
+// 3. Load your functions.php
+require_once __DIR__ . '/../functions.php'; // If you have a sanitize_input function here
+
+use MongoDB\Client; // Make sure this is imported if using new MongoDB\Client
+use MongoDB\BSON\ObjectId; // For converting string IDs to MongoDB ObjectIds
 
 // Check if the user is logged in. If not, redirect to login page.
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
-    header('Location: login.php');
+// Using BASE_URL for consistency in redirects
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
+    header('Location: ' . BASE_URL . '/login.php'); // Assuming login.php is directly under BASE_URL
     exit;
 }
 
@@ -32,7 +40,7 @@ try {
     // Handle invalid user ID, e.g., redirect to login with an error message
     $_SESSION['message'] = "Invalid session. Please log in again.";
     $_SESSION['message_type'] = "error";
-    header('Location: login.php');
+    header('Location: ' . BASE_URL . '/login.php'); // Redirect to login
     exit;
 }
 
@@ -42,12 +50,12 @@ $user_currency_symbol = '€'; // Default for display, will be updated based on 
 
 try {
     // Establish MongoDB connection
-    $mongoClient = new Client(MONGO_URI);
-    $database = $mongoClient->selectDatabase(MONGO_DB_NAME);
+    // OPTION 1: Using the helper function (recommended for consistency)
+    $mongoClient = getMongoDBClient(); // Assuming getMongoDBClient() exists in functions.php
+
+    $database = $mongoClient->selectDatabase(MONGODB_DB_NAME);
 
     // Fetch user's primary account currency
-    // In MongoDB, you'd typically store accounts in a collection.
-    // Assuming 'accounts' collection and 'user_id' field.
     $accountsCollection = $database->accounts;
     $account = $accountsCollection->findOne(['user_id' => $user_id_mongo], ['projection' => ['currency' => 1]]);
 
@@ -63,7 +71,6 @@ try {
     }
 
     // Fetch user's transactions from the 'transactions' collection
-    // Transactions can be linked by user_id for sender or recipient_user_id for receiver.
     $transactionsCollection = $database->transactions;
 
     $filter = [
@@ -81,26 +88,31 @@ try {
             'transaction_type' => 1,
             'status' => 1,
             'transaction_reference' => 1,
-            // You might need to project 'sender_account_id' or 'recipient_account_id'
-            // if you need to determine if the transaction was an inflow or outflow relative to THIS user.
+            'user_id' => 1, // Include to check if sender/receiver
+            'recipient_user_id' => 1, // Include to check if sender/receiver
         ]
     ];
 
     $transactionsCursor = $transactionsCollection->find($filter, $options);
 
     foreach ($transactionsCursor as $transaction) {
-        // Convert MongoDB\BSON\UTCDateTime to PHP DateTime object if needed for formatting
+        // Convert MongoDB\BSON\UTCDateTime to PHP DateTime object
         if ($transaction['initiated_at'] instanceof MongoDB\BSON\UTCDateTime) {
             $transaction['initiated_at'] = $transaction['initiated_at']->toDateTime()->format('Y-m-d H:i:s');
         }
 
-        // To correctly determine if it's a 'debit' or 'credit' from *this user's perspective*,
-        // you need to know which account (sender or recipient) belongs to the logged-in user.
-        // For simplicity, using the 'transaction_type' field as is, but be aware of its definition.
-        // For example, a 'transfer' type might be a debit for the sender and a credit for the receiver.
-        // You'd need to compare $user_id_mongo with $transaction['user_id'] and $transaction['recipient_user_id']
-        // and adjust 'transaction_type' (or introduce 'flow_type') based on that.
-        // For now, we'll assume `transaction_type` correctly indicates debit/credit from the source's POV.
+        // Determine actual flow type (debit/credit) from *this user's perspective*
+        if (isset($transaction['user_id']) && $transaction['user_id'] == $user_id_mongo) {
+            // This user initiated the transaction (likely a debit/outflow)
+            $transaction['flow_type'] = 'debit';
+        } elseif (isset($transaction['recipient_user_id']) && $transaction['recipient_user_id'] == $user_id_mongo) {
+            // This user is the recipient (likely a credit/inflow)
+            $transaction['flow_type'] = 'credit';
+        } else {
+            // Fallback, use the stored transaction_type, or default to debit if ambiguous
+            $transaction['flow_type'] = strtolower($transaction['transaction_type'] ?? 'debit');
+            if ($transaction['flow_type'] == 'deposit') $transaction['flow_type'] = 'credit'; // Treat deposits as credit
+        }
 
         $user_transactions[] = (array) $transaction; // Cast to array for consistent access
     }
@@ -110,18 +122,16 @@ try {
     // Display a user-friendly error message or redirect
     $_SESSION['message'] = "Error fetching statements. Please try again later.";
     $_SESSION['message_type'] = "error";
-    // Optional: header('Location: dashboard.php'); // Redirect to dashboard
+    // Optional: header('Location: ' . BASE_URL . '/dashboard.php'); // Redirect to dashboard
 } finally {
-    // In MongoDB PHP driver, there's no explicit close() method needed for Client.
-    // Connections are managed automatically.
-    $mongoClient = null;
+    $mongoClient = null; // Let PHP's garbage collection handle the client connection.
 }
 
 // Organize transactions into 'statements' by month/year for display
 $grouped_transactions = [];
 foreach ($user_transactions as $transaction) {
     // Ensure 'initiated_at' is a string compatible with DateTime constructor
-    $date = new DateTime($transaction['initiated_at']); 
+    $date = new DateTime($transaction['initiated_at']);
     $period = $date->format('F Y'); // e.g., "July 2025"
 
     if (!isset($grouped_transactions[$period])) {
@@ -143,23 +153,26 @@ uksort($grouped_transactions, function($a, $b) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Statements - Heritage Bank</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Statements - HomeTown Bank Pa</title>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/frontend/style.css">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/frontend/accounts.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+
     <style>
         /* General styling for the main content area */
         body {
             font-family: 'Roboto', sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f4f7f6;
+            background-color: #FFFFFF; /* Changed to white */
             display: flex;
             flex-direction: column;
             min-height: 100vh;
         }
 
         .dashboard-header {
-            background-color: #0056b3; /* Darker blue, typical for banks */
+            background-color: #3F0071; /* Changed to dark purple */
             color: white;
             padding: 15px 30px;
             display: flex;
@@ -215,7 +228,7 @@ uksort($grouped_transactions, function($a, $b) {
 
         .sidebar {
             width: 250px;
-            background-color: #ffffff;
+            background-color: #FFFFFF; /* Changed to white */
             box-shadow: 2px 0 5px rgba(0,0,0,0.05);
             padding-top: 20px;
             flex-shrink: 0;
@@ -245,8 +258,8 @@ uksort($grouped_transactions, function($a, $b) {
         .sidebar ul li a:hover,
         .sidebar ul li a.active {
             background-color: #e6f0fa;
-            border-left-color: #007bff;
-            color: #0056b3;
+            border-left-color: #3F0071; /* Accent color to match new header */
+            color: #3F0071;
         }
 
         .sidebar ul li a i {
@@ -259,10 +272,15 @@ uksort($grouped_transactions, function($a, $b) {
         .statements-content {
             flex-grow: 1; /* Allow content to take remaining space */
             padding: 20px;
-            background-color: #f4f7f6;
-            margin-left: 250px; /* Offset for fixed sidebar */
+            background-color: #FFFFFF; /* Changed to white */
+            margin-left: 0; /* No sidebar on this page */
             padding-top: 20px; /* No need for extra padding-top due to fixed header and padding-top on dashboard-container */
         }
+        /* Adjusted margin for main content if sidebar is used */
+        body.has-sidebar .statements-content {
+            margin-left: 250px; /* Offset for fixed sidebar */
+        }
+
 
         .statements-card {
             background-color: #fff;
@@ -275,7 +293,7 @@ uksort($grouped_transactions, function($a, $b) {
             color: #333;
             margin-bottom: 25px;
             font-size: 1.8em;
-            border-bottom: 2px solid #0056b3;
+            border-bottom: 2px solid #3F0071; /* Accent color to match header */
             padding-bottom: 10px;
         }
 
@@ -289,12 +307,12 @@ uksort($grouped_transactions, function($a, $b) {
         }
 
         .month-group h3 {
-            background-color: #007bff; /* Primary blue */
+            background-color: #3F0071; /* Changed to dark purple to match header */
             color: white;
             padding: 15px 20px;
             margin: 0;
             font-size: 1.4em;
-            border-bottom: 1px solid #0056b3;
+            border-bottom: 1px solid #000000; /* Darker border for contrast */
             cursor: pointer; /* Indicate it's clickable for toggle */
             display: flex;
             justify-content: space-between;
@@ -360,18 +378,11 @@ uksort($grouped_transactions, function($a, $b) {
         }
 
         /* Applying specific colors based on transaction type for amounts */
-        .transaction-item-amount.credit,
-        .transaction-item-amount.deposit { /* Added deposit for clarity */
+        .transaction-item-amount.credit {
             color: #28a745; /* Green for credit/deposit */
         }
 
-        .transaction-item-amount.debit,
-        .transaction-item-amount.withdrawal, /* Added withdrawal for clarity */
-        .transaction-item-amount.transfer,
-        .transaction-item-amount.internal_self_transfer,
-        .transaction-item-amount.internal_heritage,
-        .transaction-item-amount.external_iban,
-        .transaction-item-amount.external_sort_code {
+        .transaction-item-amount.debit {
             color: #dc3545; /* Red for debit and all transfer types */
         }
 
@@ -395,7 +406,6 @@ uksort($grouped_transactions, function($a, $b) {
             background-color: #dc3545;
         }
 
-
         .no-transactions-message {
             text-align: center;
             color: #666;
@@ -405,6 +415,28 @@ uksort($grouped_transactions, function($a, $b) {
             border: 1px dashed #ddd;
             margin-top: 20px;
         }
+
+        /* Back to dashboard button styling */
+        .back-to-dashboard {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .back-to-dashboard a {
+            display: inline-block;
+            background-color: #007bff; /* A standard blue for buttons */
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        .back-to-dashboard a:hover {
+            background-color: #0056b3;
+        }
+
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
@@ -449,7 +481,7 @@ uksort($grouped_transactions, function($a, $b) {
             .sidebar ul li a:hover,
             .sidebar ul li a.active {
                 border-left-color: transparent;
-                border-bottom-color: #007bff;
+                border-bottom-color: #3F0071;
             }
             .statements-content {
                 margin-left: 0; /* No offset for collapsed sidebar */
@@ -529,31 +561,34 @@ uksort($grouped_transactions, function($a, $b) {
 <body class="statements-page">
     <header class="dashboard-header">
         <div class="logo">
-            <img src="../images/logo.png" alt="Heritage Bank Logo" class="logo-barclays">
+            <img src="<?php echo htmlspecialchars(BASE_URL); ?>/images/logo.png" alt="HomeTown Bank Pa Logo" class="logo-barclays">
         </div>
         <div class="user-info">
             <i class="fa-solid fa-user profile-icon"></i>
             <span><?php echo htmlspecialchars($full_name); ?></span>
-            <a href="logout.php">Logout</a>
-        </div>
+            <a href="<?php echo BASE_URL; ?>/logout.php">Logout</a> </div>
     </header>
 
     <div class="dashboard-container">
-        <aside class="sidebar">
-            <ul>
-                <li><a href="dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
-                <li><a href="profile.php"><i class="fas fa-user-circle"></i> <span>Profile</span></a></li>
-                <li class="active"><a href="statements.php"><i class="fas fa-file-alt"></i> <span>Statements</span></a></li>
-                <li><a href="transfer.php"><i class="fas fa-exchange-alt"></i> <span>Transfers</span></a></li>
-                <li><a href="transactions.php"><i class="fas fa-history"></i> <span>Transaction History</span></a></li>
-                <li><a href="#"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
-                <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
-            </ul>
-        </aside>
-
         <main class="statements-content">
             <div class="statements-card">
+                <div class="back-to-dashboard">
+                    <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard">
+                        <i class="fas fa-home"></i> Back to Dashboard
+                    </a>
+                </div>
+
                 <h2>Your Transaction History & Statements</h2>
+
+                <?php
+                // Display messages (e.g., from failed account fetch or invalid session)
+                if (isset($_SESSION['message'])) {
+                    $message_type = $_SESSION['message_type'] ?? 'info';
+                    echo '<div class="alert ' . htmlspecialchars($message_type) . '">' . htmlspecialchars($_SESSION['message']) . '</div>';
+                    unset($_SESSION['message']); // Clear the message after displaying
+                    unset($_SESSION['message_type']);
+                }
+                ?>
 
                 <?php if (empty($grouped_transactions)): ?>
                     <p class="no-transactions-message">No transactions available at this time. Please check back later.</p>
@@ -566,22 +601,14 @@ uksort($grouped_transactions, function($a, $b) {
                             </h3>
                             <ul class="transactions-list">
                                 <?php foreach ($transactions as $transaction):
-                                    // Determine the amount class and sign based on transaction type
+                                    // Determine the amount class and sign based on calculated flow_type
                                     $amount_class = '';
                                     $amount_sign = '';
-                                    
-                                    // IMPORTANT: This logic assumes 'transaction_type' accurately reflects
-                                    // inflow/outflow from the perspective of the *user whose statement this is*.
-                                    // If 'transaction_type' is generic (e.g., 'transfer' for both sender/receiver),
-                                    // you'd need additional logic based on 'user_id' and 'recipient_user_id'
-                                    // to decide if it's an income (+) or expense (-).
-                                    // For example: if ($transaction['user_id'] == $user_id_mongo) { $amount_class = 'debit'; $amount_sign = '-'; } else { $amount_class = 'credit'; $amount_sign = '+'; }
-                                    
-                                    if (in_array($transaction['transaction_type'], ['credit', 'deposit'])) {
+
+                                    if ($transaction['flow_type'] == 'credit') {
                                         $amount_class = 'credit';
                                         $amount_sign = '+';
-                                    } else {
-                                        // All other types (debit, transfer, withdrawal, etc.) are considered outgoing/debit for display purposes here
+                                    } else { // 'debit' or any other outgoing flow
                                         $amount_class = 'debit';
                                         $amount_sign = '-';
                                     }
@@ -590,9 +617,9 @@ uksort($grouped_transactions, function($a, $b) {
                                         <div class="transaction-item-details">
                                             <span class="description"><?php echo htmlspecialchars($transaction['description']); ?></span>
                                             <span class="date-ref">
-                                                <?php 
+                                                <?php
                                                 // Ensure $transaction['initiated_at'] is a string or DateTime object for format()
-                                                echo (new DateTime($transaction['initiated_at']))->format('M d, Y H:i'); 
+                                                echo (new DateTime($transaction['initiated_at']))->format('M d, Y H:i');
                                                 ?>
                                                 (Ref: <?php echo htmlspecialchars($transaction['transaction_reference']); ?>)
                                             </span>
