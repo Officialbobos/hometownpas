@@ -404,7 +404,7 @@ if (isset($_POST['user_identifier']) && !empty($_POST['user_identifier'])) {
                 <button type="submit" class="button-primary">Generate Transactions</button>
             </form>
 
-            <p><a href="users_management.php" class="back-link">&larr; Back to User Management</a></p>
+        <p><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_users'; ?>" class="back-link">&larr; Back to User Management</a></p>
         </div>
     </div>
 <script src="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/script.js'; ?>"></script>
