@@ -60,16 +60,39 @@ document.addEventListener('DOMContentLoaded', () => {
             messageBoxOverlay.classList.remove('show');
             messageBoxContentWrapper.classList.remove('message-box-success', 'message-box-error', 'message-box-info');
             messageBoxContentParagraph.textContent = '';
+            
+            // --- Crucial: Send an AJAX request to clear the session message ---
+            // This prevents the modal from reappearing on refresh/subsequent visits
+            fetch(PHP_BASE_URL + 'api/clear_card_modal_session.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'clear_card_modal_message' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // console.log('Session cleared response:', data); // For debugging
+                // Optionally reload the page or update global JS variables if needed,
+                // but for just clearing the session, this is usually enough.
+            })
+            .catch(error => {
+                console.error('Error clearing card modal session:', error);
+            });
         });
     }
 
     // --- Initial page message display (using the unified message box) ---
-    // Prioritize the admin message if it's enabled and has content,
-    // otherwise display the session message if it exists.
-    if (typeof showAdminCardModal !== 'undefined' && showAdminCardModal === true &&
-        typeof adminCardModalText !== 'undefined' && adminCardModalText.trim() !== '') {
+    // Prioritize the session-based message if it exists, as it comes from a dynamic user action.
+    // Fallback to admin-set message if no session message, then to default initialMessage.
+    if (typeof initialMessageForCardsPage !== 'undefined' && initialMessageForCardsPage.trim() !== '' &&
+        typeof initialMessageTypeForCardsPage !== 'undefined' && initialMessageTypeForCardsPage.trim() !== '') {
+        // This is the message passed from set_session_for_card_modal.php via PHP variable
+        window.showMessageBox(initialMessageForCardsPage, initialMessageTypeForCardsPage);
+    } else if (typeof showAdminCardModal !== 'undefined' && showAdminCardModal === true &&
+               typeof adminCardModalText !== 'undefined' && adminCardModalText.trim() !== '') {
+        // This is the static admin-set message from bank_cards.php
         window.showMessageBox(adminCardModalText, 'info'); // Admin message is typically informational
     } else if (typeof initialMessage !== 'undefined' && initialMessage.trim() !== '') {
+        // Fallback for any other general initial message (less specific)
         window.showMessageBox(initialMessage, initialMessageType);
     }
 
@@ -301,17 +324,17 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 actionCardSelect.innerHTML = '<option value="" disabled>No Cards Available</option>';
                 // Disable all action buttons if no cards are available
-                freezeActionButton.disabled = true;
-                reportActionButton.disabled = true;
-                setPinActionButton.disabled = true;
+                if (freezeActionButton) freezeActionButton.disabled = true;
+                if (reportActionButton) reportActionButton.disabled = true;
+                if (setPinActionButton) setPinActionButton.disabled = true;
                 // if (activateActionButton) activateActionButton.disabled = true; // Uncomment if activateActionButton is used
             }
         } catch (error) {
             console.error('Error populating action card select:', error);
             actionCardSelect.innerHTML = '<option value="" disabled>Error Loading Cards</option>';
-            freezeActionButton.disabled = true;
-            reportActionButton.disabled = true;
-            setPinActionButton.disabled = true;
+            if (freezeActionButton) freezeActionButton.disabled = true;
+            if (reportActionButton) reportActionButton.disabled = true;
+            if (setPinActionButton) setPinActionButton.disabled = true;
             // if (activateActionButton) activateActionButton.disabled = true; // Uncomment if activateActionButton is used
             window.showMessageBox(`Failed to load cards for actions: ${error.message}`, 'error');
         }
@@ -325,39 +348,43 @@ document.addEventListener('DOMContentLoaded', () => {
             const cardStatus = selectedOption.dataset.status;
 
             // Reset all buttons to disabled first
-            freezeActionButton.disabled = true;
-            reportActionButton.disabled = true;
-            setPinActionButton.disabled = true;
+            if (freezeActionButton) freezeActionButton.disabled = true;
+            if (reportActionButton) reportActionButton.disabled = true;
+            if (setPinActionButton) setPinActionButton.disabled = true;
             // if (activateActionButton) activateActionButton.disabled = true; // Uncomment if activateActionButton is used
 
             // Reset button texts
-            freezeActionButton.textContent = '❄️ Freeze/Unfreeze Card';
+            if (freezeActionButton) freezeActionButton.textContent = '❄️ Freeze/Unfreeze Card';
 
 
             if (cardId) {
                 // Set cardId on all relevant buttons
-                freezeActionButton.dataset.cardId = cardId;
-                reportActionButton.dataset.cardId = cardId;
-                setPinActionButton.dataset.cardId = cardId;
+                if (freezeActionButton) freezeActionButton.dataset.cardId = cardId;
+                if (reportActionButton) reportActionButton.dataset.cardId = cardId;
+                if (setPinActionButton) setPinActionButton.dataset.cardId = cardId;
                 // if (activateActionButton) activateActionButton.dataset.cardId = cardId; // Uncomment if activateActionButton is used
 
 
                 // Enable/Disable buttons based on card status
                 if (cardStatus === 'active') {
-                    freezeActionButton.disabled = false;
-                    freezeActionButton.textContent = '❄️ Freeze Card';
-                    freezeActionButton.dataset.status = 'active'; // Update dataset status
-                    reportActionButton.disabled = false;
-                    setPinActionButton.disabled = false;
+                    if (freezeActionButton) {
+                        freezeActionButton.disabled = false;
+                        freezeActionButton.textContent = '❄️ Freeze Card';
+                        freezeActionButton.dataset.status = 'active'; // Update dataset status
+                    }
+                    if (reportActionButton) reportActionButton.disabled = false;
+                    if (setPinActionButton) setPinActionButton.disabled = false;
                 } else if (cardStatus === 'frozen') {
-                    freezeActionButton.disabled = false;
-                    freezeActionButton.textContent = '🔓 Unfreeze Card';
-                    freezeActionButton.dataset.status = 'frozen'; // Update dataset status
-                    reportActionButton.disabled = false; // Still allow reporting
-                    setPinActionButton.disabled = false; // Still allow PIN setting
+                    if (freezeActionButton) {
+                        freezeActionButton.disabled = false;
+                        freezeActionButton.textContent = '🔓 Unfreeze Card';
+                        freezeActionButton.dataset.status = 'frozen'; // Update dataset status
+                    }
+                    if (reportActionButton) reportActionButton.disabled = false; // Still allow reporting
+                    if (setPinActionButton) setPinActionButton.disabled = false; // Still allow PIN setting
                 } else if (cardStatus === 'pending_activation') {
                     // if (activateActionButton) activateActionButton.disabled = false; // Uncomment if activateActionButton is used
-                    reportActionButton.disabled = false; // Allow reporting even if pending
+                    if (reportActionButton) reportActionButton.disabled = false; // Allow reporting even if pending
                     // Other actions (freeze, set pin) might be disabled until activated
                 } else if (cardStatus === 'lost' || cardStatus === 'stolen' || cardStatus === 'cancelled') {
                     // All actions should be disabled for lost/stolen/cancelled cards
@@ -549,7 +576,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.status === 'success') {
                     window.showMessageBox(data.message, 'success');
                     orderCardForm.reset();
-                    document.getElementById('cardHolderName').value = currentUserFullName; // Reset card holder name
+                    // Make sure currentUserFullName is defined globally or passed via PHP for this to work
+                    if (typeof currentUserFullName !== 'undefined') {
+                        document.getElementById('cardHolderName').value = currentUserFullName; // Reset card holder name
+                    }
                     fetchUserCards(); // Refresh the card list display
                     populateActionCardSelect(); // Refresh the action dropdown
                 } else {
