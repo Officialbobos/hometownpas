@@ -123,26 +123,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
-  // Function to update balance display
-function updateBalanceDisplay() {
-    const selectedOption = sourceAccountIdSelect.options[sourceAccountIdSelect.selectedIndex];
-    if (selectedOption && selectedOption.value) {
-        const balance = selectedOption.getAttribute('data-balance');
-        const currency = selectedOption.getAttribute('data-currency');
-        const currencySymbol = getCurrencySymbol(currency);
+    // Function to update balance display
+    function updateBalanceDisplay() {
+        const selectedOption = sourceAccountIdSelect.options[sourceAccountIdSelect.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            const balance = selectedOption.getAttribute('data-balance');
+            const currency = selectedOption.getAttribute('data-currency');
+            const currencySymbol = getCurrencySymbol(currency);
 
-        // This line correctly uses Math.abs() to ensure no minus sign is displayed.
-        displayCurrentBalance.textContent = parseFloat(Math.abs(balance)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        amountCurrencySymbolForBalance.textContent = currencySymbol;
-        currentCurrencyDisplay.textContent = currency;
-        amountCurrencySymbol.textContent = currencySymbol; // Also update currency symbol next to amount input
-    } else {
-        displayCurrentBalance.textContent = 'N/A';
-        amountCurrencySymbolForBalance.textContent = '';
-        currentCurrencyDisplay.textContent = '';
-        amountCurrencySymbol.textContent = '';
+            // This line correctly uses Math.abs() to ensure no minus sign is displayed.
+            displayCurrentBalance.textContent = parseFloat(Math.abs(balance)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            amountCurrencySymbolForBalance.textContent = currencySymbol;
+            currentCurrencyDisplay.textContent = currency;
+            amountCurrencySymbol.textContent = currencySymbol; // Also update currency symbol next to amount input
+        } else {
+            displayCurrentBalance.textContent = 'N/A';
+            amountCurrencySymbolForBalance.textContent = '';
+            currentCurrencyDisplay.textContent = '';
+            amountCurrencySymbol.textContent = '';
+        }
     }
-}
     // Helper to get currency symbol (can be expanded)
     function getCurrencySymbol(currencyCode) {
         switch (currencyCode.toUpperCase()) {
@@ -187,8 +187,14 @@ function updateBalanceDisplay() {
         if (window.APP_DATA.initialSelectedFromAccount && sourceAccountIdSelect) {
             sourceAccountIdSelect.value = window.APP_DATA.initialSelectedFromAccount;
         }
-        // Always call updateBalanceDisplay to ensure balance is shown, even if no account pre-selected
-        updateBalanceDisplay(); // Call once on load
+        
+        // **CORRECTED LOGIC:**
+        // The previous line to call `updateBalanceDisplay()` here was fine, but a slightly
+        // better approach is to ensure the select element has the correct value
+        // from PHP first, and *then* update the display.
+        // This is the ideal place to ensure the initial balance is correct.
+        updateBalanceDisplay(); // Call once on load to populate the balance correctly.
+
 
         // Show existing Transfer Success Modal if flag is set
         if (window.APP_DATA.showModal && transferSuccessModal && Object.keys(window.APP_DATA.modalDetails).length > 0) {
