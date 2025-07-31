@@ -10,7 +10,7 @@ if (session_status() == PHP_SESSION_NONE) {
 require_once __DIR__ . '/../Config.php';
 
 // Then load functions.php, which might depend on constants or autoloader from Config.php.
-require_once __DIR__ . '/../functions.php'; // Contains get_currency_symbol, generateUniqueReferenceNumber, sanitize_input
+require_once __DIR__ . '/../functions.php'; // Contains get_currency_symbol, generateUniqueReferenceNumber, sanitize_input, and sendEmail
 
 // Composer's autoloader is now available due to Config.php
 use MongoDB\Client;
@@ -52,7 +52,7 @@ try {
     $db = $client->selectDatabase(MONGODB_DB_NAME);
     $accountsCollection = $db->accounts;
     $transactionsCollection = $db->transactions;
-    $usersCollection = $db->users; // To update user modal status
+    $usersCollection = $db->users; // To update user modal status and get user email
 } catch (MongoDBException $e) {
     error_log("make_transfer.php: MongoDB connection error: " . $e->getMessage());
     $_SESSION['message'] = "ERROR: Could not connect to the database. Please try again later.";
@@ -144,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         'type' => 'debit' // Mark as debit from source account
     ];
 
-    $destination_account = null; // Initialize for use in modal details
+    $destination_account_display = null; // Initialize for use in modal details and email
 
     // Handle different transfer methods
     switch ($transfer_method) {
@@ -192,8 +192,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             $transaction_data['destination_account_id'] = $destinationAccountIdObject;
             $transaction_data['destination_account_number'] = $destinationAccount['account_number'];
             $transaction_data['destination_account_type'] = $destinationAccount['account_type'];
-            $transaction_data['recipient_name'] = $sourceAccount['first_name'] . ' ' . $sourceAccount['last_name']; // Auto-fill recipient for self-transfer
-            $destination_account = $destinationAccount['account_type'] . ' (****' . substr($destinationAccount['account_number'], -4) . ')';
+            // Auto-fill recipient for self-transfer
+            $transaction_data['recipient_name'] = $sourceAccount['first_name'] . ' ' . $sourceAccount['last_name'];
+            $destination_account_display = $destinationAccount['account_type'] . ' (****' . substr($destinationAccount['account_number'], -4) . ')';
             break;
 
         case 'internal_heritage':
@@ -240,7 +241,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
                 }
             }
             $transaction_data['recipient_name'] = $recipient_name; // Set it back after potential update
-            $destination_account = $destinationAccount['account_type'] . ' (****' . substr($destinationAccount['account_number'], -4) . ')';
+            $destination_account_display = $destinationAccount['account_type'] . ' (****' . substr($destinationAccount['account_number'], -4) . ')';
             break;
 
         case 'external_iban':
@@ -259,7 +260,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             $transaction_data['recipient_iban'] = $recipient_iban;
             $transaction_data['recipient_swift_bic'] = $recipient_swift_bic;
             $transaction_data['recipient_country'] = $recipient_country;
-            $destination_account = "IBAN: " . htmlspecialchars($recipient_iban) . " (SWIFT: " . htmlspecialchars($recipient_swift_bic) . ")";
+            $destination_account_display = "IBAN: " . htmlspecialchars($recipient_iban) . " (SWIFT: " . htmlspecialchars($recipient_swift_bic) . ")";
             break;
 
         case 'external_sort_code':
@@ -289,7 +290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             $transaction_data['recipient_bank_name'] = $recipient_bank_name_sort;
             $transaction_data['recipient_sort_code'] = $recipient_sort_code;
             $transaction_data['recipient_external_account_number'] = $recipient_external_account_number;
-            $destination_account = "UK Sort Code: " . htmlspecialchars($recipient_sort_code) . " Acc: " . htmlspecialchars($recipient_external_account_number);
+            $destination_account_display = "UK Sort Code: " . htmlspecialchars($recipient_sort_code) . " Acc: " . htmlspecialchars($recipient_external_account_number);
             break;
 
         case 'external_usa_account':
@@ -322,7 +323,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             $transaction_data['recipient_city_usa'] = $recipient_city_usa;
             $transaction_data['recipient_state_usa'] = $recipient_state_usa;
             $transaction_data['recipient_zip_usa'] = $recipient_zip_usa;
-            $destination_account = "USA Bank: " . htmlspecialchars($recipient_usa_routing_number) . " Acc: " . htmlspecialchars($recipient_usa_account_number);
+            $destination_account_display = "USA Bank: " . htmlspecialchars($recipient_usa_routing_number) . " Acc: " . htmlspecialchars($recipient_usa_account_number);
             break;
 
         default:
@@ -383,11 +384,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         $_SESSION['transfer_success_details'] = [
             'amount' => number_format($amount, 2),
             'currency' => get_currency_symbol($sourceAccount['currency']),
-            'recipient' => $recipient_name . ' (' . ($destination_account ?? 'External Bank') . ')',
+            'recipient' => $transaction_data['recipient_name'] . ' (' . ($destination_account_display ?? 'External Bank') . ')',
             'status' => 'Pending',
             'reference_number' => $transaction_data['reference_number'],
             'transfer_method' => str_replace('_', ' ', $transfer_method)
         ];
+
+        // --- Start of NEW: Email Notification for User ---
+        // Fetch user's email for notification
+        $user = $usersCollection->findOne(['_id' => new ObjectId($user_id)], ['projection' => ['email' => 1, 'first_name' => 1, 'last_name' => 1]]);
+        if ($user && isset($user['email'])) {
+            $user_email = $user['email'];
+            $user_full_name = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
+            if (empty($user_full_name)) {
+                $user_full_name = "Valued Customer"; // Fallback name
+            }
+
+            $email_subject = "Your Transfer Request Confirmation - Ref: " . $transaction_data['reference_number'];
+
+            $email_body = "
+                <p>Dear " . htmlspecialchars($user_full_name) . ",</p>
+                <p>Thank you for initiating a transfer with HomeTown Bank Pa.</p>
+                <p>Your transfer request has been successfully submitted and is currently <strong>awaiting approval</strong>.</p>
+                <p><strong>Transfer Details:</strong></p>
+                <ul>
+                    <li><strong>Reference Number:</strong> " . htmlspecialchars($transaction_data['reference_number']) . "</li>
+                    <li><strong>Amount:</strong> " . get_currency_symbol($sourceAccount['currency']) . " " . number_format($amount, 2) . "</li>
+                    <li><strong>From Account:</strong> " . htmlspecialchars($sourceAccount['account_type'] . ' (' . $sourceAccount['account_number'] . ')') . "</li>
+                    <li><strong>To Recipient:</strong> " . htmlspecialchars($transaction_data['recipient_name']) . "</li>
+                    <li><strong>Recipient Details:</strong> " . htmlspecialchars($destination_account_display) . "</li>
+                    <li><strong>Description:</strong> " . htmlspecialchars($description) . "</li>
+                    <li><strong>Initiated On:</strong> " . date('M d, Y H:i:s T') . "</li>
+                    <li><strong>Current Status:</strong> Pending Approval</li>
+                </ul>
+                <p>We will notify you once your transfer has been reviewed and its status changes. You can also track your transfer status in your dashboard.</p>
+                <p>If you have any questions, please do not hesitate to contact our support team.</p>
+                <p>Sincerely,</p>
+                <p>The HomeTown Bank Pa Team</p>
+            ";
+
+            // Assuming sendEmail function exists in functions.php
+            // The sendEmail function should handle proper email headers (e.g., Content-Type for HTML)
+            $email_sent = sendEmail($user_email, $email_subject, $email_body);
+
+            if (!$email_sent) {
+                error_log("make_transfer.php: Failed to send transfer receipt email to " . $user_email . " for Ref: " . $transaction_data['reference_number']);
+            }
+        } else {
+            error_log("make_transfer.php: User email not found for notification for user_id: " . $user_id);
+        }
+        // --- End of NEW: Email Notification for User ---
 
         // Clear form data from session after success
         unset($_SESSION['form_data']);
