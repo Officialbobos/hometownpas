@@ -1,4 +1,6 @@
 <?php
+// Path: C:\xampp\htdocs\hometownbank\accounts.php
+
 session_start(); // Keep session_start() at the very top of each script that uses sessions.
 
 // NO ini_set('display_errors', ...) or error_reporting() here.
@@ -176,6 +178,12 @@ if (!function_exists('get_currency_symbol')) {
         .back-to-dashboard a:hover {
             background-color: #0056b3;
         }
+
+        /* Added style for balance amount font size */
+        .balance-amount {
+            font-size: 1.2em; /* Adjust as needed, 'em' is relative to parent font size */
+            font-weight: bold;
+        }
     </style>
 </head>
 <body class="dashboard-page">
@@ -243,6 +251,10 @@ if (!function_exists('get_currency_symbol')) {
 
                             <?php if (!empty($account['swift_bic'])): ?>
                                 <p><span class="detail-label">SWIFT/BIC:</span> <span class="detail-value"><?php echo htmlspecialchars($account['swift_bic']); ?></span></p>
+                            <?php endif; ?>
+
+                            <?php if (!empty($account['routing_number'])): // Added for Routing Number ?>
+                                <p><span class="detail-label">Routing Number:</span> <span class="detail-value"><?php echo htmlspecialchars($account['routing_number']); ?></span></p>
                             <?php endif; ?>
 
                             <p class="balance">
