@@ -6,11 +6,10 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-
 // Enable error display for debugging. (Good for local dev, but Config.php's APP_DEBUG should control this in prod)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// ini_set('display_errors', 1); // Commented out - should be controlled by Config.php
+// ini_set('display_startup_errors', 1); // Commented out - should be controlled by Config.php
+// error_reporting(E_ALL); // Commented out - should be controlled by Config.php
 
 // Load Config.php first. It handles Composer's autoload.php and defines global constants like BASE_URL.
 // __DIR__ . '/../' points from 'frontend/' up to the project root.
@@ -26,8 +25,9 @@ use MongoDB\Exception\Exception as MongoDBException;
 
 
 // Check login, etc.
-// Use defined BASE_URL constant for redirection
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
+// *** CORRECTION: Use $_SESSION['logged_in'] for consistency with dashboard.php ***
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
+    // Use defined BASE_URL constant for redirection
     header('Location: ' . BASE_URL . '/login.php'); // Changed /login to /login.php for direct access
     exit;
 }
@@ -485,7 +485,7 @@ switch ($active_transfer_method) {
         document.addEventListener('DOMContentLoaded', function() {
             var customModal = document.getElementById('transferCustomModal');
             var transferFormContainer = document.querySelector('.transfer-form-container');
-            
+
             // Check if the custom modal should be displayed
             if (window.APP_DATA.showCustomModal) {
                 // Display the custom modal
