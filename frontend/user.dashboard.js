@@ -379,52 +379,35 @@ document.addEventListener('DOMContentLoaded', () => {
             // These are constants that should be passed from dashboard.php PHP
             // They hold the *current* state of the card modal settings from the database
             const messageFromDashboardPHP = window.cardModalMessage; // e.g., "Your new card requires activation."
-            const showFromDashboardPHP = window.showCardModal;     // e.g., true or false
+            const showFromDashboardPHP = window.showCardModal;      // e.g., true or false
 
-            const redirectToBankCards = () => {
-                // Make an AJAX call to set session variables for bank_cards.php
-                // This ensures bank_cards.php displays the modal if needed.
-                fetch(BASE_URL_JS + 'api/set_session_for_card_modal.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    // Send the current message and show status from dashboard's PHP constants
-                    body: JSON.stringify({
-                        message_for_display: messageFromDashboardPHP, // Matches PHP session variable name
-                        display_modal: showFromDashboardPHP           // Matches PHP session variable name
-                    })
+            // Make an AJAX call to set session variables for bank_cards.php, regardless of whether a message exists
+            fetch(`${BASE_URL_JS}api/set_session_for_card_modal.php`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message_for_display: messageFromDashboardPHP, // Matches PHP session variable name
+                    display_modal: showFromDashboardPHP            // Matches PHP session variable name
                 })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok ' + response.statusText);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Session set response for card modal:', data);
-                    // Redirect after session variables are set
-                    window.location.href = `${BASE_URL_JS}bank_cards`;
-                })
-                .catch(error => {
-                    console.error('Error setting session for card modal:', error);
-                    // In case of error, still redirect to avoid blocking the user
-                    window.location.href = `${BASE_URL_JS}bank_cards`;
-                });
-            };
-
-            // If the modal should be shown *before* redirecting to bank_cards.php,
-            // display it using the dynamic message modal
-            if (showFromDashboardPHP && messageFromDashboardPHP) {
-                openDynamicMessageModal(
-                    'My Cards Information',
-                    messageFromDashboardPHP,
-                    redirectToBankCards // Callback to redirect after modal is dismissed
-                );
-            } else {
-                // If no message or message is turned off, proceed directly with setting session and redirect
-                redirectToBankCards();
-            }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Session set response for card modal:', data);
+                // Redirect after session variables are set
+                window.location.href = `${BASE_URL_JS}bank_cards`;
+            })
+            .catch(error => {
+                console.error('Error setting session for card modal:', error);
+                // In case of error, still redirect to avoid blocking the user
+                window.location.href = `${BASE_URL_JS}bank_cards`;
+            });
         });
     }
 

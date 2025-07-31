@@ -126,6 +126,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $message = "Account " . htmlspecialchars($account_number_input) . " (" . htmlspecialchars($user_name) . " - {$user_email}) successfully {$transaction_type_label} with " . number_format($amount, 2) . ". New balance: " . number_format($new_balance, 2);
                                 $message_type = $operation_type;
                                 $_POST = array(); // Clear POST data to reset form fields
+
+                                // NEW: Set a session variable for the user's dashboard
+                                $_SESSION['user_funds_message'] = [
+                                    'title' => 'Account Update',
+                                    'message' => 'Your account has been updated by an administrator. ' . htmlspecialchars($admin_description) . '.<br>Amount: ' . ($operation_type === 'credit' ? '+' : '-') . number_format($amount, 2) . '<br>New Balance: ' . number_format($new_balance, 2),
+                                    'type' => $operation_type === 'credit' ? 'success' : 'error', // Use 'success' and 'error' for general modal styling
+                                    'user_id' => (string)$user_id // Store the user ID to prevent cross-user messages
+                                ];
                             } else {
                                 $message = "Error recording transaction for account " . htmlspecialchars($account_number_input) . ". (Transaction insert failed)";
                                 $message_type = 'error';
@@ -380,12 +388,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <button type="submit" class="button-primary">Process Funds</button>
             </form>
 
-<<<<<<< HEAD
-<p><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_users'; ?>" class="back-link">&larr; Back to Manage Users</a></p>        </div>
-=======
             <p><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_users'; ?>" class="back-link">&larr; Back to Manage Users</a></p>
         </div>
->>>>>>> 9279b39ec00731d3162e0fb489128bbccc0f0f75
     </div>
 <script src="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/script.js'; ?>"></script>
 </body>
