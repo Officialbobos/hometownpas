@@ -11,10 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Logic for Account Cards Carousel ---
-    const accountCardsWrapper = document.querySelector('.account-cards-wrapper');
+    const accountCardsWrapper = document.querySelector('.account-cards-wrapper'); // This might be null if not in HTML
     const accountCardsContainer = document.querySelector('.account-cards-container');
     const accountCards = accountCardsContainer ? Array.from(accountCardsContainer.querySelectorAll('.account-card')) : [];
     const accountPagination = document.querySelector('.account-pagination');
+    // Select all toggle indicators if they exist
     const accountToggleIndicators = accountCardsContainer ? Array.from(accountCardsContainer.querySelectorAll('.account-toggle-indicator')) : [];
 
     let currentAccountIndex = 0; // Index of the currently displayed card
@@ -49,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function showAccountCard(index) {
         if (accountCards.length === 0 || !accountCardsContainer) {
-            console.warn("No account cards or container found for carousel. Skipping carousel logic.");
+            // console.warn("No account cards or container found for carousel. Skipping carousel logic.");
             return;
         }
 
@@ -145,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         accountCardsContainer.addEventListener('touchstart', (e) => {
             // Only start swipe if not on the toggle indicator
             if (e.target.closest('.account-toggle-indicator')) {
+                isSwiping = false; // Do not start swipe if clicking toggle
                 return;
             }
             touchStartX = e.touches[0].clientX;
@@ -193,6 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
         accountCardsContainer.addEventListener('mousedown', (e) => {
             // Only left click (main button) and not on the toggle indicator
             if (e.button !== 0 || e.target.closest('.account-toggle-indicator')) {
+                isDragging = false; // Do not start drag if clicking toggle
                 return;
             }
 
@@ -239,74 +242,165 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     } // End of accountCards.length > 0 check
 
-    // --- Account Toggle Button Logic (New Feature) ---
+    // --- Account Toggle Button Logic (Integrated with showAccountCardByType) ---
     accountToggleIndicators.forEach(indicator => {
         indicator.addEventListener('click', (e) => {
-            // Prevent carousel swipe if clicking the indicator
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent carousel swipe/drag event from firing
             const targetAccountType = indicator.dataset.toggleTarget; // e.g., 'savings' or 'checking'
             showAccountCardByType(targetAccountType);
         });
     });
 
 
-    // --- Transfer Modal Logic ---
-    const transferButton = document.getElementById('transferButton');
-    const transferModalOverlay = document.getElementById('transferModalOverlay');
-    const closeTransferModal = document.getElementById('closeTransferModal');
+    // --- UNIFIED DYNAMIC MESSAGE MODAL HANDLING ---
+    // Ensure these elements exist in your HTML (they should based on previous instructions)
+    const dynamicMessageModal = document.getElementById('dynamicMessageModal');
+    const modalTitleElement = dynamicMessageModal ? dynamicMessageModal.querySelector('#modalTitle') : null;
+    const modalMessageContentElement = dynamicMessageModal ? dynamicMessageModal.querySelector('#modalMessageContent') : null;
+    const closeDynamicModalButtons = dynamicMessageModal ? dynamicMessageModal.querySelectorAll('.close-button, .close-modal-button-main') : [];
 
-    if (transferButton && transferModalOverlay && closeTransferModal) {
-        transferButton.addEventListener('click', (e) => {
-            e.preventDefault(); // Prevent default link/button action if it's a link
+    function openDynamicMessageModal(title, message, callback = null) {
+        if (!dynamicMessageModal || !modalTitleElement || !modalMessageContentElement) {
+            console.error("Dynamic message modal elements not found.");
+            return;
+        }
+        modalTitleElement.textContent = title;
+        modalMessageContentElement.textContent = message; // Using textContent to prevent XSS
+        dynamicMessageModal.classList.add('active'); // This class controls display: flex
+
+        // Clear previous listeners on the main close button
+        const mainCloseButton = dynamicMessageModal.querySelector('.close-modal-button-main');
+        if (mainCloseButton) {
+            // Clone the node to remove all existing event listeners
+            const newOkayButton = mainCloseButton.cloneNode(true);
+            mainCloseButton.parentNode.replaceChild(newOkayButton, mainCloseButton);
+            newOkayButton.addEventListener('click', () => {
+                closeDynamicMessageModal();
+                if (callback && typeof callback === 'function') {
+                    callback();
+                }
+            });
+        }
+    }
+
+    function closeDynamicMessageModal() {
+        if (dynamicMessageModal) {
+            dynamicMessageModal.classList.remove('active');
+            if (modalMessageContentElement) {
+                modalMessageContentElement.textContent = ''; // Clear content on close
+            }
+        }
+    }
+
+    // Add event listeners for closing the dynamic message modal (for X button and overlay click)
+    closeDynamicModalButtons.forEach(button => {
+        // Ensure we don't double-add listeners if they are already handled by openDynamicMessageModal for the main button
+        if (!button.classList.contains('close-modal-button-main')) {
+            button.addEventListener('click', closeDynamicMessageModal);
+        }
+    });
+
+    // Close modal if user clicks outside of it
+    if (dynamicMessageModal) {
+        dynamicMessageModal.addEventListener('click', (event) => {
+            if (event.target === dynamicMessageModal) {
+                closeDynamicMessageModal();
+            }
+        });
+    }
+
+    // --- TRANSFER MODAL (Choose Transfer Type) Handling ---
+    const transferButton = document.getElementById('transferButton'); // The main 'Transfer' action button
+    const transferModalOverlay = document.getElementById('transferModalOverlay'); // The choose transfer type modal
+    const closeTransferModalButton = document.getElementById('closeTransferModal');
+    const transferOptionButtons = document.querySelectorAll('.transfer-options-list .transfer-option');
+
+    if (transferButton && transferModalOverlay && closeTransferModalButton) {
+        transferButton.addEventListener('click', () => {
             transferModalOverlay.classList.add('active');
         });
 
-        closeTransferModal.addEventListener('click', () => {
+        closeTransferModalButton.addEventListener('click', () => {
             transferModalOverlay.classList.remove('active');
         });
 
-        // Close modal if clicking on the overlay itself (outside the content)
-        transferModalOverlay.addEventListener('click', (e) => {
-            if (e.target === transferModalOverlay) {
+        // Close transfer type modal if user clicks outside of it
+        transferModalOverlay.addEventListener('click', (event) => {
+            if (event.target === transferModalOverlay) {
                 transferModalOverlay.classList.remove('active');
             }
         });
     }
 
-    // --- Sidebar Logic ---
-    const menuIcon = document.getElementById('menuIcon');
-    const sidebar = document.getElementById('sidebar');
-    const closeSidebarBtn = document.getElementById('closeSidebarBtn');
-    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    // --- Logic for displaying admin-set transfer message ---
+    transferOptionButtons.forEach(button => {
+        button.addEventListener('click', (event) => {
+            // Check if the admin-set message should be shown for transfers
+            // `showTransferModal` and `transferModalMessage` are global constants set by PHP
+            if (window.showTransferModal && window.transferModalMessage) {
+                event.preventDefault(); // Stop the navigation to transfer page
+                transferModalOverlay.classList.remove('active'); // Close the choose transfer type modal
 
-    // Consolidated sidebar toggle logic into a single function for reusability
-    function toggleSidebar() {
-        sidebar.classList.toggle('active');
-        sidebarOverlay.classList.toggle('active');
-    }
+                const originalHref = button.dataset.href; // Get the original link from data-href
 
-    if (menuIcon) menuIcon.addEventListener('click', toggleSidebar);
-    if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', toggleSidebar);
-    if (sidebarOverlay) sidebarOverlay.addEventListener('click', toggleSidebar);
-
-
-    // --- View My Cards Logic ---
-    const viewMyCardsButton = document.getElementById('viewMyCardsButton');
-
-    if (viewMyCardsButton) {
-        viewMyCardsButton.addEventListener('click', (e) => {
-            e.preventDefault(); // Prevent default link behavior
-
-            // Check if BASE_URL_JS is defined (it should be, via the PHP script block)
-            if (typeof BASE_URL_JS !== 'undefined') {
-                // Ensure this path matches your router/file structure.
-                // Assuming `bank_cards` route leads to `my_cards.php`
-                window.location.href = `${BASE_URL_JS}/bank_cards`;
+                openDynamicMessageModal(
+                    'Transfer Information',
+                    window.transferModalMessage,
+                    () => { // Callback to execute after user clicks 'Okay'
+                        window.location.href = originalHref;
+                    }
+                );
             } else {
-                console.error("BASE_URL_JS is not defined. Cannot navigate to bank cards.");
-                // Fallback to relative path, though relying on BASE_URL_JS is better
-                window.location.href = './bank_cards';
+                // If no message or message is turned off, proceed with normal transfer logic
+                const href = button.dataset.href;
+                if (href) {
+                    // This will cause navigation directly
+                    // No need for window.location.href = href; here if the button is a real link
+                    // The default action of the button (if it's an <a> or has a form action) will handle it.
+                    // If it's a <button>, you need to set window.location.href
+                    window.location.href = href;
+                }
             }
         });
+    });
+
+
+    // --- Logic for displaying admin-set "View My Cards" message ---
+    // Corrected ID: viewCardButton (from your PHP HTML)
+    const viewCardButton = document.getElementById('viewCardButton');
+
+    if (viewCardButton) {
+        viewCardButton.addEventListener('click', (event) => {
+            if (window.showCardModal && window.cardModalMessage) {
+                event.preventDefault(); // Stop the default navigation to bank_cards
+                openDynamicMessageModal(
+                    'My Cards Information',
+                    window.cardModalMessage,
+                    () => { // Callback to execute after user clicks 'Okay'
+                        window.location.href = `${BASE_URL_JS}/bank_cards`;
+                    }
+                );
+            } else {
+                // If no message or message is turned off, proceed with normal card view logic
+                window.location.href = `${BASE_URL_JS}/bank_cards`;
+            }
+        });
+    }
+
+
+    // --- Transaction Alert Modal (Existing PHP-driven modal) ---
+    // This part is self-contained in dashboard.php's inline script
+    // It's good that it's separate as it's a one-time display.
+
+    // --- Initialize dynamic modals if active on page load ---
+    // These are global variables set by PHP in dashboard.php
+    if (window.showTransferModal && window.transferModalMessage) {
+        // We don't want to open the "Choose Transfer Type" modal automatically on page load.
+        // The transfer message should only appear when a specific transfer option is clicked.
+        // So, no `openDynamicMessageModal` call here for `transferModalMessage`.
+    }
+    if (window.showCardModal && window.cardModalMessage) {
+        // We also don't want to open the card message modal automatically on page load.
+        // It should appear when "View My Card" is clicked.
     }
 });
