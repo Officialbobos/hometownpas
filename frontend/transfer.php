@@ -237,7 +237,7 @@ switch ($active_transfer_method) {
                 data-balance="<?php echo htmlspecialchars($account['balance']); ?>"
                 data-currency="<?php echo htmlspecialchars($account['currency']); ?>"
                 <?php echo ((string)($form_data['source_account_id'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <strong><?php echo number_format(abs((float)$account['balance']), 2); ?></strong>
+                <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], 4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <strong><?php echo number_format(abs((float)$account['balance']), 2); ?></strong>
             </option>
         <?php endforeach; ?>
     </select>
@@ -402,37 +402,18 @@ switch ($active_transfer_method) {
         </div>
     </div>
 
-    <script>
-        window.APP_DATA = {
+   <script>
+        // This object makes PHP variables available to your JavaScript file.
+        // It's defined once and can be accessed globally by your script.
+        const APP_DATA = {
             userAccountsData: <?php echo json_encode($user_accounts); ?>,
             initialSelectedFromAccount: '<?php echo htmlspecialchars($form_data['source_account_id'] ?? ''); ?>',
-            initialTransferMethod: '<?php
-                $js_transfer_method = $active_transfer_method;
-                echo htmlspecialchars($js_transfer_method);
-            ?>',
+            initialTransferMethod: '<?php echo htmlspecialchars($active_transfer_method); ?>',
             showModal: <?php echo $show_modal_on_load ? 'true' : 'false'; ?>,
             modalDetails: <?php echo json_encode($transfer_success_details); ?>
-            // REMOVED: showCustomModal is no longer needed in JS as it's handled in PHP display
-            // showCustomModal: <?php echo $showCustomModal ? 'true' : 'false'; ?>
         };
     </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // REMOVED: Logic to handle and display the custom modal is no longer needed here
-            // var customModal = document.getElementById('transferCustomModal');
-            // var transferFormContainer = document.querySelector('.transfer-form-container');
-            // if (window.APP_DATA.showCustomModal) {
-            //     customModal.style.display = 'flex';
-            //     if (transferFormContainer) {
-            //         transferFormContainer.style.display = 'none';
-            //     }
-            // } else {
-            //     if (transferFormContainer) {
-            //         transferFormContainer.style.display = 'block';
-            //     }
-            // }
-        });
-    </script>
+
     <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer.js"></script>
 </body>
 </html>
