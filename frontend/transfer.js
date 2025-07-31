@@ -123,27 +123,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
-    // Function to update balance display
-    function updateBalanceDisplay() {
-        const selectedOption = sourceAccountIdSelect.options[sourceAccountIdSelect.selectedIndex];
-        if (selectedOption && selectedOption.value) {
-            const balance = selectedOption.getAttribute('data-balance');
-            const currency = selectedOption.getAttribute('data-currency');
-            const currencySymbol = getCurrencySymbol(currency);
+  // Function to update balance display
+function updateBalanceDisplay() {
+    const selectedOption = sourceAccountIdSelect.options[sourceAccountIdSelect.selectedIndex];
+    if (selectedOption && selectedOption.value) {
+        const balance = selectedOption.getAttribute('data-balance');
+        const currency = selectedOption.getAttribute('data-currency');
+        const currencySymbol = getCurrencySymbol(currency);
 
-            // *** CRITICAL CHANGE HERE: Use Math.abs() ***
-            displayCurrentBalance.textContent = parseFloat(Math.abs(balance)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            amountCurrencySymbolForBalance.textContent = currencySymbol;
-            currentCurrencyDisplay.textContent = currency;
-            amountCurrencySymbol.textContent = currencySymbol; // Also update currency symbol next to amount input
-        } else {
-            displayCurrentBalance.textContent = 'N/A';
-            amountCurrencySymbolForBalance.textContent = '';
-            currentCurrencyDisplay.textContent = '';
-            amountCurrencySymbol.textContent = '';
-        }
+        // This line correctly uses Math.abs() to ensure no minus sign is displayed.
+        displayCurrentBalance.textContent = parseFloat(Math.abs(balance)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        amountCurrencySymbolForBalance.textContent = currencySymbol;
+        currentCurrencyDisplay.textContent = currency;
+        amountCurrencySymbol.textContent = currencySymbol; // Also update currency symbol next to amount input
+    } else {
+        displayCurrentBalance.textContent = 'N/A';
+        amountCurrencySymbolForBalance.textContent = '';
+        currentCurrencyDisplay.textContent = '';
+        amountCurrencySymbol.textContent = '';
     }
-
+}
     // Helper to get currency symbol (can be expanded)
     function getCurrencySymbol(currencyCode) {
         switch (currencyCode.toUpperCase()) {
