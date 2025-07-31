@@ -1,9 +1,9 @@
 <?php
 // C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\manage_modals.php
 
-session_start(); // ADD THIS LINE HERE!
-
-// Removed session_start() as it should be handled by a central router file. (You can remove this comment too)
+// Ensure session starts at the very beginning of the script.
+// No whitespace, comments, or other output before this line.
+session_start();
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../Config.php';
@@ -13,12 +13,17 @@ use MongoDB\BSON\UTCDateTime;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
-// Corrected authentication check to look for 'admin_logged_in'
+// --- Authentication Check ---
+// Log session status before checking
+error_log("manage_modals.php: Session started. admin_user_id: " . ($_SESSION['admin_user_id'] ?? 'Not set') . ", admin_logged_in: " . var_export($_SESSION['admin_logged_in'] ?? null, true));
+
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    error_log("manage_modals.php: Admin not logged in. Redirecting to login page.");
     // Corrected redirection to point specifically to the admin index/login page
     header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/index.php');
     exit;
 }
+// --- End Authentication Check ---
 
 $usersCollection = getCollection('users');
 $modalMessage = ''; // For Transfer Modal (This variable holds the message for the admin form field)
@@ -36,13 +41,12 @@ try {
 } catch (MongoDBDriverException $e) {
     $message = "Could not load the list of users.";
     $message_type = "error";
-    error_log("MongoDB Error in manage_modals.php (fetching users): " . $e->getMessage()); // Added error logging
+    error_log("MongoDB Error in manage_modals.php (fetching users): " . $e->getMessage());
 } catch (Exception $e) {
     $message = "An unexpected error occurred while fetching users.";
     $message_type = "error";
-    error_log("General Error in manage_modals.php (fetching users): " . $e->getMessage()); // Added error logging
+    error_log("General Error in manage_modals.php (fetching users): " . $e->getMessage());
 }
-
 
 $selectedUserId = $_GET['user_id'] ?? null; // Get the user ID from the URL
 
@@ -145,7 +149,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $showCardModal = $selectedUser['show_card_modal'] ?? false;
             }
 
-
         } catch (MongoDBDriverException $e) {
             $message = "Database error: " . $e->getMessage();
             $message_type = "error";
@@ -169,8 +172,8 @@ if (!empty($selectedUserId)) {
             // Update form field variables from the fetched user data
             $modalMessage = $selectedUser['transfer_modal_message'] ?? '';
             $isActive = $selectedUser['show_transfer_modal'] ?? false;
-            $cardModalMessage = $selectedUser['card_modal_message'] ?? ''; // NEW
-            $showCardModal = $selectedUser['show_card_modal'] ?? false; // NEW
+            $cardModalMessage = $selectedUser['card_modal_message'] ?? '';
+            $showCardModal = $selectedUser['show_card_modal'] ?? false;
         }
     } catch (MongoDBDriverException $e) {
         $message = "Could not load current settings for the selected user.";
@@ -194,7 +197,8 @@ if (!empty($selectedUserId)) {
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         /* ... (Your existing CSS styles remain the same) ... */
-        .dashboard-container { display: flex; flex-direction: column; min-height: 100vh; background-color: #fff; margin: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); overflow: hidden; }
+        body { font-family: 'Roboto', sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
+        .dashboard-container { display: flex; flex-direction: column; min-height: 100vh; background-color: #fff; margin: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); overflow: hidden; width: 100%; max-width: 900px; }
         .dashboard-header { background-color: #007bff; color: white; padding: 20px 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0056b3; }
         .dashboard-header .logo { max-height: 50px; width: auto; margin-right: 20px; }
         .dashboard-header h2 { margin: 0; font-size: 1.8em; flex-grow: 1; }
@@ -246,6 +250,34 @@ if (!empty($selectedUserId)) {
         .message-box.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .message-box.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         .message-box.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 768px) {
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 15px 20px;
+            }
+            .dashboard-header .logo {
+                margin-bottom: 10px;
+            }
+            .dashboard-header h2 {
+                margin-bottom: 10px;
+            }
+            .logout-button {
+                width: 100%;
+                text-align: center;
+            }
+            .dashboard-content {
+                padding: 20px;
+            }
+            .form-group .btn-primary,
+            .form-group .btn-secondary {
+                width: 100%;
+                margin-left: 0;
+                margin-top: 10px;
+            }
+        }
     </style>
 </head>
 <body>
