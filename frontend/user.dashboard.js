@@ -265,7 +265,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         modalTitleElement.textContent = title;
-        modalMessageContentElement.textContent = message; // Using textContent to prevent XSS
+        // Use innerHTML and replace newlines for correct rendering
+        modalMessageContentElement.innerHTML = message.replace(/\n/g, '<br>');
         dynamicMessageModal.classList.add('active'); // This class controls display: flex
 
         // Clear previous listeners on the main close button
@@ -287,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dynamicMessageModal) {
             dynamicMessageModal.classList.remove('active');
             if (modalMessageContentElement) {
-                modalMessageContentElement.textContent = ''; // Clear content on close
+                modalMessageContentElement.innerHTML = ''; // Clear content on close
             }
         }
     }
@@ -354,10 +355,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 // If no message or message is turned off, proceed with normal transfer logic
                 const href = button.dataset.href;
                 if (href) {
-                    // This will cause navigation directly
-                    // No need for window.location.href = href; here if the button is a real link
-                    // The default action of the button (if it's an <a> or has a form action) will handle it.
-                    // If it's a <button>, you need to set window.location.href
                     window.location.href = href;
                 }
             }
@@ -365,29 +362,52 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 
-    // --- Logic for displaying admin-set "View My Cards" message ---
-    // Corrected ID: viewCardButton (from your PHP HTML)
+    // --- MODIFIED LOGIC FOR "VIEW MY CARDS" BUTTON ---
     const viewCardButton = document.getElementById('viewCardButton');
 
     if (viewCardButton) {
         viewCardButton.addEventListener('click', (event) => {
-            if (window.showCardModal && window.cardModalMessage) {
-                event.preventDefault(); // Stop the default navigation to bank_cards
+            event.preventDefault(); // Prevent default navigation initially
+
+            const message = window.cardModalMessage;
+            const show = window.showCardModal;
+
+            const redirectToBankCards = () => {
+                // Function to handle the AJAX call and redirection
+                fetch(BASE_URL_JS + '/backend/set_session_for_card_modal.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message, show: show }) // Send current message/show status
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Session set response:', data);
+                    window.location.href = `${BASE_URL_JS}/bank_cards`;
+                })
+                .catch(error => {
+                    console.error('Error setting session for card modal:', error);
+                    // Still redirect even on error to avoid breaking user flow
+                    window.location.href = `${BASE_URL_JS}/bank_cards`;
+                });
+            };
+
+            if (show && message) {
+                // If message should be shown, display the modal first
                 openDynamicMessageModal(
                     'My Cards Information',
-                    window.cardModalMessage,
-                    () => { // Callback to execute after user clicks 'Okay'
-                        window.location.href = `${BASE_URL_JS}/bank_cards`;
-                    }
+                    message,
+                    redirectToBankCards // Call the redirect function as a callback
                 );
             } else {
-                // If no message or message is turned off, proceed with normal card view logic
-                window.location.href = `${BASE_URL_JS}/bank_cards`;
+                // If no message or message is turned off, proceed directly with setting session (to clear previous) and redirect
+                redirectToBankCards();
             }
         });
     }
 
-    // --- SIDEBAR TOGGLE LOGIC (New Addition) ---
+    // --- SIDEBAR TOGGLE LOGIC ---
     const menuIcon = document.querySelector('.menu-icon');
     const sidebar = document.querySelector('.sidebar');
     const sidebarOverlay = document.querySelector('.sidebar-overlay');
@@ -435,13 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initialize dynamic modals if active on page load ---
     // These are global variables set by PHP in dashboard.php
-    if (window.showTransferModal && window.transferModalMessage) {
-        // We don't want to open the "Choose Transfer Type" modal automatically on page load.
-        // The transfer message should only appear when a specific transfer option is clicked.
-        // So, no `openDynamicMessageModal` call here for `transferModalMessage`.
-    }
-    if (window.showCardModal && window.cardModalMessage) {
-        // We also don't want to open the card message modal automatically on page load.
-        // It should appear when "View My Card" is clicked.
-    }
+    // The previous logic correctly prevents auto-opening these specific modals on dashboard load,
+    // as they are meant to be triggered by button clicks.
+    // The outstanding payment modal is handled separately by PHP directly in dashboard.php.
 });
