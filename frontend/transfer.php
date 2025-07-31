@@ -64,21 +64,24 @@ try {
     die("ERROR: An unexpected error occurred during database connection. Please try again later. Detail: " . $e->getMessage());
 }
 
-// --- NEW LOGIC FOR ADMIN MODAL MESSAGE ---
-$showCustomModal = false;
-$modalMessageContent = '';
-
+// --- NEW LOGIC FOR ADMIN MODAL MESSAGE (INTEGRATED INTO STANDARD MESSAGE) ---
+$admin_transfer_message = ''; // Initialize
 if (!empty($user_id)) {
     try {
         $currentUser = $usersCollection->findOne(['_id' => new ObjectId($user_id)]);
         if ($currentUser) {
-            $showCustomModal = $currentUser['show_transfer_modal'] ?? false;
-            $modalMessageContent = $currentUser['transfer_modal_message'] ?? '';
+            // If show_transfer_modal is true and there's a message, capture it
+            if (($currentUser['show_transfer_modal'] ?? false) && !empty($currentUser['transfer_modal_message'] ?? '')) {
+                $admin_transfer_message = $currentUser['transfer_modal_message'];
+                // Optionally, unset show_transfer_modal here if you want it to appear only once
+                // This would be done in make_transfer.php as part of a successful transaction
+                // or if the user clicks "understood" on a dedicated modal for this.
+                // For now, let's just display it if the flag is true.
+            }
         }
     } catch (Exception $e) {
         error_log("Error fetching user modal message in transfer.php: " . $e->getMessage());
-        $showCustomModal = false;
-        $modalMessageContent = '';
+        // Do not set $admin_transfer_message if there's an error fetching it
     }
 }
 // --- END NEW LOGIC ---
@@ -168,81 +171,21 @@ switch ($active_transfer_method) {
             display: none;
         }
 
-        /* --- NEW CSS FOR CUSTOM TRANSFER MODAL --- */
-        .custom-modal-overlay {
-            display: none; /* Hidden by default */
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0, 0, 0, 0.6);
-            display: flex; /* Use flexbox for centering */
-            align-items: center; /* Center vertically */
-            justify-content: center; /* Center horizontally */
-        }
-
-        .custom-modal-content {
-            background-color: #ffffff;
-            /* margin: 15% auto; Removed margin for flex centering */
-            padding: 30px;
-            border: 1px solid #888;
-            width: 90%;
-            max-width: 500px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            font-family: 'Poppins', sans-serif;
-            position: relative; /* Needed for absolute positioning of close button if added */
-        }
-
-        .custom-modal-header {
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        /* Additional styles for the admin alert message */
+        .admin-message-alert {
+            background-color: #fff3cd; /* Light warning yellow */
+            border-left: 5px solid #ffc107; /* Darker yellow border */
+            color: #856404; /* Dark text color for contrast */
+            padding: 15px;
             margin-bottom: 20px;
-        }
-
-        .caution-icon {
-            font-size: 2em;
-            color: #ff9800; /* A strong caution color */
-            margin-right: 15px;
-        }
-
-        .custom-modal-header h2 {
-            color: #4B0082; /* Deep purple */
-            margin: 0;
-            font-weight: 700;
-        }
-
-        .custom-modal-body p {
-            font-size: 1.1em;
-            line-height: 1.6;
-            color: #333;
-        }
-
-        .custom-modal-footer {
-            margin-top: 25px;
-        }
-
-        .custom-modal-footer .btn-purple {
-            background-color: #4B0082; /* Deep purple */
-            color: white;
-            padding: 12px 25px;
-            border: none;
             border-radius: 5px;
-            font-size: 1em;
-            cursor: pointer;
-            text-decoration: none;
-            transition: background-color 0.3s ease;
+            font-weight: 500;
+            line-height: 1.5;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-
-        .custom-modal-footer .btn-purple:hover {
-            background-color: #6A0DAD; /* Lighter purple on hover */
+        .admin-message-alert strong {
+            color: #ff9800; /* Orange for emphasis */
         }
-        /* --- END NEW CSS --- */
     </style>
 </head>
 <body>
@@ -264,8 +207,14 @@ switch ($active_transfer_method) {
                     <p class="message <?php echo htmlspecialchars($message_type); ?>"><?php echo htmlspecialchars($message); ?></p>
                 <?php endif; ?>
 
-            <form action="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/make_transfer.php" method="POST" id="transferForm">
-                <input type="hidden" name="initiate_transfer" value="1">
+                <?php if (!empty($admin_transfer_message)): // Display admin message if available ?>
+                    <div class="admin-message-alert">
+                        <strong>Important:</strong> <?php echo htmlspecialchars($admin_transfer_message); ?>
+                    </div>
+                <?php endif; ?>
+
+                <form action="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/make_transfer.php" method="POST" id="transferForm">
+                    <input type="hidden" name="initiate_transfer" value="1">
 
                     <div class="form-group">
                         <label for="transfer_method">Select Transfer Method:</label>
@@ -453,19 +402,6 @@ switch ($active_transfer_method) {
         </div>
     </div>
 
-    <div id="transferCustomModal" class="custom-modal-overlay">
-        <div class="custom-modal-content">
-            <div class="custom-modal-header">
-                <span class="caution-icon">&#9888;</span> <h2>Important Notification</h2>
-            </div>
-            <div class="custom-modal-body">
-                <p><?php echo htmlspecialchars($modalMessageContent); ?></p>
-            </div>
-            <div class="custom-modal-footer">
-                <a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/dashboard.php" class="btn-purple">Understood</a>
-            </div>
-        </div>
-    </div>
     <script>
         window.APP_DATA = {
             userAccountsData: <?php echo json_encode($user_accounts); ?>,
@@ -475,32 +411,26 @@ switch ($active_transfer_method) {
                 echo htmlspecialchars($js_transfer_method);
             ?>',
             showModal: <?php echo $show_modal_on_load ? 'true' : 'false'; ?>,
-            modalDetails: <?php echo json_encode($transfer_success_details); ?>,
-            // --- NEW DATA FOR CUSTOM MODAL ---
-            showCustomModal: <?php echo $showCustomModal ? 'true' : 'false'; ?>
-            // --- END NEW DATA ---
+            modalDetails: <?php echo json_encode($transfer_success_details); ?>
+            // REMOVED: showCustomModal is no longer needed in JS as it's handled in PHP display
+            // showCustomModal: <?php echo $showCustomModal ? 'true' : 'false'; ?>
         };
     </script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            var customModal = document.getElementById('transferCustomModal');
-            var transferFormContainer = document.querySelector('.transfer-form-container');
-
-            // Check if the custom modal should be displayed
-            if (window.APP_DATA.showCustomModal) {
-                // Display the custom modal
-                customModal.style.display = 'flex'; // Changed to 'flex' for better centering
-
-                // Hide the main transfer form so the user can't proceed
-                if (transferFormContainer) {
-                    transferFormContainer.style.display = 'none';
-                }
-            } else {
-                // If the custom modal is not needed, make sure the form is visible
-                if (transferFormContainer) {
-                    transferFormContainer.style.display = 'block';
-                }
-            }
+            // REMOVED: Logic to handle and display the custom modal is no longer needed here
+            // var customModal = document.getElementById('transferCustomModal');
+            // var transferFormContainer = document.querySelector('.transfer-form-container');
+            // if (window.APP_DATA.showCustomModal) {
+            //     customModal.style.display = 'flex';
+            //     if (transferFormContainer) {
+            //         transferFormContainer.style.display = 'none';
+            //     }
+            // } else {
+            //     if (transferFormContainer) {
+            //         transferFormContainer.style.display = 'block';
+            //     }
+            // }
         });
     </script>
     <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer.js"></script>
