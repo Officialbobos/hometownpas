@@ -131,7 +131,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const currency = selectedOption.getAttribute('data-currency');
             const currencySymbol = getCurrencySymbol(currency);
 
-            displayCurrentBalance.textContent = parseFloat(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            // *** CRITICAL CHANGE HERE: Use Math.abs() ***
+            displayCurrentBalance.textContent = parseFloat(Math.abs(balance)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             amountCurrencySymbolForBalance.textContent = currencySymbol;
             currentCurrencyDisplay.textContent = currency;
             amountCurrencySymbol.textContent = currencySymbol; // Also update currency symbol next to amount input
