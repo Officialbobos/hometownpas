@@ -27,13 +27,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalReference = document.getElementById('modalReference');
     const modalMethod = document.getElementById('modalMethod');
 
-    // NEW: General Notification Modal elements for "Transfer Modal Message"
-    const transferNotificationModal = document.getElementById('transferNotificationModal');
-    const transferNotificationModalTitle = document.getElementById('transferNotificationModalTitle');
-    const transferNotificationModalContent = document.getElementById('transferNotificationModalContent');
-    const transferNotificationCloseButton = document.getElementById('transferNotificationCloseButton');
-    const transferNotificationDismissButton = document.getElementById('transferNotificationDismissButton');
-
+    // NEW: Custom Transfer Modal (from admin message) elements
+    const transferCustomModal = document.getElementById('transferCustomModal'); // Corrected ID
 
     // Sidebar Toggle Functionality
     function toggleSidebar() {
@@ -209,37 +204,12 @@ document.addEventListener('DOMContentLoaded', function() {
             transferSuccessModal.classList.add('active');
         }
 
-        // NEW LOGIC FOR THE TRANSFER NOTIFICATION MODAL (from admin)
-        if (transferNotificationModal && window.APP_DATA.showTransferNotificationModal && window.APP_DATA.transferNotificationMessage) {
-            transferNotificationModalTitle.textContent = 'Important Transfer Alert'; // You can customize this title
-            transferNotificationModalContent.innerHTML = window.APP_DATA.transferNotificationMessage;
-            transferNotificationModal.style.display = 'flex'; // Show the modal
-
-            // Add event listeners for the new notification modal
-            const dismissTransferNotificationModal = () => {
-                transferNotificationModal.style.display = 'none';
-                // Optional: Make an AJAX call here to tell the server this modal has been shown/dismissed
-                // so it doesn't reappear until the admin reactivates it.
-                // For now, it will simply disappear. You might want to reload the page or redirect,
-                // but for a notification, just hiding it might be sufficient.
-                // If you want to redirect after dismissing this modal, change the line below:
-                // window.location.href = BASE_URL + '/dashboard'; // Example redirect
-            };
-
-            if (transferNotificationCloseButton) {
-                transferNotificationCloseButton.addEventListener('click', dismissTransferNotificationModal);
-            }
-            if (transferNotificationDismissButton) {
-                transferNotificationDismissButton.addEventListener('click', dismissTransferNotificationModal);
-            }
-
-            // Close if clicked outside modal content
-            window.addEventListener('click', function(event) {
-                if (event.target == transferNotificationModal) {
-                    dismissTransferNotificationModal();
-                }
-            });
-        }
+        // CUSTOM TRANSFER MODAL LOGIC (from admin)
+        // This logic is already correctly placed in transfer.php's inline script.
+        // The `transferCustomModal`'s display is handled directly by the PHP's
+        // embedded JS which runs *before* this script. This ensures the modal
+        // takes precedence and the form is hidden if the admin message is active.
+        // No further JS needed here to explicitly 'show' this modal.
     }
 
     // Helper to get user-friendly display name for transfer method
