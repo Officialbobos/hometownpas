@@ -33,7 +33,7 @@ $user_email = $_SESSION['user_email'] ?? '';
 $message = '';
 $message_type = '';
 
-// --- NEW: Check for session messages set by other pages (e.g., after an API call) ---
+// --- Check for session messages set by other pages (e.g., after an API call) ---
 if (isset($_SESSION['message'])) {
     $message = $_SESSION['message'];
     $message_type = $_SESSION['message_type'] ?? 'info'; // Default to info if type not set
@@ -41,7 +41,7 @@ if (isset($_SESSION['message'])) {
     unset($_SESSION['message']);
     unset($_SESSION['message_type']);
 }
-// --- END NEW ---
+// --- END SESSION MESSAGE CHECK ---
 
 // Assuming $mongoDb object is available from index.php's scope
 // If not, uncomment and initialize here:
@@ -56,6 +56,26 @@ if (!$mongoDb) {
 $usersCollection = $mongoDb->selectCollection('users');
 $accountsCollection = $mongoDb->selectCollection('accounts');
 $bankCardsCollection = $mongoDb->selectCollection('bank_cards');
+
+// --- NEW: Fetch Admin Card Modal Settings ---
+$showCardModalFromAdmin = false;
+$cardModalMessageFromAdmin = '';
+
+try {
+    $adminSettingsCollection = $mongoDb->selectCollection('admin_settings'); // Assuming 'admin_settings' is your collection name
+    $adminConfig = $adminSettingsCollection->findOne(['name' => 'card_modal_settings']); // Assuming a document with this 'name'
+
+    if ($adminConfig) {
+        $showCardModalFromAdmin = (bool)($adminConfig['enabled'] ?? false);
+        $cardModalMessageFromAdmin = $adminConfig['message'] ?? '';
+    }
+} catch (MongoDBDriverException $e) {
+    error_log("MongoDB error fetching admin card modal settings: " . $e->getMessage());
+    // Continue with default values (false, empty string) if there's a DB error
+} catch (Exception $e) {
+    error_log("General error fetching admin card modal settings: " . $e->getMessage());
+}
+// --- END NEW ---
 
 try {
     // Convert user_id from session string to MongoDB ObjectId
@@ -129,19 +149,21 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hometown Bank PA - Manage Cards</title>
-        <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/bank_cards.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer.css">
 </head>
 <body>
     <header class="header">
         <nav class="header-nav">
-        <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="contact-button homepage">
-                <i class="fas fa-home"></i> Back to Dashboard </a>
+            <a href="<?php echo rtrim(BASE_URL, '/'); ?>/dashboard" class="contact-button homepage">
+                <i class="fas fa-home"></i> Back to Dashboard
+            </a>
         </nav>
         <h1>Manage My Cards</h1>
         <div class="logo">
-                <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo">
+            <img src="https://i.imgur.com/UeqGGSn.png" alt="HomeTown Bank Logo">
         </div>
     </header>
 
@@ -149,11 +171,16 @@ try {
         <?php
         // This PHP block is for displaying messages directly on the page,
         // it's distinct from the modal message box.
+        // The modal below will handle showing messages including admin ones.
+        // We can remove this direct page message display if the modal is preferred for all messages.
+        /*
         if (!empty($message) && !isset($_SESSION['message_displayed'])): // Only display once
             $_SESSION['message_displayed'] = true; // Set a flag to prevent re-display on refresh
         ?>
             <p class="message <?php echo $message_type; ?>"><?php echo htmlspecialchars($message); ?></p>
-        <?php endif; ?>
+        <?php endif;
+        */
+        ?>
 
         <section class="cards-section">
             <h2>Your Current Cards</h2>
@@ -172,7 +199,7 @@ try {
                 <label for="actionCardSelect">Select Card:</label>
                 <select id="actionCardSelect" name="actionCardSelect">
                     <option value="">-- Loading Cards --</option>
-                    </select>
+                </select>
             </div>
             <div class="action-buttons-group">
                 <button id="freezeActionButton" class="action-button primary-action" disabled><i class="fas fa-snowflake"></i> Freeze/Unfreeze Card</button>
@@ -237,8 +264,8 @@ try {
 
         <section class="manage-pin-section">
             <h2>Manage Card PIN & Activation</h2>
-        <p>To activate a new card or set/change your existing card's PIN, please visit the <a href="<?php echo rtrim(BASE_URL, '/'); ?>/my_cards">Card Activation & PIN Management page</a>.</p>
-            </section>
+            <p>To activate a new card or set/change your existing card's PIN, please visit the <a href="<?php echo rtrim(BASE_URL, '/'); ?>/my_cards">Card Activation & PIN Management page</a>.</p>
+        </section>
     </main>
 
     <div class="message-box-overlay" id="messageBoxOverlay">
@@ -249,18 +276,22 @@ try {
     </div>
     <script>
         // These variables must be defined before cards.js is loaded
-        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/'); ?>; // *** ADDED '/' to ensure API calls are correct ***
+        const PHP_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/'); ?>;
         // Assuming 'frontend' is directly under your BASE_URL for frontend assets
         const FRONTEND_BASE_URL = <?php echo json_encode(rtrim(BASE_URL, '/') . '/frontend'); ?>;
         const currentUserId = <?php echo json_encode($user_id); ?>;
         const currentUserFullName = <?php echo json_encode($user_full_name); ?>;
         const currentUserEmail = <?php echo json_encode($user_email); ?>;
 
-        // --- NEW: Pass PHP messages to JavaScript ---
+        // Pass PHP messages to JavaScript
         const initialMessage = <?php echo json_encode($message); ?>;
         const initialMessageType = <?php echo json_encode($message_type); ?>;
+
+        // --- NEW: Pass Admin Card Modal Settings to JavaScript ---
+        const showAdminCardModal = <?php echo json_encode($showCardModalFromAdmin); ?>;
+        const adminCardModalText = <?php echo json_encode($cardModalMessageFromAdmin); ?>;
         // --- END NEW ---
     </script>
-        <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/cards.js"></script>
 </body>
 </html>
