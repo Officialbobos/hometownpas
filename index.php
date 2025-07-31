@@ -123,7 +123,6 @@ $authenticated_routes = [
     'set_card_pin',
     'deposit',
     'statements',
-    'debug_transfer',
     // 'verify_code', // Removed from authenticated_routes as it has its own distinct auth check below
     'api/get_user_cards',
     'api/get_user_accounts',
@@ -131,6 +130,7 @@ $authenticated_routes = [
     'api/set_card_pin',
     'api/deposit_check',
     'api/set_session_for_card_modal',
+    'api/clear_card_modal_session.php',
     // ... potentially other API/frontend routes that require authentication
 ];
 
@@ -228,10 +228,6 @@ switch ($path) {
     case 'deposit':
         require __DIR__ . '/frontend/deposit.php';
         break;
-    case 'debug_transfer':
-        require __DIR__ . '/frontend/debug_transfer.php';
-        break;
-
 
     // --- API Routes ---
     case 'api/get_user_cards':
@@ -255,7 +251,9 @@ switch ($path) {
     case 'api/set_session_for_card_modal':
         require __DIR__ . '/api/set_session_for_card_modal.php';
         break;
-
+        case 'api/clear_card_modal_session':
+        require __DIR__ . '/api/clear_card_modal_session.php';
+        break;
 
     // --- ADMIN PANEL ROUTES ---
     case 'admin':
