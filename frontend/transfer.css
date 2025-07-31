@@ -1,630 +1,737 @@
-/* Path: C:\xampp\htdocs\hometownbank\frontend\transfer.css */
+/* style.css (or transfer.css) */
 
-/* General Body and Container Styling */
+:root {
+    --purple-dark: #4a004a;
+    --purple-medium: #6a006a;
+    --purple-light: #8a008a;
+    --white: #ffffff;
+    --light-gray: #f0f0f0;
+    --dark-text: #333333;
+    --border-color: #ddd;
+    --glow-color: rgba(138, 0, 138, 0.5); /* Lighter purple for glow */
+    --hover-purple: #5a005a;
+    --selected-account-bg: #e0f2f7; /* Light blue for selected account item */
+    --selected-account-border: #007bff; /* Primary blue for selected account border */
+    --success-color: #28a745; /* Green for balance */
+}
+
+/* Base styles for glowing effect */
+@keyframes glow {
+    0% { box-shadow: 0 0 5px var(--glow-color); }
+    50% { box-shadow: 0 0 15px var(--glow-color), 0 0 25px var(--glow-color); }
+    100% { box-shadow: 0 0 5px var(--glow-color); }
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
     padding: 0;
-    background: linear-gradient(135deg, #2c003e, #0a011d); /* Dark purple to very dark purple/blue */
-    color: #e0e0e0; /* Light grey for text */
-    min-height: 100vh;
+    background-color: var(--light-gray);
+    color: var(--dark-text);
+    line-height: 1.6;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
-}
-
-.container {
-    display: flex;
-    flex-direction: column; /* Stack header, main, sidebar */
     min-height: 100vh;
-    width: 100%;
-    max-width: 1400px; /* Max width for the entire layout */
-    margin: 0 auto; /* Center the container */
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5); /* Stronger shadow for depth */
 }
 
-/* Header Styling (assuming .dashboard-header or .header) */
-.header {
+/* Header */
+.dashboard-header {
+    background-color: var(--purple-dark);
+    color: var(--white);
+    padding: 15px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px 25px;
-    background-color: rgba(30, 0, 45, 0.8); /* Slightly lighter, transparent dark purple */
-    border-bottom: 1px solid rgba(150, 0, 255, 0.3); /* Purple border */
-    color: #ffffff;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-.menu-icon {
-    font-size: 24px;
-    cursor: pointer;
-    color: #c9a0dc; /* Soft purple */
-    transition: color 0.3s ease;
+.dashboard-header .logo .logo-barclays {
+    height: 40px; /* Adjust as needed */
+    width: auto;
 }
 
-.menu-icon:hover {
-    color: #e6b3ff; /* Lighter purple on hover */
-}
-
-.greeting h1 {
-    margin: 0;
-    font-size: 24px;
-    color: #ffffff;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5); /* Subtle white glow */
-}
-
-.profile-pic img {
-    width: 45px;
-    height: 45px;
-    border-radius: 50%;
-    border: 2px solid #a052c9; /* Purple border */
-    object-fit: cover;
-    transition: transform 0.3s ease;
-}
-
-.profile-pic img:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 15px rgba(200, 100, 255, 0.7); /* Purple glow on hover */
-}
-
-
-/* Main Content / Form Area */
-.main-content {
-    flex-grow: 1; /* Allows main content to take available space */
-    padding: 30px;
+.dashboard-header .user-info {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center; /* Center content vertically too */
-    z-index: 1; /* Ensure it's above background but below sidebar overlay */
+    gap: 15px;
 }
 
-.transfer-form-container {
-    background-color: rgba(255, 255, 255, 0.08); /* Semi-transparent white background */
-    backdrop-filter: blur(8px); /* Frosted glass effect */
-    border-radius: 15px;
-    padding: 35px 45px;
-    box-shadow: 0 0 25px rgba(150, 0, 255, 0.3), 0 0 40px rgba(255, 255, 255, 0.1); /* Purple and white glow */
-    width: 100%;
-    max-width: 600px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    animation: fadeInScale 0.7s ease-out;
+.dashboard-header .user-info .profile-icon {
+    font-size: 24px;
+    color: var(--white);
 }
 
-@keyframes fadeInScale {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-.transfer-form-container h2 {
-    color: #ffffff;
-    text-align: center;
-    margin-bottom: 30px;
-    font-size: 28px;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8); /* Stronger white glow */
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    color: #e0e0e0; /* Light grey */
+.dashboard-header .user-info span {
     font-weight: bold;
 }
 
-.form-group input[type="text"],
-.form-group input[type="number"],
-.form-group select,
-.form-group textarea {
-    width: calc(100% - 20px); /* Adjust for padding */
-    padding: 12px;
-    border: 1px solid rgba(200, 100, 255, 0.5); /* Light purple border */
-    border-radius: 8px;
-    background-color: rgba(255, 255, 255, 0.1); /* Slightly transparent white input background */
-    color: #ffffff;
-    font-size: 16px;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
-    outline: none;
+.dashboard-header .user-info a {
+    color: var(--white);
+    text-decoration: none;
+    padding: 5px 10px;
+    border: 1px solid var(--white);
+    border-radius: 5px;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-.form-group input[type="text"]::placeholder,
-.form-group input[type="number"]::placeholder,
-.form-group textarea::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+.dashboard-header .user-info a:hover {
+    background-color: var(--white);
+    color: var(--purple-dark);
 }
 
-.form-group input[type="text"]:focus,
-.form-group input[type="number"]:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-    border-color: #a052c9; /* Stronger purple on focus */
-    box-shadow: 0 0 15px rgba(200, 100, 255, 0.6); /* Purple glow on focus */
-}
-
-.form-group select option {
-    background-color: #2c003e; /* Dark background for dropdown options */
-    color: #ffffff;
-}
-
-.currency-symbol {
-    color: #c9a0dc; /* Purple color for currency symbol */
-    font-weight: bold;
-    margin-left: 5px;
-}
-
-#display_current_balance, #current_currency_display {
-    font-weight: bold;
-    color: #c9a0dc; /* Purple for balance */
-}
-
-/* --- NEW / MODIFIED RULES FOR TRANSACTION DISPLAY --- */
-
-/* Style for individual transaction items to display side-by-side */
-.transaction-item {
+/* Main Content Wrapper */
+.transfer-content {
+    flex-grow: 1;
     display: flex;
-    justify-content: space-between; /* Pushes description to left, amount to right */
-    align-items: center; /* Vertically aligns them */
-    margin-bottom: 10px; /* Space between each transaction item */
-    padding: 10px 0;
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.1); /* Subtle separator */
+    justify-content: center;
+    align-items: flex-start; /* Align to top */
+    padding: 20px;
 }
 
-.transaction-description {
-    flex-grow: 1; /* Allows description to take available space */
-    color: #e0e0e0;
-    font-size: 1rem; /* Base font size for description */
-    margin-right: 15px; /* Space between description and amount */
+/* Transfer Card */
+.transfer-card {
+    background-color: var(--white);
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1), 0 0 30px var(--glow-color); /* Initial glow */
+    width: 100%;
+    max-width: 700px;
+    box-sizing: border-box;
+    animation: glow 3s infinite alternate; /* Apply glowing animation */
 }
 
-/* Reduced font size for the transaction amount */
-.transaction-amount {
-    font-size: 1.1rem; /* Smaller font size for the amount */
+.transfer-card h2 {
+    text-align: center;
+    color: var(--purple-dark);
+    margin-bottom: 25px;
+    font-size: 2em;
+    font-weight: 700;
+}
+
+/* Current Balance Display */
+.current-balance {
+    background-color: var(--purple-light);
+    color: var(--white);
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.current-balance h3 {
+    margin: 0;
+    font-size: 1.3em;
+}
+
+#display_current_balance {
     font-weight: bold;
-    color: #c9a0dc; /* Consistent purple color */
-    white-space: nowrap; /* Prevents the amount from wrapping to next line */
+    font-size: 1.5em;
+    margin-right: 5px;
 }
-
-/* --- END NEW / MODIFIED RULES --- */
-
 
 /* Messages */
 .message {
-    padding: 15px;
-    margin-bottom: 20px;
+    padding: 12px 20px;
     border-radius: 8px;
+    margin-bottom: 20px;
     font-weight: bold;
     text-align: center;
-    animation: slideInFromTop 0.5s ease-out;
-}
-
-.message.success {
-    background-color: rgba(144, 238, 144, 0.2); /* Light green with transparency */
-    color: #90ee90; /* Light green text */
-    border: 1px solid #90ee90;
-    box-shadow: 0 0 10px rgba(144, 238, 144, 0.5);
 }
 
 .message.error {
-    background-color: rgba(255, 99, 71, 0.2); /* Tomato red with transparency */
-    color: #ff6347; /* Tomato red text */
-    border: 1px solid #ff6347;
-    box-shadow: 0 0 10px rgba(255, 99, 71, 0.5);
+    background-color: #ffe0e0;
+    color: #cc0000;
+    border: 1px solid #ff9999;
 }
 
-@keyframes slideInFromTop {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.message.success {
+    background-color: #e0ffe0;
+    color: #008000;
+    border: 1px solid #99ff99;
 }
 
-/* Button Styling */
-.button-primary {
+.message.info {
+    background-color: #e0f0ff;
+    color: #0056b3;
+    border: 1px solid #99ccff;
+}
+
+/* Form Styling */
+.form-standard .form-group {
+    margin-bottom: 20px;
+}
+
+.form-standard label {
     display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--purple-dark);
+}
+
+.form-standard input[type="text"],
+.form-standard input[type="number"],
+.form-standard select,
+.form-standard textarea {
     width: 100%;
-    padding: 15px;
-    background: linear-gradient(45deg, #a052c9, #6a0dad); /* Purple gradient */
-    color: #ffffff;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1em;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-standard input[type="text"]:focus,
+.form-standard input[type="number"]:focus,
+.form-standard select:focus,
+.form-standard textarea:focus {
+    border-color: var(--purple-light);
+    box-shadow: 0 0 0 3px rgba(138, 0, 138, 0.2);
+    outline: none;
+}
+
+/* --- Specific styling for source_account_id to act as a modal trigger on mobile --- */
+/* Hide default dropdown arrow and style it like a button/input */
+#source_account_id {
+    appearance: none; /* Remove default arrow on select */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="%234a004a"><path d="M9.293 12.95l1.414 1.414L16.414 10l-1.414-1.414L10 12.121 5.879 8l-1.414 1.414L10 14.95z"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 15px center; /* Adjust position */
+    background-size: 1.2em; /* Adjust size */
+    cursor: pointer;
+    text-align: left; /* Ensure text aligns left */
+    padding-right: 40px; /* Make space for the icon */
+}
+#source_account_id:hover {
+    background-color: var(--light-gray);
+}
+
+
+.input-group {
+    display: flex;
+    align-items: center;
+}
+
+.input-group .input-group-addon {
+    background-color: var(--light-gray);
+    border: 1px solid var(--border-color);
+    border-right: none;
+    padding: 12px 15px;
+    border-radius: 8px 0 0 8px;
+    font-weight: bold;
+    color: var(--purple-dark);
+}
+
+.input-group input {
+    border-radius: 0 8px 8px 0;
+}
+
+.form-standard small {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 0.9em;
+}
+
+/* Transfer Type Selector Buttons */
+.transfer-type-selector {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+    justify-content: center;
+}
+
+.type-button {
+    flex: 1;
+    background-color: var(--light-gray);
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    padding: 20px 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px; /* Ensure a decent size */
+}
+
+.type-button i {
+    font-size: 3em;
+    color: var(--purple-medium);
+    margin-bottom: 10px;
+    transition: color 0.3s ease;
+}
+
+.type-button p {
+    margin: 0;
+    font-weight: 600;
+    color: var(--dark-text);
+    font-size: 1.1em;
+    transition: color 0.3s ease;
+}
+
+.type-button:hover {
+    border-color: var(--purple-medium);
+    box-shadow: 0 0 10px rgba(138, 0, 138, 0.3);
+}
+
+.type-button.selected {
+    background-color: var(--purple-medium);
+    border-color: var(--purple-dark);
+    color: var(--white);
+    box-shadow: 0 0 15px var(--glow-color); /* More intense glow when selected */
+}
+
+.type-button.selected i,
+.type-button.selected p {
+    color: var(--white);
+}
+
+/* Sub-method selection */
+.sub-method-selection {
+    background-color: var(--light-gray);
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.05);
+}
+
+.sub-method-selection h4 {
+    margin-top: 0;
+    color: var(--purple-dark);
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.radio-group label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: var(--dark-text);
+    font-weight: normal; /* Override general label bold */
+    transition: color 0.2s ease;
+}
+
+.radio-group input[type="radio"] {
+    margin-right: 10px;
+    accent-color: var(--purple-medium); /* Style radio button itself */
+}
+
+.radio-group label:hover {
+    color: var(--purple-medium);
+}
+
+/* Specific Transfer Method Fields */
+.transfer-method-fields {
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+    margin-top: 25px;
+}
+
+.transfer-method-fields h4 {
+    color: var(--purple-dark);
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-align: center;
+    border-bottom: 2px solid var(--purple-light);
+    padding-bottom: 10px;
+}
+
+/* Recipient Name Group (dynamic visibility) */
+.recipient-name-group {
+    /* Base style, will be hidden/shown by JS */
+}
+
+/* Submit Button */
+.button-primary {
+    background-color: var(--purple-dark);
+    color: var(--white);
+    padding: 15px 25px;
     border: none;
     border-radius: 8px;
-    font-size: 18px;
-    font-weight: bold;
+    font-size: 1.1em;
     cursor: pointer;
+    width: 100%;
     transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-    box-shadow: 0 5px 20px rgba(160, 82, 201, 0.4); /* Soft purple shadow */
-    text-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    margin-top: 20px;
+    font-weight: 600;
 }
 
 .button-primary:hover {
-    background: linear-gradient(45deg, #b862e3, #8a2be2); /* Lighter purple gradient on hover */
+    background-color: var(--hover-purple);
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(160, 82, 201, 0.6); /* Enhanced shadow on hover */
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2), 0 0 20px var(--glow-color);
 }
 
-.button-primary:active {
-    transform: translateY(0);
-    box-shadow: 0 4px 15px rgba(160, 82, 201, 0.4);
+.button-primary:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
 }
 
 .back-link {
-    color: #c9a0dc; /* Purple color */
+    display: block;
+    text-align: center;
+    margin-top: 25px;
+    color: var(--purple-medium);
     text-decoration: none;
-    font-size: 16px;
-    margin-top: 20px;
-    display: inline-block;
+    font-weight: 600;
     transition: color 0.3s ease;
 }
 
 .back-link:hover {
-    color: #e6b3ff; /* Lighter purple on hover */
+    color: var(--purple-dark);
     text-decoration: underline;
 }
 
-/* Sidebar Styling (from previous context, ensure consistency) */
-.sidebar-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
-    z-index: 100;
+/* Hidden Utility Class */
+.hidden {
+    display: none !important;
+}
+
+/* Modal Styles - Base */
+.modal-overlay { /* Renamed from .modal for clarity, applied to #accountSelectionModal */
     display: none; /* Hidden by default */
-    transition: opacity 0.3s ease;
-    opacity: 0;
-}
-
-.sidebar-overlay.active {
-    display: block;
-    opacity: 1;
-}
-
-.sidebar {
-    position: fixed;
-    top: 0;
-    left: -280px; /* Start off-screen */
-    width: 260px;
-    height: 100%;
-    background: linear-gradient(180deg, #1a002a, #000000); /* Dark gradient for sidebar */
-    color: #ffffff;
-    box-shadow: 2px 0 15px rgba(0, 0, 0, 0.5);
-    z-index: 101;
-    transition: left 0.3s ease-out;
-    padding: 20px;
-    box-sizing: border-box; /* Include padding in width */
-    display: flex;
-    flex-direction: column;
-}
-
-.sidebar.active {
-    left: 0; /* Slide in */
-}
-
-.close-sidebar-button {
-    background: none;
-    border: none;
-    color: #e6b3ff; /* Light purple */
-    font-size: 24px;
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    cursor: pointer;
-    transition: color 0.3s ease;
-}
-
-.close-sidebar-button:hover {
-    color: #ffffff;
-}
-
-.sidebar-header {
-    text-align: center;
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.sidebar-profile-pic {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 3px solid #a052c9; /* Purple border */
-}
-
-.sidebar-header h3 {
-    margin: 10px 0 5px;
-    color: #ffffff;
-    font-size: 20px;
-}
-
-.sidebar-header p {
-    color: #bbbbbb;
-    font-size: 14px;
-}
-
-.sidebar-nav ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    flex-grow: 1; /* Allows nav to take up remaining space */
-}
-
-.sidebar-nav ul li {
-    margin-bottom: 10px;
-}
-
-.sidebar-nav ul li a {
-    display: flex;
-    align-items: center;
-    padding: 12px 15px;
-    color: #e0e0e0;
-    text-decoration: none;
-    border-radius: 8px;
-    transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
-}
-
-.sidebar-nav ul li a i {
-    margin-right: 15px;
-    font-size: 18px;
-    color: #c9a0dc; /* Purple icon */
-}
-
-.sidebar-nav ul li a:hover {
-    background-color: rgba(160, 82, 201, 0.2); /* Light purple hover background */
-    color: #ffffff;
-    box-shadow: 0 0 10px rgba(160, 82, 201, 0.4); /* Subtle glow on hover */
-}
-
-.sidebar-nav ul li a.active {
-    background-color: #a052c9; /* Stronger purple for active */
-    color: #ffffff;
-    box-shadow: 0 0 15px rgba(160, 82, 201, 0.6);
-    font-weight: bold;
-}
-
-.sidebar-nav ul li a.active i {
-    color: #ffffff; /* White icon for active */
-}
-
-.logout-button {
-    background: linear-gradient(45deg, #8a2be2, #a052c9); /* Purple gradient for logout */
-    color: #ffffff;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-    margin-top: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-    box-shadow: 0 4px 15px rgba(160, 82, 201, 0.4);
-}
-
-.logout-button:hover {
-    background: linear-gradient(45deg, #9933ff, #b862e3); /* Lighter gradient on hover */
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(160, 82, 201, 0.6);
-}
-
-/* Modal Styling (for success/error messages) */
-.modal-overlay {
-    position: fixed;
-    top: 0;
+    position: fixed; /* Stay in place */
+    z-index: 1000; /* Sit on top */
     left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
-    display: flex;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgba(0, 0, 0, 0.6); /* Black w/ opacity */
     justify-content: center;
     align-items: center;
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
+    padding: 20px;
+    box-sizing: border-box;
+    opacity: 0; /* For fade in/out transition */
+    transition: opacity 0.3s ease;
 }
 
 .modal-overlay.active {
+    display: flex; /* Changed to flex for centering content */
     opacity: 1;
-    visibility: visible;
 }
 
 .modal-content {
-    background: linear-gradient(135deg, #3a0050, #1a002a); /* Dark purple gradient */
-    border-radius: 15px;
-    padding: 40px;
-    width: 90%;
-    max-width: 500px;
-    text-align: center;
-    box-shadow: 0 0 30px rgba(160, 82, 201, 0.8), 0 0 60px rgba(255, 255, 255, 0.2); /* Stronger glow */
+    background-color: var(--white);
+    margin: auto;
+    padding: 30px;
+    border-radius: 12px;
     position: relative;
-    transform: translateY(-50px);
-    opacity: 0;
-    transition: transform 0.4s ease-out, opacity 0.4s ease-out;
-    border: 1px solid rgba(200, 100, 255, 0.5);
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.2), 0 0 40px var(--glow-color);
+    text-align: center;
+    animation: fadeIn 0.3s ease-out;
 }
 
-.modal-overlay.active .modal-content {
-    transform: translateY(0);
-    opacity: 1;
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-.modal-content h3 {
-    color: #e6b3ff; /* Light purple for heading */
+.modal-content h2 {
+    color: var(--purple-dark);
     margin-top: 0;
-    font-size: 28px;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
     margin-bottom: 20px;
+    font-size: 1.8em;
 }
 
 .modal-content p {
-    color: #e0e0e0; /* Light text for paragraphs */
-    margin-bottom: 15px;
-    line-height: 1.8;
+    margin-bottom: 10px;
+    color: var(--dark-text);
 }
 
-.modal-content strong {
-    color: #ffffff; /* White for strong text */
-}
-
-.modal-content .status-pending {
-    color: #FFA500; /* Orange for pending status */
-    font-weight: bold;
-}
-
-.modal-content .modal-reference {
-    font-family: 'Courier New', Courier, monospace;
-    background-color: rgba(255, 255, 255, 0.05);
-    padding: 8px 12px;
-    border-radius: 5px;
-    display: inline-block;
-    margin-top: 10px;
-    color: #90ee90; /* Greenish glow for reference */
-    box-shadow: 0 0 8px rgba(144, 238, 144, 0.3);
-}
-
-.modal-button {
-    background: linear-gradient(45deg, #6a0dad, #a052c9); /* Purple gradient button */
-    color: #ffffff;
-    border: none;
-    padding: 12px 25px;
+.modal-details {
+    background-color: var(--light-gray);
     border-radius: 8px;
-    cursor: pointer;
-    font-size: 17px;
-    font-weight: bold;
-    margin-top: 25px;
-    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-    box-shadow: 0 5px 20px rgba(160, 82, 201, 0.4);
+    padding: 15px 20px;
+    margin-top: 20px;
+    margin-bottom: 25px;
+    text-align: left;
 }
 
-.modal-button:hover {
-    background: linear-gradient(45deg, #8a2be2, #b862e3); /* Lighter gradient on hover */
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(160, 82, 201, 0.6);
+.modal-details p {
+    margin: 8px 0;
+    display: flex;
+    justify-content: space-between;
+    font-weight: 500;
 }
+
+.modal-details p strong {
+    color: var(--purple-dark);
+    min-width: 120px;
+}
+.modal-details p span {
+    font-weight: normal;
+    text-align: right;
+    flex-grow: 1;
+}
+
+.modal-close-button { /* Renamed from .modal .close-button for consistency with JS */
+    background-color: var(--purple-dark);
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    margin-top: 20px;
+    display: block; /* Make it a block element */
+    width: 100%; /* Make it full width */
+    text-align: center;
+    transition: background-color 0.3s ease;
+}
+
+.modal-close-button:hover {
+    background-color: var(--hover-purple);
+}
+
+/* --- NEW: Specific styles for Account Selection Modal --- */
+.account-selection-modal-content {
+    /* Specific overrides or additions for the account selection modal */
+    max-width: 600px; /* Make it a bit wider to accommodate two columns */
+}
+
+.account-selection-modal-content .modal-title {
+    text-align: center;
+    margin-bottom: 20px;
+    color: var(--purple-dark);
+}
+
+.account-categories {
+    display: flex;
+    flex-direction: column; /* Stack categories vertically on mobile by default */
+    gap: 20px;
+}
+
+/* For larger screens, display categories side-by-side */
+@media (min-width: 768px) {
+    .account-categories {
+        flex-direction: row;
+        justify-content: space-around;
+    }
+    .account-category {
+        flex: 1; /* Distribute space equally */
+        padding: 0 10px; /* Add some internal padding */
+    }
+}
+
+.account-category .category-title {
+    color: var(--purple-dark); /* Use your purple for titles */
+    margin-bottom: 10px;
+    border-bottom: 2px solid var(--purple-light);
+    padding-bottom: 5px;
+    text-align: center;
+    font-size: 1.2em;
+}
+
+.account-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 250px; /* Limit height and make scrollable for many accounts */
+    overflow-y: auto;
+    padding-right: 5px; /* Space for scrollbar */
+}
+/* Style scrollbar for better appearance */
+.account-list::-webkit-scrollbar {
+    width: 8px;
+}
+.account-list::-webkit-scrollbar-track {
+    background: var(--light-gray);
+    border-radius: 10px;
+}
+.account-list::-webkit-scrollbar-thumb {
+    background: var(--purple-medium);
+    border-radius: 10px;
+}
+.account-list::-webkit-scrollbar-thumb:hover {
+    background: var(--purple-dark);
+}
+
+
+.account-list-item {
+    background-color: var(--light-gray); /* Match your light-gray for list items */
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 10px 15px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Subtle shadow */
+}
+
+.account-list-item:hover {
+    background-color: #e9e9e9;
+    border-color: var(--purple-medium);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+}
+
+.account-list-item.selected {
+    background-color: var(--selected-account-bg); /* Light blue from variables */
+    border-color: var(--selected-account-border); /* Primary blue from variables */
+    font-weight: bold;
+    box-shadow: 0 0 8px rgba(0, 123, 255, 0.4); /* Blue glow for selected */
+}
+
+.account-list-item .account-info {
+    text-align: left;
+}
+
+.account-list-item .account-type {
+    font-weight: bold;
+    color: var(--dark-text);
+    font-size: 1.1em;
+}
+.account-list-item .account-number-display {
+    font-family: 'Consolas', 'Monaco', monospace; /* Monospaced font for numbers */
+    font-size: 0.9em;
+    color: #666;
+}
+.account-list-item .account-balance {
+    font-weight: bold;
+    color: var(--success-color); /* Green for balance */
+    font-size: 1.1em;
+}
+/* --- END NEW Account Selection Modal Styles --- */
+
 
 /* Responsive Design */
 @media (max-width: 768px) {
-    .header {
-        padding: 10px 15px;
-    }
-
-    .greeting h1 {
-        font-size: 20px;
-    }
-
-    .menu-icon {
-        font-size: 20px;
-    }
-
-    .profile-pic img {
-        width: 40px;
-        height: 40px;
-    }
-
-    .transfer-form-container {
-        padding: 25px 30px;
-    }
-
-    .transfer-form-container h2 {
-        font-size: 24px;
-    }
-
-    .form-group input,
-    .form-group select,
-    .form-group textarea,
-    .button-primary {
-        font-size: 15px;
-        padding: 10px;
-    }
-
-    /* Responsive adjustments for transaction display */
-    .transaction-amount {
-        font-size: 1rem; /* Smaller on tablets */
-    }
-
-    .sidebar {
-        width: 230px;
-        left: -250px;
-    }
-}
-
-@media (max-width: 480px) {
-    .header {
-        flex-wrap: wrap;
-        justify-content: center;
+    .dashboard-header {
+        flex-direction: column;
+        gap: 10px;
         text-align: center;
     }
-
-    .greeting {
-        width: 100%;
-        order: 1; /* Move greeting below icons */
-        margin-top: 10px;
+    .dashboard-header .user-info {
+        flex-direction: column;
+        gap: 8px;
+    }
+    .dashboard-header .user-info a {
+        padding: 3px 8px;
+        font-size: 0.9em;
     }
 
-    .menu-icon, .profile-pic {
-        order: 0; /* Keep icons at the top */
-        flex-basis: 50%;
-        text-align: center;
-    }
-    .profile-pic {
-        text-align: right;
-    }
-    .menu-icon {
-        text-align: left;
-    }
-
-    .transfer-form-container {
+    .transfer-card {
         padding: 20px;
-        box-shadow: 0 0 15px rgba(150, 0, 255, 0.3), 0 0 25px rgba(255, 255, 255, 0.1); /* Smaller glow for small screens */
+        border-radius: 10px;
     }
 
-    .transfer-form-container h2 {
-        font-size: 20px;
+    .transfer-card h2 {
+        font-size: 1.8em;
+        margin-bottom: 20px;
+    }
+
+    .current-balance {
+        padding: 12px 15px;
+        margin-bottom: 20px;
+    }
+    .current-balance h3 {
+        font-size: 1.1em;
+    }
+    #display_current_balance {
+        font-size: 1.3em;
+    }
+
+    .form-standard input,
+    .form-standard select,
+    .form-standard textarea,
+    .input-group .input-group-addon {
+        padding: 10px;
+        font-size: 0.95em;
+    }
+
+    .transfer-type-selector {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .type-button {
+        padding: 15px 10px;
+        min-height: 80px;
+    }
+    .type-button i {
+        font-size: 2.5em;
+        margin-bottom: 5px;
+    }
+    .type-button p {
+        font-size: 1em;
+    }
+
+    .sub-method-selection {
+        padding: 15px;
+    }
+
+    .sub-method-selection h4,
+    .transfer-method-fields h4 {
+        font-size: 1.2em;
+    }
+
+    .button-primary {
+        padding: 12px 20px;
+        font-size: 1em;
     }
 
     .modal-content {
-        padding: 25px;
+        padding: 20px;
+        width: 95%; /* Make modal slightly wider on small screens */
+    }
+    .modal-content h2 {
+        font-size: 1.6em;
+    }
+    .modal-details p {
+        flex-direction: column; /* Stack details on small screens */
+        align-items: flex-start;
+        margin-bottom: 10px;
+    }
+    .modal-details p strong {
+        margin-bottom: 3px;
+    }
+    /* No longer applies to new modal close button directly */
+    /* .modal .close-button {
+        font-size: 30px;
+        top: 10px;
+        right: 15px;
+    } */
+
+    /* Specific adjustment for account selection modal on small screens */
+    .account-selection-modal-content {
+        padding: 15px; /* Adjust padding for smaller screens */
+    }
+    .account-category {
+        padding: 0; /* Remove horizontal padding on stacked categories */
+    }
+    .account-list {
+        max-height: 200px; /* Adjust max height for smaller screens */
     }
 
-    .modal-content h3 {
-        font-size: 22px;
+    .modal-close-button { /* Apply to both modals */
+        font-size: 0.95em;
+        padding: 10px;
     }
+}
 
-    .modal-button {
-        padding: 10px 20px;
-        font-size: 15px;
-    }
-
-    /* Stack description and amount vertically on very small screens */
-    .transaction-item {
-        flex-direction: column; /* Stack them vertically on very small screens */
-        align-items: flex-start; /* Align text to the left */
-    }
-    .transaction-description {
-        margin-bottom: 5px; /* Add small space when stacked */
-        margin-right: 0;
-    }
-    .transaction-amount {
-        font-size: 0.9rem; /* Even smaller on mobile */
-    }
+/* Accessibility: Focus styles */
+*:focus-visible {
+    outline: 3px solid var(--purple-light);
+    outline-offset: 2px;
+    border-radius: 5px;
 }
