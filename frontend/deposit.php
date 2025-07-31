@@ -10,10 +10,11 @@ require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../Config.php';
 require_once __DIR__ . '/../functions.php'; // Ensure functions.php is included for getCollection()
 
+use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
-use MongoDB\Driver\Exception\Exception as MongoDBDriverException; // Added for specific MongoDB exceptions
+use MongoDB\BSON\UTCDateTime; // Added for timestamping activation
+use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
-// Check if the user is logged in
 // Ensure session_start() is called somewhere BEFORE this check,
 // ideally in your central router file (like the main index.php)
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
