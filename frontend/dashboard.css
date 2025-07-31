@@ -852,41 +852,57 @@ body {
         font-size: 16px;
     }
 
-    /* Account cards on very small screens (still carousel, but maybe slightly smaller minimums) */
-    .account-card {
-        min-width: 260px;
-        flex: 0 0 calc(100% - 16px); /* ADJUSTED for a smaller margin */
-        margin-right: 16px; /* ADJUSTED */
-    }
-      .account-card:last-child {
-        margin-right: 0;
-    }
+   .account-cards-container {
+    /* Ensure these are set on the container for small screens as well */
+    display: flex;
+    flex-wrap: nowrap; /* Prevents cards from stacking */
+    gap: 16px; /* Use CSS gap for consistent spacing between cards */
+    /* Add scroll-snap-type for native-like scrolling behavior (optional but good) */
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch; /* For smoother iOS scrolling */
+}
 
-    .transaction-item {
-        flex-direction: column;
-        align-items: flex-start;
-        padding: 10px 15px;
-    }
+.account-card {
+    /* Ensure these are set for all screen sizes where carousel is active */
+    flex: 0 0 auto; /* Do not grow or shrink, size based on width below */
+    width: calc(100vw - 40px); /* Example: Full viewport width minus total horizontal padding/margin */
+                               /* Adjust 40px based on your actual padding around the wrapper/container */
+                               /* This aims for the card to take up most of the screen but leave some padding */
+    max-width: 300px; /* Prevent cards from getting too wide on slightly larger mobile devices */
+    scroll-snap-align: start; /* For smooth snapping behavior with scroll-snap-type */
+    box-sizing: border-box; /* Important: Include padding and border in width calculation */
 
-    .transaction-amount-date {
-        margin-top: 5px;
-        text-align: left;
-        width: 100%;
-    }
+    /* Remove margin-right if using gap on the container */
+    margin-right: 0;
+}
 
-    .transfer-modal-content {
-        padding: 20px;
-    }
+/* You won't need .account-card:last-child { margin-right: 0; } if using gap */
 
-    .transfer-modal-content h3 {
-        font-size: 20px;
-    }
+/* Other styles from your snippet */
+.transaction-item {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 15px;
+}
 
-    .transfer-options-list {
-        grid-template-columns: 1fr; /* Single column for transfer options */
-    }
+.transaction-amount-date {
+    margin-top: 5px;
+    text-align: left;
+    width: 100%;
+}
 
-    .transfer-option p {
-        font-size: 12px;
-    }
+.transfer-modal-content {
+    padding: 20px;
+}
+
+.transfer-modal-content h3 {
+    font-size: 20px;
+}
+
+.transfer-options-list {
+    grid-template-columns: 1fr; /* Single column for transfer options */
+}
+
+.transfer-option p {
+    font-size: 12px;
 }
