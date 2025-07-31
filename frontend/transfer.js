@@ -196,19 +196,31 @@ document.addEventListener('DOMContentLoaded', function() {
         updateBalanceDisplay(); // Call once on load to populate the balance correctly.
 
 
-        // Show existing Transfer Success Modal if flag is set
-        if (window.APP_DATA.showModal && transferSuccessModal && Object.keys(window.APP_DATA.modalDetails).length > 0) {
-            const details = window.APP_DATA.modalDetails;
-            modalAmount.textContent = parseFloat(details.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            modalCurrency.textContent = details.currency;
-            modalRecipient.textContent = details.recipient_name;
-            modalStatus.textContent = details.status;
-            // Refinement 2: Check for details.reference before setting textContent
-            modalReference.textContent = details.reference || 'N/A'; // Provide a fallback
-            // Refinement 2: Map method to a more user-friendly name for the modal
-            modalMethod.textContent = getTransferMethodDisplayName(details.method);
-            transferSuccessModal.classList.add('active');
-        }
+       // Show existing Transfer Success Modal if flag is set
+if (window.APP_DATA.showModal && transferSuccessModal && Object.keys(window.APP_DATA.modalDetails).length > 0) {
+    const details = window.APP_DATA.modalDetails;
+    
+    // Ensure no sign is displayed by using Math.abs() on the amount
+    const absoluteAmount = Math.abs(parseFloat(details.amount));
+    
+    // Format the amount
+    modalAmount.textContent = absoluteAmount.toLocaleString(undefined, { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+    });
+    
+    modalCurrency.textContent = details.currency;
+    modalRecipient.textContent = details.recipient_name;
+    modalStatus.textContent = details.status;
+    
+    // Refinement 2: Check for details.reference before setting textContent
+    modalReference.textContent = details.reference || 'N/A'; // Provide a fallback
+    
+    // Refinement 2: Map method to a more user-friendly name for the modal
+    modalMethod.textContent = getTransferMethodDisplayName(details.method);
+    
+    transferSuccessModal.classList.add('active');
+}
 
         // CUSTOM TRANSFER MODAL LOGIC (from admin)
         // This logic is already correctly placed in transfer.php's inline script.
