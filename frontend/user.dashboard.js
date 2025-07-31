@@ -374,7 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const redirectToBankCards = () => {
                 // Function to handle the AJAX call and redirection
-                fetch(BASE_URL_JS + '/backend/set_session_for_card_modal.php', {
+                fetch(BASE_URL_JS + '/api/set_session_for_card_modal.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
