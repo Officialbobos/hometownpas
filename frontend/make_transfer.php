@@ -400,32 +400,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
                 $user_full_name = "Valued Customer"; // Fallback name
             }
 
-            $email_subject = "Your Transfer Request Confirmation - Ref: " . $transaction_data['reference_number'];
+          $email_subject = "Your Transfer Request Confirmation - Ref: " . $transaction_data['reference_number'];
 
-            $email_body = "
-                <p>Dear " . htmlspecialchars($user_full_name) . ",</p>
-                <p>Thank you for initiating a transfer with HomeTown Bank Pa.</p>
-                <p>Your transfer request has been successfully submitted and is currently <strong>awaiting approval</strong>.</p>
-                <p><strong>Transfer Details:</strong></p>
-                <ul>
-                    <li><strong>Reference Number:</strong> " . htmlspecialchars($transaction_data['reference_number']) . "</li>
-                    <li><strong>Amount:</strong> " . get_currency_symbol($sourceAccount['currency']) . " " . number_format($amount, 2) . "</li>
-                    <li><strong>From Account:</strong> " . htmlspecialchars($sourceAccount['account_type'] . ' (' . $sourceAccount['account_number'] . ')') . "</li>
-                    <li><strong>To Recipient:</strong> " . htmlspecialchars($transaction_data['recipient_name']) . "</li>
-                    <li><strong>Recipient Details:</strong> " . htmlspecialchars($destination_account_display) . "</li>
-                    <li><strong>Description:</strong> " . htmlspecialchars($description) . "</li>
-                    <li><strong>Initiated On:</strong> " . date('M d, Y H:i:s T') . "</li>
-                    <li><strong>Current Status:</strong> Pending Approval</li>
-                </ul>
-                <p>We will notify you once your transfer has been reviewed and its status changes. You can also track your transfer status in your dashboard.</p>
-                <p>If you have any questions, please do not hesitate to contact our support team.</p>
-                <p>Sincerely,</p>
-                <p>The HomeTown Bank Pa Team</p>
-            ";
+$email_body = '
+<div style="font-family: Arial, sans-serif; background-color: #1a1532; color: #FFFFFF; padding: 30px; line-height: 1.6;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #2e285a; padding: 25px; border-radius: 12px; border: 1px solid #4a4087; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);">
+        <div style="text-align: center; margin-bottom: 25px;">
+            <h1 style="color: #FFFFFF; font-size: 28px; text-shadow: 0 0 8px #9f91d0;">HomeTown Bank Pa</h1>
+            <p style="color: #d0c8e2; font-size: 16px;">Transfer Request Confirmation</p>
+        </div>
 
-            // Assuming sendEmail function exists in functions.php
-            // The sendEmail function should handle proper email headers (e.g., Content-Type for HTML)
-            $email_sent = sendEmail($user_email, $email_subject, $email_body);
+        <p style="color: #e0dced; margin-bottom: 20px;">Dear <strong style="color: #FFFFFF;">' . htmlspecialchars($user_full_name) . '</strong>,</p>
+
+        <p style="color: #e0dced; margin-bottom: 20px;">Thank you for initiating a transfer. Your request has been successfully submitted and is currently <strong style="color: #c7baf1; text-shadow: 0 0 5px #c7baf1;">awaiting approval</strong>.</p>
+
+        <div style="background-color: #3b3472; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+            <h2 style="color: #FFFFFF; margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #5a5193; padding-bottom: 10px;">Transfer Details</h2>
+            <ul style="list-style: none; padding-left: 0; color: #d0c8e2;">
+                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Reference Number:</strong> <span style="color: #FFFFFF;">' . htmlspecialchars($transaction_data['reference_number']) . '</span></li>
+                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Amount:</strong> <span style="color: #FFFFFF;">' . get_currency_symbol($sourceAccount['currency']) . ' ' . number_format($amount, 2) . '</span></li>
+                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">From Account:</strong> <span style="color: #FFFFFF;">' . htmlspecialchars($sourceAccount['account_type'] . ' (' . $sourceAccount['account_number'] . ')') . '</span></li>
+                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">To Recipient:</strong> <span style="color: #FFFFFF;">' . htmlspecialchars($transaction_data['recipient_name']) . '</span></li>
+                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Recipient Details:</strong> <span style="color: #FFFFFF;">' . htmlspecialchars($destination_account_display) . '</span></li>
+                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Description:</strong> <span style="color: #FFFFFF;">' . htmlspecialchars($description) . '</span></li>
+                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Initiated On:</strong> <span style="color: #FFFFFF;">' . date('M d, Y H:i:s T') . '</span></li>
+                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Current Status:</strong> <span style="color: #c7baf1; text-shadow: 0 0 5px #c7baf1;">Pending Approval</span></li>
+            </ul>
+        </div>
+
+        <p style="color: #e0dced; margin-bottom: 20px;">We will notify you once your transfer has been reviewed and its status changes. You can also track your transfer status in your dashboard.</p>
+
+        <p style="color: #e0dced; margin-bottom: 15px;">If you have any questions, please do not hesitate to contact our support team.</p>
+
+        <p style="color: #e0dced;">Sincerely,</p>
+        <p style="color: #FFFFFF; font-weight: bold;">The HomeTown Bank Pa Team</p>
+    </div>
+    <div style="text-align: center; margin-top: 25px; color: #8880a1; font-size: 12px;">
+        <p>This is an automated confirmation email. Please do not reply.</p>
+    </div>
+</div>
+';
+
+// Assuming sendEmail function exists in functions.php
+// The sendEmail function should handle proper email headers (e.g., Content-Type for HTML)
+$email_sent = sendEmail($user_email, $email_subject, $email_body);
 
             if (!$email_sent) {
                 error_log("make_transfer.php: Failed to send transfer receipt email to " . $user_email . " for Ref: " . $transaction_data['reference_number']);

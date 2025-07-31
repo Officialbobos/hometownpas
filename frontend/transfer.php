@@ -228,7 +228,7 @@ switch ($active_transfer_method) {
                         </select>
                     </div>
 
-                     <div class="form-group">
+                   <div class="form-group">
     <label for="source_account_id">From Account:</label>
     <select id="source_account_id" name="source_account_id" class="form-control" required>
         <option value="">-- Select Your Account --</option>
@@ -241,7 +241,7 @@ switch ($active_transfer_method) {
             </option>
         <?php endforeach; ?>
     </select>
-    <p>Available Balance: <span id="amount_currency_symbol_for_balance"></span><span id="display_current_balance">N/A</span> <span id="current_currency_display"></span></p>
+    <p>Available Balance: <span id="amount_currency_symbol_for_balance"></span><span id="display_current_balance" style="color: green;">N/A</span> <span id="current_currency_display"></span></p>
 </div>
 
                     <div class="form-group external-fields common-external-fields">

@@ -991,21 +991,20 @@ try {
             }
             ?>
 
-            <form action="transactions_management" method="GET">
-                <label for="filter_status">Filter by Status:</label>
-                <select name="status_filter" id="filter_status" onchange="this.form.submit()">
-                    <option value="all" <?php echo ($status_filter == 'all') ? 'selected' : ''; ?>>All</option>
-                    <option value="pending" <?php echo ($status_filter == 'pending') ? 'selected' : ''; ?>>Pending</option>
-                    <option value="approved" <?php echo ($status_filter == 'approved') ? 'selected' : ''; ?>>Approved</option>
-                    <option value="declined" <?php echo ($status_filter == 'declined') ? 'selected' : ''; ?>>Declined</option>
-                    <option value="completed" <?php echo ($status_filter == 'completed') ? 'selected' : ''; ?>>Completed</option>
-                    <option value="restricted" <?php echo ($status_filter == 'restricted') ? 'selected' : ''; ?>>Restricted</option>
-                    <option value="failed" <?php echo ($status_filter == 'failed') ? 'selected' : ''; ?>>Failed</option>
-                    <option value="on hold" <?php echo ($status_filter == 'on hold') ? 'selected' : ''; ?>>On Hold</option>
-                    <option value="refunded" <?php echo ($status_filter == 'refunded') ? 'selected' : ''; ?>>Refunded</option>
-                </select>
-            </form>
-
+         <form action="transactions_management.php" method="GET">
+    <label for="filter_status">Filter by Status:</label>
+    <select name="status_filter" id="filter_status" onchange="this.form.submit()">
+        <option value="all" <?php echo ($status_filter == 'all') ? 'selected' : ''; ?>>All</option>
+        <option value="pending" <?php echo ($status_filter == 'pending') ? 'selected' : ''; ?>>Pending</option>
+        <option value="approved" <?php echo ($status_filter == 'approved') ? 'selected' : ''; ?>>Approved</option>
+        <option value="declined" <?php echo ($status_filter == 'declined') ? 'selected' : ''; ?>>Declined</option>
+        <option value="completed" <?php echo ($status_filter == 'completed') ? 'selected' : ''; ?>>Completed</option>
+        <option value="restricted" <?php echo ($status_filter == 'restricted') ? 'selected' : ''; ?>>Restricted</option>
+        <option value="failed" <?php echo ($status_filter == 'failed') ? 'selected' : ''; ?>>Failed</option>
+        <option value="on hold" <?php echo ($status_filter == 'on hold') ? 'selected' : ''; ?>>On Hold</option>
+        <option value="refunded" <?php echo ($status_filter == 'refunded') ? 'selected' : ''; ?>>Refunded</option>
+    </select>
+</form>
             <div class="table-responsive">
                 <table class="transaction-table">
                     <thead>
