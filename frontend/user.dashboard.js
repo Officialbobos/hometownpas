@@ -387,10 +387,51 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- SIDEBAR TOGGLE LOGIC (New Addition) ---
+    const menuIcon = document.querySelector('.menu-icon');
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarOverlay = document.querySelector('.sidebar-overlay');
+    const closeSidebarButton = document.querySelector('.close-sidebar-button');
 
-    // --- Transaction Alert Modal (Existing PHP-driven modal) ---
-    // This part is self-contained in dashboard.php's inline script
-    // It's good that it's separate as it's a one-time display.
+    // Function to open the sidebar
+    function openSidebar() {
+        if (sidebar && sidebarOverlay) {
+            sidebar.classList.add('active');
+            sidebarOverlay.classList.add('active');
+            // Disable body scrolling when sidebar is open
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    // Function to close the sidebar
+    function closeSidebar() {
+        if (sidebar && sidebarOverlay) {
+            sidebar.classList.remove('active');
+            sidebarOverlay.classList.remove('active');
+            // Re-enable body scrolling
+            document.body.style.overflow = '';
+        }
+    }
+
+    // Event listener for opening the sidebar (menu icon click)
+    if (menuIcon) {
+        menuIcon.addEventListener('click', openSidebar);
+    }
+
+    // Event listener for closing the sidebar (close button click)
+    if (closeSidebarButton) {
+        closeSidebarButton.addEventListener('click', closeSidebar);
+    }
+
+    // Event listener for closing the sidebar (clicking on the overlay)
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', (event) => {
+            // Ensure the click was directly on the overlay, not its children
+            if (event.target === sidebarOverlay) {
+                closeSidebar();
+            }
+        });
+    }
 
     // --- Initialize dynamic modals if active on page load ---
     // These are global variables set by PHP in dashboard.php
