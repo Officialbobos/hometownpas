@@ -1,14 +1,14 @@
 <?php
-session_start();
-require_once '../Config.php'; // Essential for MONGO_URI, MONGO_DB_NAME
-require_once '../vendor/autoload.php'; // Make sure Composer's autoloader is included for MongoDB classes
-require_once '../functions.php'; // <--- ADD THIS LINE if formatCurrency is here
+
+require_once __DIR__ . '/../Config.php'; // Correct path
+require_once __DIR__.'/../vendor/autoload.php'; // Correct path
+require_once __DIR__.'/../functions.php'; // Correct path
 
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 
 // Check if the user is logged in. If not, redirect to login page.
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true || !isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
@@ -33,8 +33,8 @@ $database = null;
 
 try {
     // Establish MongoDB connection
-    $mongoClient = new Client(MONGO_URI);
-    $database = $mongoClient->selectDatabase(MONGO_DB_NAME);
+    $mongoClient = new Client(MONGODB_CONNECTION_URI);
+    $database = $mongoClient->selectDatabase(MONGODB_DB_NAME);
 
     // Fetch user's name for display in header
     $usersCollection = $database->users;
