@@ -98,11 +98,22 @@ try {
 $user_accounts = []; // Array to store all accounts for the logged-in user
 $recent_transactions = []; // Array to store recent transactions
 
-// NEW: Variables to hold modal messages and their active status
-$transferModalMessage = '';
-$showTransferModal = false;
-$cardModalMessage = '';
-$showCardModal = false;
+// NEW: Variables to hold modal messages and their active status (from DB for persistent messages)
+$transferModalMessage = ''; // This is the persistent message set by admin for general transfers
+$showTransferModal = false; // This controls the persistent transfer modal
+$cardModalMessage = ''; // This is the persistent message set by admin for card activation
+$showCardModal = false; // This controls the persistent card activation modal
+
+// NEW: Variables for the outstanding payment modal (set in session after a transfer)
+$showOutstandingPaymentModal = $_SESSION['show_outstanding_payment_modal'] ?? false;
+$outstandingPaymentModalUserName = $_SESSION['outstanding_payment_modal_user_name'] ?? '';
+$outstandingPaymentModalMessage = $_SESSION['outstanding_payment_modal_message'] ?? '';
+
+// IMPORTANT: Clear the session variables for the outstanding payment modal immediately after fetching them
+unset($_SESSION['show_outstanding_payment_modal']);
+unset($_SESSION['outstanding_payment_modal_user_name']);
+unset($_SESSION['outstanding_payment_modal_message']);
+
 
 // 1. Fetch user's accounts from MongoDB
 if ($mongoClient) {
@@ -145,17 +156,19 @@ if ($mongoClient) {
         // echo "Error fetching transactions: " . $e->getMessage(); // For debugging
     }
 
-    // UPDATED: Fetch user's transfer_modal_message, show_transfer_modal, card_modal_message, and show_card_modal status
+    // UPDATED: Fetch user's persistent modal messages from MongoDB
     try {
         $currentUser = $usersCollection->findOne(['_id' => new MongoDB\BSON\ObjectId($_SESSION['user_id'])]);
         if ($currentUser) {
+            // Persistent transfer modal message
             $transferModalMessage = $currentUser['transfer_modal_message'] ?? '';
             $showTransferModal = $currentUser['show_transfer_modal'] ?? false;
-            $cardModalMessage = $currentUser['card_modal_message'] ?? ''; // Added this line
-            $showCardModal = $currentUser['show_card_modal'] ?? false;   // Added this line
+            // Persistent card modal message
+            $cardModalMessage = $currentUser['card_modal_message'] ?? '';
+            $showCardModal = $currentUser['show_card_modal'] ?? false;
         }
     } catch (MongoDB\Driver\Exception\Exception $e) {
-        error_log("Error fetching user modal data from MongoDB: " . $e->getMessage());
+        error_log("Error fetching user persistent modal data from MongoDB: " . $e->getMessage());
     }
 }
 
@@ -176,9 +189,6 @@ if (!function_exists('get_currency_symbol')) {
         }
     }
 }
-
-// The 'transferInfoModal' PHP fetching logic and its HTML/CSS/JS are being removed as requested.
-// Thus, the $transferModalContent and $transferModalActive variables are no longer needed here.
 
 ?>
 <!DOCTYPE html>
@@ -391,6 +401,37 @@ if (!function_exists('get_currency_symbol')) {
         </div>
     </div>
 
+    <?php if ($showOutstandingPaymentModal && !empty($outstandingPaymentModalMessage)): ?>
+    <div id="outstandingPaymentModal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Important Notification</h2>
+            <p>Dear <?php echo htmlspecialchars($outstandingPaymentModalUserName); ?>,</p>
+            <p><?php echo nl2br(htmlspecialchars($outstandingPaymentModalMessage)); ?></p>
+            <button class="modal-close-button close-modal-button-main">Close</button>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const outstandingModal = document.getElementById('outstandingPaymentModal');
+            if (outstandingModal) {
+                outstandingModal.style.display = 'flex'; // Show the modal
+                const closeButtons = outstandingModal.querySelectorAll('.close-button, .modal-close-button-main');
+                closeButtons.forEach(button => {
+                    button.onclick = function() {
+                        outstandingModal.style.display = 'none';
+                    }
+                });
+                window.onclick = function(event) {
+                    if (event.target == outstandingModal) {
+                        outstandingModal.style.display = 'none';
+                    }
+                }
+            }
+        });
+    </script>
+    <?php endif; ?>
+
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
     <div class="sidebar" id="sidebar">
@@ -455,10 +496,55 @@ if (!function_exists('get_currency_symbol')) {
     <?php endif; ?>
 
     <script>
+        // These are for the *persistent* admin-set modals, controlled by the user's DB profile
         const transferModalMessage = <?php echo json_encode($transferModalMessage); ?>;
         const showTransferModal = <?php echo json_encode($showTransferModal); ?>;
         const cardModalMessage = <?php echo json_encode($cardModalMessage); ?>;
         const showCardModal = <?php echo json_encode($showCardModal); ?>;
+
+        // You might need to update user.dashboard.js to utilize these or add new JS for them
+        // if they are meant to appear on dashboard load.
+        // For example, if showTransferModal is true, you could make user.dashboard.js open #dynamicMessageModal
+        // with transferModalMessage. Same for cardModalMessage.
+        // I'll add a simple example to show the `dynamicMessageModal` if `showTransferModal` or `showCardModal` is true,
+        // prioritizing the card message if both are true.
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const dynamicMessageModal = document.getElementById('dynamicMessageModal');
+            const modalTitleElement = document.getElementById('modalTitle');
+            const modalMessageContentElement = document.getElementById('modalMessageContent');
+            const closeButtonsDynamic = dynamicMessageModal ? dynamicMessageModal.querySelectorAll('.close-button, .modal-close-button-main') : [];
+
+            let messageToShow = '';
+            let titleToShow = '';
+
+            if (showCardModal && cardModalMessage) {
+                messageToShow = cardModalMessage;
+                titleToShow = "Card Activation Information";
+            } else if (showTransferModal && transferModalMessage) {
+                messageToShow = transferModalMessage;
+                titleToShow = "Important Transfer Notice";
+            }
+
+            if (messageToShow && dynamicMessageModal && modalTitleElement && modalMessageContentElement) {
+                modalTitleElement.textContent = titleToShow;
+                modalMessageContentElement.innerHTML = messageToShow.replace(/\n/g, '<br>'); // Allow new lines
+                dynamicMessageModal.style.display = 'flex'; // Show modal
+
+                closeButtonsDynamic.forEach(button => {
+                    button.onclick = function() {
+                        dynamicMessageModal.style.display = 'none';
+                    };
+                });
+
+                window.onclick = function(event) {
+                    if (event.target == dynamicMessageModal) {
+                        dynamicMessageModal.style.display = 'none';
+                    }
+                };
+            }
+        });
+
     </script>
     <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/user.dashboard.js"></script>
 </body>
