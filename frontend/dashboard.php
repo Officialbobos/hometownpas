@@ -186,220 +186,90 @@ if (!function_exists('get_currency_symbol')) {
     <script>
         const BASE_URL_JS = "<?php echo rtrim(BASE_URL, '/'); ?>";
     </script>
-    <style>
-        /* Basic Modal Styles for customMessageModal */
-        .modal-overlay {
-            display: none; /* Hidden by default */
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            max-width: 500px;
-            width: 90%;
-            text-align: center;
-            position: relative;
-            animation: fadeIn 0.3s ease-out;
-        }
-
-        .modal-content h3 {
-            color: #004494;
-            margin-top: 0;
-            margin-bottom: 20px;
-            font-size: 1.8em;
-        }
-
-        .modal-content p {
-            font-size: 1.1em;
-            line-height: 1.6;
-            color: #333;
-            margin-bottom: 25px;
-            word-wrap: break-word; /* Ensure long words wrap */
-        }
-
-        .modal-close-button {
-            background-color: #004494;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1em;
-            transition: background-color 0.3s ease;
-        }
-
-        .modal-close-button:hover {
-            background-color: #003366;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Responsive adjustments for customMessageModal */
-        @media (max-width: 600px) {
-            .modal-content {
-                padding: 20px;
-                width: 95%;
-            }
-            .modal-content h3 {
-                font-size: 1.5em;
-            }
-            .modal-content p {
-                font-size: 1em;
-            }
-        }
-
-        /* Transaction Modal Styles */
-        .transaction-modal {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            z-index: 1000;
-            max-width: 500px;
-            width: 90%;
-            border-top: 5px solid; /* Dynamic border color */
-            display: none; /* Initially hidden, dialog element handles display */
-        }
-        
-        .transaction-modal h3 {
-            margin-top: 0;
-            color: #333;
-        }
-
-        .transaction-modal p {
-            line-height: 1.6;
-            color: #555;
-        }
-
-        .modal-backdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            z-index: 999;
-            display: none;
-        }
-
-        /* Status-based colors for the transaction modal border */
-        .status-completed { border-top-color: #28a745; }
-        .status-declined { border-top-color: #dc3545; }
-        .status-on-hold, .status-restricted { border-top-color: #ffc107; }
-
-        /* The close button for transaction modal (reusing .modal-close-button class) */
-        .transaction-modal .modal-close-button {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            text-align: center;
-            font-size: 1em;
-            transition: background-color 0.3s ease;
-        }
-
-        .transaction-modal .modal-close-button:hover {
-            background-color: #0056b3;
-        }
-    </style>
-</head>
 <body>
-    <div class="container">
-        <header class="header">
-            <div class="menu-icon" id="menuIcon">
-                <i class="fas fa-bars"></i>
-            </div>
-            <div class="greeting">
-                <h1 data-user-first-name="<?php echo htmlspecialchars($first_name); ?>">Hi, <?php echo htmlspecialchars($first_name); ?></h1>
-            </div>
-        </header>
+  <div class="container">
+    <header class="header">
+        <div class="menu-icon" id="menuIcon">
+            <i class="fas fa-bars"></i>
+        </div>
+        <div class="greeting">
+            <h1 data-user-first-name="<?php echo htmlspecialchars($first_name); ?>">Hi, <?php echo htmlspecialchars($first_name); ?></h1>
+        </div>
+    </header>
+
+    <div class="dashboard-content-area">
 
         <section class="accounts-section">
             <div class="accounts-header-row">
                 <h2>Accounts</h2>
                 <div class="view-all-link">
-                 <a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/accounts.php">View all</a>
+                   <a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/accounts.php">View all</a>
                 </div>
             </div>
-            <div class="account-cards-container">
-                <?php if (empty($user_accounts)): ?>
-                    <p class="loading-message" id="accountsLoadingMessage">No accounts found. Please contact support.</p>
-                <?php else: ?>
-                    <?php
-                    // Sort accounts to ensure checking always comes first if present, then savings
-                    usort($user_accounts, function($a, $b) {
-                        $typeA = strtolower($a['account_type'] ?? '');
-                        $typeB = strtolower($b['account_type'] ?? '');
-                        if ($typeA === 'checking' && $typeB !== 'checking') return -1;
-                        if ($typeB === 'checking' && $typeA !== 'checking') return 1;
-                        if ($typeA === 'savings' && $typeB !== 'savings') return -1;
-                        if ($typeB === 'savings' && $typeA !== 'savings') return 1;
-                        return 0; // Maintain original order for other types
-                    });
+            <div class="account-cards-wrapper">
+                <div class="account-cards-container">
+                    <?php if (empty($user_accounts)): ?>
+                        <p class="loading-message" id="accountsLoadingMessage">No accounts found. Please contact support.</p>
+                    <?php else: ?>
+                        <?php
+                        // Sort accounts to ensure checking always comes first if present, then savings
+                        usort($user_accounts, function($a, $b) {
+                            $typeA = strtolower($a['account_type'] ?? '');
+                            $typeB = strtolower($b['account_type'] ?? '');
+                            if ($typeA === 'checking' && $typeB !== 'checking') return -1;
+                            if ($typeB === 'checking' && $typeA !== 'checking') return 1;
+                            if ($typeA === 'savings' && $typeB !== 'savings') return -1;
+                            if ($typeB === 'savings' && $typeA !== 'savings') return 1;
+                            return 0; // Maintain original order for other types
+                        });
 
-                    // Collect account types for easy lookup of toggle targets
-                    $account_types_available = array_map(function($acc) {
-                        return strtolower($acc['account_type'] ?? '');
-                    }, $user_accounts);
-                    $account_types_available = array_unique($account_types_available);
+                        // Collect account types for easy lookup of toggle targets
+                        $account_types_available = array_map(function($acc) {
+                            return strtolower($acc['account_type'] ?? '');
+                        }, $user_accounts);
+                        $account_types_available = array_unique($account_types_available);
 
-                    foreach ($user_accounts as $account):
-                        $account_type_lower = strtolower($account['account_type'] ?? '');
-                        $card_class = 'account-card';
-                        // Determine the target for the toggle button
-                        $toggle_target = '';
-                        if ($account_type_lower === 'checking' && in_array('savings', $account_types_available)) {
-                            $toggle_target = 'savings';
-                        } elseif ($account_type_lower === 'savings' && in_array('checking', $account_types_available)) {
-                            $toggle_target = 'checking';
-                        }
-                    ?>
-                        <div class="<?php echo htmlspecialchars($card_class); ?>" data-account-type="<?php echo htmlspecialchars($account_type_lower); ?>">
-                            <div class="account-details">
-                                <p class="account-type"><?php echo htmlspecialchars(ucfirst($account_type_lower)); ?> Account</p>
-                                <p class="account-number">**** **** **** <?php echo htmlspecialchars(substr($account['account_number'] ?? 'N/A', -4)); ?></p>
+                        foreach ($user_accounts as $account):
+                            $account_type_lower = strtolower($account['account_type'] ?? '');
+                            $card_class = 'account-card';
+                            // Determine the target for the toggle button
+                            $toggle_target = '';
+                            if ($account_type_lower === 'checking' && in_array('savings', $account_types_available)) {
+                                $toggle_target = 'savings';
+                            } elseif ($account_type_lower === 'savings' && in_array('checking', $account_types_available)) {
+                                $toggle_target = 'checking';
+                            }
+                        ?>
+                            <div class="<?php echo htmlspecialchars($card_class); ?>" data-account-type="<?php echo htmlspecialchars($account_type_lower); ?>">
+                                <div class="account-details">
+                                    <p class="account-type"><?php echo htmlspecialchars(ucfirst($account_type_lower)); ?> Account</p>
+                                    <p class="account-number">**** **** **** <?php echo htmlspecialchars(substr($account['account_number'] ?? 'N/A', -4)); ?></p>
+                                </div>
+                                <div class="account-balance">
+                                    <p class="balance-amount">
+                                        <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <?php echo number_format($account['balance'] ?? 0, 2); ?>
+                                    </p>
+                                    <p class="balance-status">Available</p>
+                                </div>
+                                <?php if (!empty($toggle_target)): ?>
+                                    <span class="account-toggle-indicator" data-toggle-target="<?php echo htmlspecialchars($toggle_target); ?>">
+                                        <i class="fas fa-exchange-alt"></i>
+                                        <span><?php echo htmlspecialchars(ucfirst($toggle_target)); ?></span>
+                                    </span>
+                                <?php endif; ?>
                             </div>
-                            <div class="account-balance">
-                                <p class="balance-amount">
-                                    <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <?php echo number_format($account['balance'] ?? 0, 2); ?>
-                                </p>
-                                <p class="balance-status">Available</p>
-                            </div>
-                            <?php if (!empty($toggle_target)): ?>
-                                <span class="account-toggle-indicator" data-toggle-target="<?php echo htmlspecialchars($toggle_target); ?>">
-                                    <i class="fas fa-exchange-alt"></i>
-                                    <span><?php echo htmlspecialchars(ucfirst($toggle_target)); ?></span>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </div>
-            <div class="account-pagination">
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div> <div class="account-pagination">
             </div>
         </section>
+
+        <section class="quick-actions-section">...</section>
+        <section class="my-cards-section">...</section>
+        <section class="transactions-section">...</section>
+
+    </div> </div>
 
         <section class="actions-section">
             <div class="action-button" id="transferButton">
@@ -511,14 +381,6 @@ if (!function_exists('get_currency_symbol')) {
                 </button>
             </div>
             <button class="close-modal-button" id="closeTransferModal">Close</button>
-        </div>
-    </div>
-
-    <div id="customMessageModal" class="modal-overlay">
-        <div class="modal-content">
-            <h3>Important Message</h3>
-            <p id="modalMessageContent"></p>
-            <button class="modal-close-button" onclick="closeModal()">Close</button>
         </div>
     </div>
 
