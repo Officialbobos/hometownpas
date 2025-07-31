@@ -130,6 +130,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error clearing card modal session:', error);
         }
+
+        // --- NEW: Redirect user to the dashboard after closing the modal ---
+        window.location.href = `${FRONTEND_BASE_URL}dashboard.php`;
     }
 
     // Event listeners for the Card Activation/Info Modal
