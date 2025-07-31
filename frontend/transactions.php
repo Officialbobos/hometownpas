@@ -273,66 +273,46 @@ function formatCurrency($amount, $currency_code) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($transactions as $transaction):
-                                    // Initialize variables for the amount display and class
-                                    $amount_for_display = (float)$transaction['amount'];
-                                    $amount_class = '';
-                                    $display_amount_string = '';
+                                 <?php foreach ($transactions as $transaction):
+                                     $amount_for_display = (float)$transaction['amount'];
+                                     $amount_class = '';
+                                     $display_amount_string = '';
+                                     $transaction_type_simplified = strtolower($transaction['transaction_type']);
 
-                                    // Determine if the logged-in user is the sender (debit) or recipient (credit)
-                                    $is_user_sender = (isset($transaction['user_id']) && $transaction['user_id'] == $user_id_mongo);
-                                    $is_user_recipient = (isset($transaction['recipient_user_id']) && $transaction['recipient_user_id'] == $user_id_mongo);
+                                     // Determine if the logged-in user is the sender or recipient
+                                     $is_user_sender = (isset($transaction['user_id']) && $transaction['user_id'] == $user_id_mongo);
+                                     $is_user_recipient = (isset($transaction['recipient_user_id']) && $transaction['recipient_user_id'] == $user_id_mongo);
 
-                                    // Determine if it's an incoming or outgoing transaction for the logged-in user
-                                    $is_incoming_for_user = false;
-                                    $is_outgoing_for_user = false;
-
-                                    if ($is_user_sender && $is_user_recipient && $transaction['transaction_type'] === 'internal_self_transfer') {
-                                        // This is a self-transfer affecting two of the user's own accounts
-                                        // How you display this is crucial. If 'amount' is always positive in DB for these,
-                                        // you might show it as neither red nor green, or require more logic based on account numbers.
-                                        // For simplicity here, if it's a self-transfer and the 'amount' field in DB is positive,
-                                        // we'll treat it as a neutral display for the amount itself, or based on its type's implied nature.
-                                        // If your DB stores amount as negative for the debiting side of a self-transfer, the 'else' block will handle it.
-                                        $amount_class = ''; // Neutral color if amount is always positive for self-transfers
-                                        $display_amount_string = formatCurrency($amount_for_display, $transaction['user_account_currency'] ?? 'EUR');
-                                        // You might still explicitly add '+' or '-' if it makes sense within the context of the account it affected.
-                                        // For now, relying on the 'amount' field's sign if it exists, otherwise neutral.
-                                        if ($amount_for_display > 0) {
-                                            $display_amount_string = '+' . $display_amount_string;
-                                            $amount_class = 'text-success'; // Assume positive amount for self-transfer is a 'credit' effect from a global view
-                                        } else if ($amount_for_display < 0) {
-                                            $display_amount_string = '-' . $display_amount_string;
-                                            $amount_class = 'text-danger'; // Assume negative amount for self-transfer is a 'debit' effect
-                                        }
-
-                                    } else if ($is_user_sender) {
-                                        // Logged-in user is the sender (initiator) of the transaction
-                                        $is_outgoing_for_user = true;
-                                    } else if ($is_user_recipient) {
-                                        // Logged-in user is the recipient of the transaction
-                                        $is_incoming_for_user = true;
-                                    }
-
-                                    // Assign amount class and display string based on transaction direction
-                                    if ($is_incoming_for_user || strtolower($transaction['transaction_type']) == 'credit' || strtolower($transaction['transaction_type']) == 'deposit') {
-                                        $amount_class = 'text-success';
-                                        $display_amount_string = '+' . formatCurrency($amount_for_display, $transaction['user_account_currency'] ?? 'EUR');
-                                    } else if ($is_outgoing_for_user || strtolower($transaction['transaction_type']) == 'debit' || strtolower($transaction['transaction_type']) == 'withdrawal') {
-                                        $amount_class = 'text-danger';
-                                        $display_amount_string = '-' . formatCurrency($amount_for_display, $transaction['user_account_currency'] ?? 'EUR');
-                                    } else {
-                                        // Fallback for cases not explicitly covered by sender/recipient logic
-                                        // (e.g., if 'amount' in DB already carries the sign and type isn't perfectly clear)
-                                        if ($amount_for_display >= 0) {
-                                            $amount_class = 'text-success';
-                                            $display_amount_string = '+' . formatCurrency($amount_for_display, $transaction['user_account_currency'] ?? 'EUR');
-                                        } else {
-                                            $amount_class = 'text-danger';
-                                            $display_amount_string = '-' . formatCurrency(abs($amount_for_display), $transaction['user_account_currency'] ?? 'EUR');
-                                        }
-                                    }
-
+                                     // Logic: Credit is green, Debit is red.
+                                     // Prioritize explicit credit/debit types or recipient status for 'credit'
+                                     if ($transaction_type_simplified === 'credit' || $transaction_type_simplified === 'deposit' || $is_user_recipient) {
+                                         $amount_class = 'amount-credit'; // Use a specific class for clarity
+                                         $display_amount_string = '+' . formatCurrency($amount_for_display, $transaction['user_account_currency'] ?? 'EUR');
+                                     }
+                                     // Prioritize explicit debit types or sender status for 'debit'
+                                     else if ($transaction_type_simplified === 'debit' || $transaction_type_simplified === 'withdrawal' || $is_user_sender) {
+                                         $amount_class = 'amount-debit'; // Use a specific class for clarity
+                                         $display_amount_string = '-' . formatCurrency(abs($amount_for_display), $transaction['user_account_currency'] ?? 'EUR');
+                                     }
+                                     // Special handling for internal self-transfers or ambiguous cases
+                                     // If it's a self-transfer, or if neither sender nor recipient is clearly the current user (shouldn't happen often with the current filter)
+                                     else {
+                                         // If amount is positive, treat as credit; if negative, treat as debit
+                                         if ($amount_for_display >= 0) {
+                                             $amount_class = 'amount-credit';
+                                             $display_amount_string = '+' . formatCurrency($amount_for_display, $transaction['user_account_currency'] ?? 'EUR');
+                                         } else {
+                                             $amount_class = 'amount-debit';
+                                             $display_amount_string = '-' . formatCurrency(abs($amount_for_display), $transaction['user_account_currency'] ?? 'EUR');
+                                         }
+                                     }
+                                     // If it's a self-transfer, you might want to adjust the description dynamically as well
+                                     if ($transaction_type_simplified === 'internal_self_transfer') {
+                                         // You can refine this further to show "Transfer from X to Y"
+                                         $display_description = "Self-Transfer: " . htmlspecialchars($transaction['description']);
+                                     } else {
+                                         $display_description = htmlspecialchars($transaction['description']);
+                                     }
 
                                     // Determine the display currency code
                                     $display_currency_code = $transaction['user_account_currency'] ?? ($transaction['currency'] ?? 'EUR');
