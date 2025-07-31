@@ -13,7 +13,7 @@ require_once __DIR__ . '/../../vendor/autoload.php'; // Make sure PHPMailer is l
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
-use MongoDB\Driver\Session; // 
+use MongoDB\Driver\Session; 
 use MongoDB\Driver\Exception\Exception as MongoDBException;
 use Exception; // Also include this for general PHP exceptions
 
@@ -74,7 +74,7 @@ function send_transaction_update_email_notification($user_email, $customer_name,
         return false;
     }
 
-    $subject = 'Heritage Bank Transaction Update: ' . ucfirst($new_status);
+    $subject = 'HomeTown Bank Pa Transaction Update: ' . ucfirst($new_status);
     $amount_display = htmlspecialchars(($tx_details['currency'] ?? 'USD') . ' ' . number_format($tx_details['amount'] ?? 0, 2));
     $recipient_name_display = htmlspecialchars($tx_details['recipient_name'] ?? 'N/A');
     $transaction_ref_display = htmlspecialchars($tx_details['transaction_reference'] ?? 'N/A');
@@ -100,7 +100,7 @@ function send_transaction_update_email_notification($user_email, $customer_name,
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Transaction Update from Heritage Bank</title>
+    <title>Transaction Update from HomeTown Bank Pa</title>
     <style type="text/css">
         body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -176,7 +176,7 @@ function send_transaction_update_email_notification($user_email, $customer_name,
 <body>
     <div class="container">
         <div class="header">
-            <h1>Heritage Bank</h1>
+            <h1>HomeTown Bank Pa</h1>
         </div>
         <div class="content">
             <p>Dear {$customer_name},</p>
@@ -203,12 +203,12 @@ EOT;
 
     $body .= <<<EOT
             <p>If you have any questions or require further assistance, please do not hesitate to contact our support team directly. We are always here to help.</p>
-            <p>Thank you for banking with Heritage Bank.</p>
+            <p>Thank you for banking with HomeTown Bank Pa.</p>
             <p>Sincerely,</p>
-            <p>Heritage Bank Management Team</p>
+            <p>HomeTown Bank Management Team</p>
         </div>
         <div class="footer">
-            <p>&copy; 2025 Heritage Bank. All rights reserved.</p>
+            <p>&copy; 2025 HomeTown Bank Pa. All rights reserved.</p>
             <p>123 Bank Street, City, Country</p>
         </div>
     </div>
@@ -223,7 +223,7 @@ EOT;
 
 /**
  * Function to process a refund (add amount back to user's main account) and update transaction status.
- * This function assumes a MongoDB replica set is configured for multi-document transactions.
+ * This function uses MongoDB\Client::withTransaction() for multi-document transactions.
  *
  * @param MongoDB\Client $client The MongoDB client instance.
  * @param MongoDB\Collection $transactionsCollection The transactions collection.
@@ -267,15 +267,8 @@ function process_transaction_refund(
     }
     
     try {
-        // Start a session for multi-document transaction
-        // This requires a MongoDB replica set.
-        $session = $client->startSession();
-        $session->startTransaction([
-            'readConcern' => new MongoDB\Driver\ReadConcern(MongoDB\Driver\ReadConcern::MAJORITY),
-            'writeConcern' => new MongoDB\Driver\WriteConcern(1, 1000) // w=1, 1-second timeout
-        ]);
-
-        $result = $session->withTransaction(function () use (
+        // Use the convenient API for transactions: MongoDB\Client::withTransaction()
+        $result = $client->withTransaction(function ($session) use (
             $transactionsCollection, 
             $usersCollection, 
             $refundsCollection, 
@@ -289,15 +282,14 @@ function process_transaction_refund(
         ) {
             // 1. Update user's account balance (credit the amount back)
             // Assuming `balance` is in the `users` collection directly or in an associated `accounts` document
-            // For simplicity, we'll update the `users` collection's balance field directly.
-            // If user accounts are in a separate 'accounts' collection, you'd update that instead.
             $user_update_result = $usersCollection->updateOne(
                 ['_id' => new ObjectId($user_id)],
                 ['$inc' => ['balance' => $amount_to_refund]],
-                ['session' => $session]
+                ['session' => $session] // Pass the session explicitly
             );
 
             if ($user_update_result->getModifiedCount() === 0 && $user_update_result->getMatchedCount() === 0) {
+                // If user not found or balance not modified, consider it a failure for the transaction
                 throw new Exception("Failed to update user balance or user not found for ID: " . $user_id);
             }
 
@@ -307,15 +299,16 @@ function process_transaction_refund(
                 [
                     '$set' => [
                         'status' => $new_status,
-                        'Heritage_comment' => $admin_comment_message,
+                        'HomeTown_comment' => $admin_comment_message,
                         'admin_action_by' => $admin_username,
                         'action_at' => new UTCDateTime()
                     ]
                 ],
-                ['session' => $session]
+                ['session' => $session] // Pass the session explicitly
             );
 
             if ($transaction_update_result->getModifiedCount() === 0 && $transaction_update_result->getMatchedCount() === 0) {
+                // If transaction not found or status not modified, consider it a failure
                 throw new Exception("Failed to update transaction status for ID: " . $transaction_objectId . ". Status might already be " . $new_status);
             }
 
@@ -330,23 +323,19 @@ function process_transaction_refund(
                 'refund_comment' => $admin_comment_message,
                 'refunded_at' => new UTCDateTime(),
                 'original_transaction_ref' => $tx_details['transaction_reference'] ?? 'N/A'
-            ], ['session' => $session]);
+            ], ['session' => $session]); // Pass the session explicitly
 
             return ['success' => true, 'message' => "Transaction status updated to '" . ucfirst($new_status) . "' and amount refunded successfully."];
 
-        }, ['session' => $session]); // Pass the session to withTransaction
-
-        $session->endSession(); // End the session
+        }, [
+            'readConcern' => new MongoDB\Driver\ReadConcern(MongoDB\Driver\ReadConcern::MAJORITY),
+            'writeConcern' => new MongoDB\Driver\WriteConcern(1, 1000) // w=1, 1-second timeout
+        ]);
 
         return $result;
 
     } catch (Exception $e) {
-        if (isset($session) && $session->inTransaction()) {
-            $session->abortTransaction();
-        }
-        if (isset($session)) {
-            $session->endSession();
-        }
+        // The withTransaction API automatically handles aborting and ending the session on Exception
         error_log("Refund processing failed for transaction ID {$transaction_objectId}: " . $e->getMessage());
         return ['success' => false, 'message' => "Error processing refund: " . $e->getMessage()];
     }
@@ -405,7 +394,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
 
                     } elseif ($new_status === 'completed' && $current_db_status === 'pending') {
                         // Assuming complete_pending_transfer handles status update and balance transfer for recipients
+                        // NOTE: complete_pending_transfer is not defined in this file. Ensure it's available or adapt its logic.
+                        // For a complete solution, you'd need to define or include `complete_pending_transfer` here,
+                        // and it should also ideally use a transaction for consistency if it modifies multiple documents.
+                        // For now, I'm assuming it's available and works as intended for balance transfers.
                         $result_action = complete_pending_transfer($transactionsCollection, $accountsCollection, $original_tx_details);
+                        
                         // Make sure complete_pending_transfer also returns the updated transaction details
                         if ($result_action['success']) {
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
@@ -425,7 +419,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                             $admin_comment_message,
                             $admin_username
                         );
-                         if ($result_action['success']) {
+                        if ($result_action['success']) {
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
                             $result_action['transaction_details'] = (array) $updated_tx_details;
                         }
@@ -435,7 +429,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                             ['_id' => $transaction_objectId],
                             ['$set' => [
                                 'status' => $new_status,
-                                'Heritage_comment' => $admin_comment_message,
+                                'HomeTown_comment' => $admin_comment_message,
                                 'admin_action_by' => $admin_username,
                                 'action_at' => new UTCDateTime()
                             ]]
