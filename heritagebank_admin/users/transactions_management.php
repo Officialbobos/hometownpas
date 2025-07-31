@@ -675,7 +675,7 @@ try {
             }
             ?>
 
-            <form action="transactions_management.php" method="GET">
+            <form action="transactions_management" method="GET">
                 <label for="filter_status">Filter by Status:</label>
                 <select name="status_filter" id="filter_status" onchange="this.form.submit()">
                     <option value="all" <?php echo ($status_filter == 'all') ? 'selected' : ''; ?>>All</option>
@@ -749,7 +749,7 @@ try {
                                         ?>
                                     </td>
                                     <td data-label="Actions">
-                                        <form action="transactions_management.php?status_filter=<?php echo htmlspecialchars($status_filter); ?>" method="POST">
+                                        <form action="transactions_management?status_filter=<?php echo htmlspecialchars($status_filter); ?>" method="POST">
                                             <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
                                             <select name="new_status">
                                                 <option value="">Set Status</option>
@@ -773,16 +773,20 @@ try {
         </main>
     </div>
     <script>
-        // Optional: JavaScript to dynamically adjust textarea height if needed
-        document.querySelectorAll('.admin-comment-textarea').forEach(textarea => {
-            textarea.addEventListener('input', function() {
-                this.style.height = 'auto';
-                this.style.height = (this.scrollHeight) + 'px';
-            });
-            // Adjust on load
+    // Optional: JavaScript to dynamically adjust textarea height if needed
+    document.querySelectorAll('.admin-comment-textarea').forEach(textarea => {
+        // Event listener for dynamic resizing on input
+        textarea.addEventListener('input', function() {
+            // 'this' inside the event listener correctly refers to the textarea element
             this.style.height = 'auto';
             this.style.height = (this.scrollHeight) + 'px';
         });
-    </script>
+
+        // Adjust height on load for *this specific textarea*
+        // Use the 'textarea' variable which correctly refers to the current element in the forEach loop
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    });
+</script>
 </body>
 </html>
