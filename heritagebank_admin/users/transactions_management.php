@@ -1065,8 +1065,7 @@ try {
                                         ?>
                                     </td>
                                     <td data-label="Actions">
-                                        <form action="transactions_management?status_filter=<?php echo htmlspecialchars($status_filter); ?>" method="POST">
-                                            <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
+                                            <form action="transactions_management.php?status_filter=<?php echo htmlspecialchars($status_filter); ?>" method="POST">                                            <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
                                             <select name="new_status">
                                                 <option value="">Set Status</option>
                                                 <?php

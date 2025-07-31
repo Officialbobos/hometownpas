@@ -228,21 +228,21 @@ switch ($active_transfer_method) {
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label for="source_account_id">From Account:</label>
-                        <select id="source_account_id" name="source_account_id" class="form-control" required>
-                            <option value="">-- Select Your Account --</option>
-                            <?php foreach ($user_accounts as $account): ?>
-                                <option value="<?php echo htmlspecialchars($account['id']); ?>"
-                                    data-balance="<?php echo htmlspecialchars($account['balance']); ?>"
-                                    data-currency="<?php echo htmlspecialchars($account['currency']); ?>"
-                                    <?php echo ((string)($form_data['source_account_id'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> **<?php echo number_format(abs((float)$account['balance']), 2); ?>**
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <p>Available Balance: <span id="amount_currency_symbol_for_balance"></span><span id="display_current_balance">N/A</span> <span id="current_currency_display"></span></p>
-                    </div>
+                     <div class="form-group">
+    <label for="source_account_id">From Account:</label>
+    <select id="source_account_id" name="source_account_id" class="form-control" required>
+        <option value="">-- Select Your Account --</option>
+        <?php foreach ($user_accounts as $account): ?>
+            <option value="<?php echo htmlspecialchars($account['id']); ?>"
+                data-balance="<?php echo htmlspecialchars($account['balance']); ?>"
+                data-currency="<?php echo htmlspecialchars($account['currency']); ?>"
+                <?php echo ((string)($form_data['source_account_id'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
+                <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <strong><?php echo number_format(abs((float)$account['balance']), 2); ?></strong>
+            </option>
+        <?php endforeach; ?>
+    </select>
+    <p>Available Balance: <span id="amount_currency_symbol_for_balance"></span><span id="display_current_balance">N/A</span> <span id="current_currency_display"></span></p>
+</div>
 
                     <div class="form-group external-fields common-external-fields">
                         <label for="recipient_name">Recipient Full Name:</label>
@@ -257,7 +257,7 @@ switch ($active_transfer_method) {
                                 <?php foreach ($user_accounts as $account): ?>
                                     <option value="<?php echo htmlspecialchars($account['id']); ?>"
                                         <?php echo ((string)($form_data['destination_account_id_self'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> **<?php echo number_format(abs((float)$account['balance']), 2); ?>**
+                                        <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], -4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <?php echo number_format(abs((float)$account['balance']), 2); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
