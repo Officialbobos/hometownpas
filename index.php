@@ -123,6 +123,7 @@ $authenticated_routes = [
     'set_card_pin',
     'deposit',
     'statements',
+    'debug_transfer',
     // 'verify_code', // Removed from authenticated_routes as it has its own distinct auth check below
     'api/get_user_cards',
     'api/get_user_accounts',
@@ -227,6 +228,10 @@ switch ($path) {
     case 'deposit':
         require __DIR__ . '/frontend/deposit.php';
         break;
+    case 'debug_transfer':
+        require __DIR__ . '/frontend/debug_transfer.php';
+        break;
+
 
     // --- API Routes ---
     case 'api/get_user_cards':
