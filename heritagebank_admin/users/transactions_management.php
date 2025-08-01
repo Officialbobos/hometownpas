@@ -6,15 +6,6 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// NEW: Create a log file and a function to write to it
-$debug_log_file = __DIR__ . '/transactions_debug.log';
-function write_debug_log($message) {
-    global $debug_log_file;
-    file_put_contents($debug_log_file, date('Y-m-d H:i:s') . " - " . $message . "\n", FILE_APPEND);
-}
-// --- END OF DEBUGGING CODE ---
-
-
 // CORRECTED PATHS: Use __DIR__ to build a reliable path
 require_once __DIR__ . '/../../Config.php'; 
 require_once __DIR__ . '/../../functions.php'; 
