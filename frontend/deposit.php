@@ -159,7 +159,7 @@ function get_currency_symbol($currency_code) {
                 <?php endif; ?>
             </div>
             
-            <form id="depositForm" action="/api/deposit_check.php" method="post" enctype="multipart/form-data">
+            <form id="depositForm" action="<?php echo rtrim(BASE_URL, '/') . '/api/deposit_check.php'; ?>" method="post" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="account_id">Choose Account</label>
                     <select class="form-select" id="account_id" name="account_id" required>

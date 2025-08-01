@@ -46,7 +46,7 @@ try {
 } catch (MongoDBException $e) {
     error_log("MongoDB connection error: " . $e->getMessage());
     $_SESSION['error_message'] = "ERROR: Could not connect to the database. Please try again later.";
-    header('Location: admin_dashboard.php'); // Redirect to a suitable admin page
+    header('Location: heritagebank_admin/dashboard.php'); // Redirect to a suitable admin page
     exit;
 }
 
@@ -517,8 +517,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
             }
         }
     }
-    header("Location: transactions_management.php?status_filter=" . urlencode($status_filter));
-    exit;
+header("Location: " . rtrim(BASE_URL, '/') . "/heritagebank_admin/users/transactions_management.php?status_filter=" . urlencode($status_filter));    exit;
 }
 
 // --- Fetch Transactions for Display ---

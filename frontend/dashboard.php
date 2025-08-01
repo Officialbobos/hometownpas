@@ -295,7 +295,7 @@ if (!function_exists('get_currency_symbol')) {
                 <i class="fas fa-exchange-alt"></i>
                 <p>Transfer</p>
             </div>
-            <div class="action-button" id="depositButton" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/'); ?>/deposit'">
+            <div class="action-button" id="depositButton" onclick="window.location.href='<?php echo rtrim(BASE_URL, '/') . '/frontend/deposit.php'; ?>'">
                 <i class="fas fa-download"></i>
                 <p>Deposit</p>
             </div>
