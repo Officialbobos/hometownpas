@@ -1,9 +1,11 @@
 <?php
 // C:\xampp\htdocs\heritagebank\admin\transactions_management.php
 
+// --- START OF DEBUGGING CODE ---
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+// --- END OF DEBUGGING CODE ---
 
 // CORRECTED PATHS: Use __DIR__ to build a reliable path
 require_once __DIR__ . '/../../Config.php'; 
@@ -15,6 +17,7 @@ use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Driver\Session; 
 use MongoDB\Driver\Exception\Exception as MongoDBException;
+use MongoDB\Driver\Exception\CommandException; // Ensure this is also included
 use Exception; // Also include this for general PHP exceptions
 
 
@@ -51,7 +54,10 @@ try {
 $allowed_filters = ['approved', 'declined', 'completed', 'pending', 'restricted', 'failed', 'on hold', 'refunded', 'all'];
 $settable_statuses = ['pending', 'approved', 'completed', 'declined', 'restricted', 'failed', 'refunded', 'on hold'];
 $recommended_currencies = ['GBP', 'EUR', 'USD'];
-$status_filter = $_POST['status_filter'] ?? $_GET['status_filter'] ?? 'pending';
+
+// --- FIX APPLIED HERE ---
+// Now we check for the status filter from the GET request, which matches the form method.
+$status_filter = $_GET['status_filter'] ?? 'pending';
 
 if (!in_array($status_filter, $allowed_filters)) {
     $status_filter = 'pending';
@@ -552,7 +558,6 @@ try {
     error_log("General error fetching transactions: " . $e->getMessage());
     $_SESSION['error_message'] = "An unexpected error occurred while fetching transactions.";
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -970,19 +975,21 @@ try {
             }
             ?>
 
-        <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/transactions_management.php'; ?>" method="POST">    <label for="filter_status">Filter by Status:</label>
-    <select name="status_filter" id="filter_status" onchange="this.form.submit()">
-        <option value="all" <?php echo ($status_filter == 'all') ? 'selected' : ''; ?>>All</option>
-        <option value="pending" <?php echo ($status_filter == 'pending') ? 'selected' : ''; ?>>Pending</option>
-        <option value="approved" <?php echo ($status_filter == 'approved') ? 'selected' : ''; ?>>Approved</option>
-        <option value="declined" <?php echo ($status_filter == 'declined') ? 'selected' : ''; ?>>Declined</option>
-        <option value="completed" <?php echo ($status_filter == 'completed') ? 'selected' : ''; ?>>Completed</option>
-        <option value="restricted" <?php echo ($status_filter == 'restricted') ? 'selected' : ''; ?>>Restricted</option>
-        <option value="failed" <?php echo ($status_filter == 'failed') ? 'selected' : ''; ?>>Failed</option>
-        <option value="on hold" <?php echo ($status_filter == 'on hold') ? 'selected' : ''; ?>>On Hold</option>
-        <option value="refunded" <?php echo ($status_filter == 'refunded') ? 'selected' : ''; ?>>Refunded</option>
-    </select>
-</form>
+            <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/transactions_management.php'; ?>" method="GET">
+                <label for="filter_status">Filter by Status:</label>
+                <select name="status_filter" id="filter_status" onchange="this.form.submit()">
+                    <option value="all" <?php echo ($status_filter == 'all') ? 'selected' : ''; ?>>All</option>
+                    <option value="pending" <?php echo ($status_filter == 'pending') ? 'selected' : ''; ?>>Pending</option>
+                    <option value="approved" <?php echo ($status_filter == 'approved') ? 'selected' : ''; ?>>Approved</option>
+                    <option value="declined" <?php echo ($status_filter == 'declined') ? 'selected' : ''; ?>>Declined</option>
+                    <option value="completed" <?php echo ($status_filter == 'completed') ? 'selected' : ''; ?>>Completed</option>
+                    <option value="restricted" <?php echo ($status_filter == 'restricted') ? 'selected' : ''; ?>>Restricted</option>
+                    <option value="failed" <?php echo ($status_filter == 'failed') ? 'selected' : ''; ?>>Failed</option>
+                    <option value="on hold" <?php echo ($status_filter == 'on hold') ? 'selected' : ''; ?>>On Hold</option>
+                    <option value="refunded" <?php echo ($status_filter == 'refunded') ? 'selected' : ''; ?>>Refunded</option>
+                </select>
+            </form>
+            
             <div class="table-responsive">
                 <table class="transaction-table">
                     <thead>
