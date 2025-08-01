@@ -46,8 +46,7 @@ try {
 } catch (MongoDBException $e) {
     error_log("MongoDB connection error: " . $e->getMessage());
     $_SESSION['error_message'] = "ERROR: Could not connect to the database. Please try again later.";
-    header('Location: heritagebank_admin/dashboard.php'); // Redirect to a suitable admin page
-    exit;
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/dashboard.php');    exit;
 }
 
 $allowed_filters = ['approved', 'declined', 'completed', 'pending', 'restricted', 'failed', 'on hold', 'refunded', 'all'];
