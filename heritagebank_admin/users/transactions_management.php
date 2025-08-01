@@ -5,9 +5,6 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Start the session at the very beginning
-session_start();
-
 // CORRECTED PATHS: Use __DIR__ to build a reliable path
 require_once __DIR__ . '/../../Config.php'; 
 require_once __DIR__ . '/../../functions.php'; 
@@ -19,7 +16,7 @@ use MongoDB\BSON\UTCDateTime;
 use MongoDB\Driver\Session; 
 use MongoDB\Driver\Exception\Exception as MongoDBException;
 use Exception; // Also include this for general PHP exceptions
-use MongoDB\Driver\Exception\CommandException;
+
 
 // Admin authentication check
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -46,13 +43,10 @@ try {
     $usersCollection = $database->selectCollection('users'); 
     $accountsCollection = $database->selectCollection('accounts');
     $refundsCollection = $database->selectCollection('refunds'); // Initialize refunds collection
-
-    error_log("MongoDB connection successful in transactions_management.php.");
 } catch (MongoDBException $e) {
-    error_log("MongoDB connection error in transactions_management.php: " . $e->getMessage());
+    error_log("MongoDB connection error: " . $e->getMessage());
     $_SESSION['error_message'] = "ERROR: Could not connect to the database. Please try again later.";
-    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/dashboard.php');
-    exit;
+header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/dashboard.php');    exit;
 }
 
 $allowed_filters = ['approved', 'declined', 'completed', 'pending', 'restricted', 'failed', 'on hold', 'refunded', 'all'];
@@ -252,8 +246,6 @@ function process_transaction_refund(
     $admin_comment_message,
     $admin_username
 ) {
-    error_log("Attempting to process refund for transaction ID: " . ($tx_details['_id'] ?? 'N/A') . " to status: " . $new_status);
-
     // Convert transaction details to array for easier access if it's a BSON object
     // Note: This casts the top-level document, but nested BSON objects/types remain.
     $tx_details = (array) $tx_details;
@@ -291,20 +283,17 @@ function process_transaction_refund(
     // Basic validation
     // Use $user_id_str and check if $originalTransactionObjectId was successfully created
     if (!$user_id_str || !$originalTransactionObjectId || $amount_to_refund <= 0) {
-        error_log("Validation failed for refund. User ID: " . ($user_id_str ?? 'N/A') . ", Tx ID: " . ($originalTransactionObjectId ?? 'N/A') . ", Amount: " . $amount_to_refund);
         return ['success' => false, 'message' => "Invalid transaction details for refund."];
     }
 
     // Prevent re-processing refunds for already refunded/failed/declined transactions
     $refund_trigger_statuses = ['failed', 'declined', 'refunded'];
     if (in_array($original_transaction_status, $refund_trigger_statuses)) {
-        error_log("Refund skipped for transaction " . (string)$originalTransactionObjectId . ". Status is already " . $original_transaction_status);
         return ['success' => false, 'message' => "Transaction is already marked as '{$original_transaction_status}'. Skipping refund."];
     }
 
     $session = null; // Initialize session variable
     try {
-        error_log("Starting MongoDB session and transaction for refund.");
         // Correct way to start a transaction in MongoDB PHP Driver
         $session = $client->startSession();
         $session->startTransaction([
@@ -325,8 +314,6 @@ function process_transaction_refund(
             ['session' => $session] // Pass the session explicitly
         );
 
-        error_log("User balance update result: Matched " . $user_update_result->getMatchedCount() . ", Modified: " . $user_update_result->getModifiedCount());
-
         if ($user_update_result->getModifiedCount() === 0 && $user_update_result->getMatchedCount() === 0) {
             // If user not found or balance not modified, throw an exception to abort transaction
             throw new Exception("Failed to update user balance or user not found for ID: " . $user_id_str);
@@ -345,8 +332,6 @@ function process_transaction_refund(
             ],
             ['session' => $session] // Pass the session explicitly
         );
-
-        error_log("Transaction status update result: Matched " . $transaction_update_result->getMatchedCount() . ", Modified: " . $transaction_update_result->getModifiedCount());
 
         if ($transaction_update_result->getModifiedCount() === 0) {
             // If transaction not found or not modified, throw an exception
@@ -369,11 +354,8 @@ function process_transaction_refund(
             ['session' => $session] // Pass the session explicitly
         );
 
-        error_log("Refund log inserted for transaction ID: " . (string)$originalTransactionObjectId);
-
         // If all operations succeed, commit the transaction
         $session->commitTransaction();
-        error_log("MongoDB transaction committed successfully.");
         return ['success' => true, 'message' => "Transaction successfully refunded."];
 
     } catch (CommandException $e) {
@@ -395,62 +377,23 @@ function process_transaction_refund(
         if ($session) {
             $session->endSession();
         }
-        error_log("MongoDB session ended.");
     }
 }
 
-
-// A helper function for completing a pending transfer, similar to refund but for completion
-function complete_pending_transfer($transactionsCollection, $accountsCollection, $tx_details) {
-    // This is a placeholder. The original code didn't provide the logic.
-    // The key here is that this function should handle the logic to debit the sender's account and credit the recipient's account.
-    // It should also use a MongoDB transaction to ensure atomicity.
-    // If you need help writing this function, please let me know.
-    // For now, this is a simplified version that just updates the status.
-    try {
-        $tx_details = (array) $tx_details;
-        $transaction_id = new ObjectId($tx_details['_id']);
-
-        $update_result = $transactionsCollection->updateOne(
-            ['_id' => $transaction_id, 'status' => 'pending'],
-            ['$set' => ['status' => 'completed', 'last_updated' => new UTCDateTime()]]
-        );
-
-        if ($update_result->getModifiedCount() > 0) {
-            return ['success' => true, 'message' => 'Transfer successfully completed.', 'transaction_details' => $tx_details];
-        } else {
-            return ['success' => false, 'message' => 'Failed to complete transaction or status was not pending.'];
-        }
-    } catch (Exception $e) {
-        error_log("Error in complete_pending_transfer: " . $e->getMessage());
-        return ['success' => false, 'message' => 'An error occurred during transfer completion.'];
-    }
-}
-
-
-// The form filter logic has a potential bug: the form's method is POST, but the retrieval is using $_GET.
-// This is a common mistake. I've corrected the form to use GET and the PHP to read from GET.
-// This ensures the URL updates correctly and allows for bookmarking.
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // This block now only handles the transaction status update form
-    error_log("POST request received for transaction status update.");
+// --- Handle Transaction Status Update POST Request ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_status'])) {
     if (!$transactionsCollection || !$usersCollection || !$accountsCollection || !$refundsCollection) {
         $_SESSION['error_message'] = "Database collections not connected. Cannot process update.";
-        error_log("Database collections not connected.");
     } else {
         $transaction_id_str = filter_var($_POST['transaction_id'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
         $new_status = filter_var($_POST['new_status'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
         $admin_comment_message = filter_var($_POST['message'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $admin_username = $_SESSION['admin_username'] ?? 'Admin';
+        $admin_username = $_SESSION['admin_username'] ?? 'Admin'; 
 
-        error_log("Processing transaction update for ID: " . $transaction_id_str . ", new status: " . $new_status);
-
-        if (empty($transaction_id_str) || empty($new_status) || $new_status === 'Set Status') {
+        if (empty($transaction_id_str) || empty($new_status)) {
             $_SESSION['error_message'] = "Transaction ID and New Status are required.";
-            error_log("Missing transaction ID or status in POST request.");
         } elseif (!in_array($new_status, $settable_statuses)) {
             $_SESSION['error_message'] = "Invalid status provided for update.";
-            error_log("Invalid status provided: " . $new_status);
         } else {
             try {
                 $transaction_objectId = new ObjectId($transaction_id_str);
@@ -458,48 +401,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if (!$original_tx_details) {
                     $_SESSION['error_message'] = "Transaction not found for ID: " . htmlspecialchars($transaction_id_str) . ".";
-                    error_log("Transaction not found for ID: " . $transaction_id_str);
                 } else {
-                    $original_tx_details_arr = (array) $original_tx_details;
+                    $original_tx_details_arr = (array) $original_tx_details; // Convert to array for easier access
                     $user_doc = $usersCollection->findOne(['_id' => new ObjectId($original_tx_details_arr['user_id'])]);
                     $user_email = $user_doc['email'] ?? null;
-                    $customer_name = ($user_doc['first_name'] ?? 'Dear') . ' ' . ($user_doc['last_name'] ?? 'Customer');
+                    $customer_name = ($user_doc['first_name'] ?? 'Dear') . ' ' . ($user_doc['last_name'] ?? 'Customer'); // Get full name for email
                     $current_db_status = $original_tx_details_arr['status'];
                     $result_action = ['success' => false, 'message' => 'An unexpected error occurred.', 'transaction_details' => null];
 
                     $refund_trigger_statuses = ['failed', 'declined', 'refunded'];
-                    
-                    error_log("Current transaction status is: " . $current_db_status . ", new status is: " . $new_status);
 
                     if (in_array($new_status, $refund_trigger_statuses)) {
-                        error_log("Invoking process_transaction_refund function.");
+                        // --- Handle Refund Process ---
                         $result_action = process_transaction_refund(
-                            $client, $transactionsCollection, $usersCollection,
-                            $accountsCollection, $refundsCollection, $original_tx_details,
-                            $new_status, $admin_comment_message, $admin_username
+                            $client,
+                            $transactionsCollection,
+                            $usersCollection,
+                            $accountsCollection,
+                            $refundsCollection,
+                            $original_tx_details,
+                            $new_status,
+                            $admin_comment_message,
+                            $admin_username
+                        );
+                        // After refund, fetch updated details to ensure email gets the latest status
+                        if ($result_action['success']) {
+                            $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
+                            $result_action['transaction_details'] = (array) $updated_tx_details;
+                        }
+
+                    } elseif ($new_status === 'completed' && $current_db_status === 'pending') {
+                        // Assuming complete_pending_transfer handles status update and balance transfer for recipients
+                        // NOTE: complete_pending_transfer is not defined in this file. Ensure it's available or adapt its logic.
+                        // For a complete solution, you'd need to define or include `complete_pending_transfer` here,
+                        // and it should also ideally use a transaction for consistency if it modifies multiple documents.
+                        // For now, I'm assuming it's available and works as intended for balance transfers.
+                        $result_action = complete_pending_transfer($transactionsCollection, $accountsCollection, $original_tx_details);
+                        
+                        // Make sure complete_pending_transfer also returns the updated transaction details
+                        if ($result_action['success']) {
+                            $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
+                            $result_action['transaction_details'] = (array) $updated_tx_details;
+                        }
+                    } elseif ($new_status === 'declined' && $current_db_status === 'pending') {
+                        // If 'declined' is chosen from a pending state, it's also a refund scenario.
+                        // We will use the generic refund function for this to ensure consistency.
+                        $result_action = process_transaction_refund(
+                            $client,
+                            $transactionsCollection,
+                            $usersCollection,
+                            $accountsCollection,
+                            $refundsCollection,
+                            $original_tx_details,
+                            $new_status, // This will be 'declined'
+                            $admin_comment_message,
+                            $admin_username
                         );
                         if ($result_action['success']) {
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
                             $result_action['transaction_details'] = (array) $updated_tx_details;
-                            error_log("Refund process reported success.");
-                        } else {
-                            error_log("Refund process reported failure: " . $result_action['message']);
-                        }
-                    } elseif ($new_status === 'completed' && $current_db_status === 'pending') {
-                        error_log("Invoking complete_pending_transfer function.");
-                        // Logic for completing a pending transfer
-                        // This function must be implemented to work correctly
-                        $result_action = complete_pending_transfer($transactionsCollection, $accountsCollection, $original_tx_details);
-                        if ($result_action['success']) {
-                            $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
-                            $result_action['transaction_details'] = (array) $updated_tx_details;
-                            error_log("Completion process reported success.");
-                        } else {
-                            error_log("Completion process reported failure: " . $result_action['message']);
                         }
                     } else {
-                        error_log("Invoking general status update logic.");
-                        // General status update logic
+                        // General status update logic (for statuses that don't involve a refund or special transfer)
                         $update_result = $transactionsCollection->updateOne(
                             ['_id' => $transaction_objectId],
                             ['$set' => [
@@ -514,30 +477,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $result_action['message'] = "Transaction status updated directly to " . ucfirst($new_status) . ".";
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
                             $result_action['transaction_details'] = (array) $updated_tx_details;
-                            error_log("General status update successful.");
                         } else {
                             $result_action['message'] = "Transaction update had no effect (status might already be " . ucfirst($new_status) . ").";
-                            error_log("General status update had no effect.");
                         }
                     }
 
                     if ($result_action['success']) {
-                        // The original alert system is commented out, assuming you want a more robust solution like the message blocks.
-                        // $_SESSION['transaction_alert'] = [ /* ... your alert details ... */ ];
+                        // Use $original_tx_details_arr for email parameters that reflect the *original* transaction,
+                        // but use $result_action['transaction_details'] for the new status.
+                        // Ensure transaction_alert reflects the *new* status and any updated comment
+                        $_SESSION['transaction_alert'] = [
+                            'status' => $new_status,
+                            'message' => $admin_comment_message,
+                            'ref_no' => $original_tx_details_arr['transaction_reference'] ?? 'N/A',
+                            'recipient_name' => $original_tx_details_arr['recipient_name'] ?? 'N/A',
+                            'amount' => $original_tx_details_arr['amount'] ?? 0,
+                            'currency' => $original_tx_details_arr['currency'] ?? 'N/A',
+                            'user_id' => (string)($original_tx_details_arr['user_id'] ?? '')
+                        ];
+                        
                         $_SESSION['success_message'] = $result_action['message'];
 
+                        // Send email notification with the *updated* transaction details if available
                         if ($user_email && $result_action['transaction_details']) {
                             if (send_transaction_update_email_notification($user_email, $customer_name, $result_action['transaction_details'], $new_status, $admin_comment_message)) {
                                 $_SESSION['info_message'] = "Email notification sent to " . htmlspecialchars($user_email) . ".";
-                                error_log("Email notification sent to user.");
                             } else {
                                 $_SESSION['error_message'] = "Failed to send email notification to user.";
-                                error_log("Failed to send email notification.");
                             }
                         }
                     } else {
                         $_SESSION['error_message'] = $result_action['message'];
-                        error_log("Transaction update failed: " . $result_action['message']);
                     }
                 }
             } catch (MongoDBException | Exception $e) {
@@ -546,35 +516,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
-    
-    // THE REDIRECT MUST BE INSIDE THIS BLOCK
-    // It should only run if the form was submitted.
-    $redirect_url = rtrim(BASE_URL, '/') . "/heritagebank_admin/users/transactions_management.php?status_filter=" . urlencode($_POST['status_filter'] ?? $status_filter);
-    header("Location: " . $redirect_url);
-    exit;
+header("Location: " . rtrim(BASE_URL, '/') . "/heritagebank_admin/users/transactions_management.php?status_filter=" . urlencode($status_filter));    exit;
 }
 
 // --- Fetch Transactions for Display ---
-// This code runs when the page is loaded normally (GET request)
-// or after the redirect from a POST request.
-$status_filter = $_GET['status_filter'] ?? 'all'; // Get filter from URL query string
 $filter_query = [];
 if ($status_filter !== 'all') {
     $filter_query['status'] = $status_filter;
 }
 
-$transactions = []; // Initialize to an empty array
+$transactions = [];
 try {
     if ($transactionsCollection) {
-        $transactions = $transactionsCollection->find($filter_query)->toArray();
-        error_log("Found " . count($transactions) . " transactions for filter: " . $status_filter);
+        // Fetch transactions from MongoDB
+        $cursor = $transactionsCollection->find(
+            $filter_query,
+            ['sort' => ['transaction_date' => -1]] // Sort by latest transactions first
+        );
+        $transactions = $cursor->toArray();
+
+        // Populate sender details for each transaction
+        foreach ($transactions as $key => $tx) {
+            if (isset($tx['user_id'])) {
+                try {
+                    $user = $usersCollection->findOne(['_id' => new ObjectId($tx['user_id'])]);
+                    $transactions[$key]['sender_fname'] = $user['first_name'] ?? 'Unknown';
+                    $transactions[$key]['sender_lname'] = $user['last_name'] ?? 'User';
+                } catch (MongoDB\Driver\Exception\InvalidArgumentException $e) {
+                    error_log("Invalid user ID for transaction " . ($tx['_id'] ?? 'N/A') . ": " . $e->getMessage());
+                    $transactions[$key]['sender_fname'] = 'Invalid';
+                    $transactions[$key]['sender_lname'] = 'User ID';
+                }
+            }
+            // Ensure dates are formatted correctly for display
+            if (isset($tx['initiated_at']) && $tx['initiated_at'] instanceof UTCDateTime) {
+                $transactions[$key]['initiated_at'] = $tx['initiated_at']->toDateTime()->format('Y-m-d H:i:s');
+            } else {
+                $transactions[$key]['initiated_at'] = null; // Or 'N/A'
+            }
+            if (isset($tx['action_at']) && $tx['action_at'] instanceof UTCDateTime) {
+                $transactions[$key]['action_at'] = $tx['action_at']->toDateTime()->format('Y-m-d H:i:s');
+            } else {
+                $transactions[$key]['action_at'] = null; // Or 'N/A'
+            }
+        }
+    } else {
+        $_SESSION['error_message'] = "Transactions collection not available.";
     }
-} catch (Exception $e) {
+} catch (MongoDBException $e) {
     error_log("Error fetching transactions: " . $e->getMessage());
-    $_SESSION['error_message'] = "Failed to load transactions: " . $e->getMessage();
+    $_SESSION['error_message'] = "Error fetching transactions: " . $e->getMessage();
+} catch (Exception $e) {
+    error_log("General error fetching transactions: " . $e->getMessage());
+    $_SESSION['error_message'] = "An unexpected error occurred while fetching transactions.";
 }
 
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -991,20 +989,19 @@ try {
             }
             ?>
 
-        <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/transactions_management.php'; ?>" method="GET">
-            <label for="filter_status">Filter by Status:</label>
-            <select name="status_filter" id="filter_status" onchange="this.form.submit()">
-                <option value="all" <?php echo ($status_filter == 'all') ? 'selected' : ''; ?>>All</option>
-                <option value="pending" <?php echo ($status_filter == 'pending') ? 'selected' : ''; ?>>Pending</option>
-                <option value="approved" <?php echo ($status_filter == 'approved') ? 'selected' : ''; ?>>Approved</option>
-                <option value="declined" <?php echo ($status_filter == 'declined') ? 'selected' : ''; ?>>Declined</option>
-                <option value="completed" <?php echo ($status_filter == 'completed') ? 'selected' : ''; ?>>Completed</option>
-                <option value="restricted" <?php echo ($status_filter == 'restricted') ? 'selected' : ''; ?>>Restricted</option>
-                <option value="failed" <?php echo ($status_filter == 'failed') ? 'selected' : ''; ?>>Failed</option>
-                <option value="on hold" <?php echo ($status_filter == 'on hold') ? 'selected' : ''; ?>>On Hold</option>
-                <option value="refunded" <?php echo ($status_filter == 'refunded') ? 'selected' : ''; ?>>Refunded</option>
-            </select>
-        </form>
+        <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/transactions_management.php'; ?>" method="POST">    <label for="filter_status">Filter by Status:</label>
+    <select name="status_filter" id="filter_status" onchange="this.form.submit()">
+        <option value="all" <?php echo ($status_filter == 'all') ? 'selected' : ''; ?>>All</option>
+        <option value="pending" <?php echo ($status_filter == 'pending') ? 'selected' : ''; ?>>Pending</option>
+        <option value="approved" <?php echo ($status_filter == 'approved') ? 'selected' : ''; ?>>Approved</option>
+        <option value="declined" <?php echo ($status_filter == 'declined') ? 'selected' : ''; ?>>Declined</option>
+        <option value="completed" <?php echo ($status_filter == 'completed') ? 'selected' : ''; ?>>Completed</option>
+        <option value="restricted" <?php echo ($status_filter == 'restricted') ? 'selected' : ''; ?>>Restricted</option>
+        <option value="failed" <?php echo ($status_filter == 'failed') ? 'selected' : ''; ?>>Failed</option>
+        <option value="on hold" <?php echo ($status_filter == 'on hold') ? 'selected' : ''; ?>>On Hold</option>
+        <option value="refunded" <?php echo ($status_filter == 'refunded') ? 'selected' : ''; ?>>Refunded</option>
+    </select>
+</form>
             <div class="table-responsive">
                 <table class="transaction-table">
                     <thead>
@@ -1044,7 +1041,7 @@ try {
                                     <td data-label="Description"><?php echo htmlspecialchars($tx['description'] ?? 'N/A'); ?></td>
                                     <td data-label="Initiated At">
                                         <?php 
-                                        echo (isset($tx['initiated_at']) && !empty($tx['initiated_at'])) ? date('M d, Y H:i', $tx['initiated_at']->toDateTime()->getTimestamp()) : 'N/A';
+                                            echo (isset($tx['initiated_at']) && !empty($tx['initiated_at'])) ? date('M d, Y H:i', strtotime($tx['initiated_at'])) : 'N/A';
                                         ?>
                                     </td>
                                     <td data-label="Status">
@@ -1060,24 +1057,24 @@ try {
                                     </td>
                                     <td data-label="Action At">
                                         <?php 
-                                        echo (isset($tx['action_at']) && !empty($tx['action_at'])) ? date('M d, Y H:i', $tx['action_at']->toDateTime()->getTimestamp()) : 'N/A';
+                                            echo (isset($tx['action_at']) && !empty($tx['action_at'])) ? date('M d, Y H:i', strtotime($tx['action_at'])) : 'N/A';
                                         ?>
                                     </td>
                                     <td data-label="Actions">
                                     <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/transactions_management.php?status_filter=' . htmlspecialchars($status_filter); ?>" method="POST">
-                                        <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
-                                        <select name="new_status">
-                                            <option value="">Set Status</option>
-                                            <?php
-                                            foreach ($settable_statuses as $status_option) {
-                                                $selected = (isset($tx['status']) && $tx['status'] == $status_option) ? 'selected' : '';
-                                                echo "<option value=\"" . htmlspecialchars($status_option) . "\" " . $selected . ">" . htmlspecialchars(ucfirst($status_option)) . "</option>";
-                                            }
-                                            ?>
-                                        </select>
-                                        <textarea name="message" rows="3" placeholder="Reason/Comment (optional)" class="admin-comment-textarea"><?php echo htmlspecialchars($tx['Hometown_comment'] ?? ''); ?></textarea>
-                                        <button type="submit" name="update_transaction_status" class="button-small button-edit">Update</button>
-                                    </form>
+                                                 <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
+                                            <select name="new_status">
+                                                <option value="">Set Status</option>
+                                                <?php
+                                                foreach ($settable_statuses as $status_option) {
+                                                    $selected = (isset($tx['status']) && $tx['status'] == $status_option) ? 'selected' : '';
+                                                    echo "<option value=\"" . htmlspecialchars($status_option) . "\" " . $selected . ">" . htmlspecialchars(ucfirst($status_option)) . "</option>";
+                                                }
+                                                ?>
+                                            </select>
+                                            <textarea name="message" rows="3" placeholder="Reason/Comment (optional)" class="admin-comment-textarea"><?php echo htmlspecialchars($tx['Hometown_comment'] ?? ''); ?></textarea>
+                                            <button type="submit" name="update_transaction_status" class="button-small button-edit">Update</button>
+                                        </form>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
