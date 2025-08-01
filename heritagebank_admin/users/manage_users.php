@@ -419,9 +419,9 @@ try {
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/edit_users?id=' . $user['id']; ?>" class="button-small button-edit">Edit</a>
-                                        <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/account_status_management?user_id=' . $user['id']; ?>" class="button-small button-status">Manage Status</a>
-                                        <a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_users?action=delete&id=' . $user['id']; ?>" class="button-small button-delete" onclick="return confirm('Are you sure you want to delete this user and ALL their data? This action cannot be undone.');">Delete</a>
+                                      <a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/edit_users?id=' . $user['id']; ?>" class="button-small button-edit">Edit</a>
+                                    <a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/account_status_management?user_id=' . $user['id']; ?>" class="button-small button-status">Manage Status</a>
+                                    <a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/manage_users?action=delete&id=' . $user['id']; ?>" class="button-small button-delete" onclick="return confirm('Are you sure you want to delete this user and ALL their data? This action cannot be undone.');">Delete</a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

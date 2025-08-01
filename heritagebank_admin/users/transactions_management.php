@@ -965,10 +965,10 @@ try {
                 <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/create_user.php'; ?>">Create New User</a></li>
                 <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/manage_users.php'; ?>">Manage Users (Edit/Delete)</a></li>
                 <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/manage_user_funds.php'; ?>">Manage User Funds (Credit/Debit)</a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/account_status_management.php'; ?>">Manage Account Status</a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/transactions_management.php'; ?>" class="active">Transactions Management</a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/generate_bank_card.php'; ?>">Generate Bank Card (Mock)</a></li>
-                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/generate_mock_transaction.php'; ?>">Generate Mock Transaction</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/account_status_management.php'; ?>">Manage Account Status</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/transactions_management.php'; ?>" class="active">Transactions Management</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/generate_bank_card.php'; ?>">Generate Bank Card (Mock)</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/generate_mock_transaction.php'; ?>">Generate Mock Transaction</a></li>
             </ul>
         </nav>
 
@@ -991,8 +991,7 @@ try {
             }
             ?>
 
-         <form action="/admin/transactions_management.php" method="POST">
-    <label for="filter_status">Filter by Status:</label>
+        <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/transactions_management.php'; ?>" method="POST">    <label for="filter_status">Filter by Status:</label>
     <select name="status_filter" id="filter_status" onchange="this.form.submit()">
         <option value="all" <?php echo ($status_filter == 'all') ? 'selected' : ''; ?>>All</option>
         <option value="pending" <?php echo ($status_filter == 'pending') ? 'selected' : ''; ?>>Pending</option>
@@ -1064,7 +1063,8 @@ try {
                                         ?>
                                     </td>
                                     <td data-label="Actions">
-                                            <form action="transactions_management.php?status_filter=<?php echo htmlspecialchars($status_filter); ?>" method="POST">                                            <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
+                                    <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/transactions_management.php?status_filter=' . htmlspecialchars($status_filter); ?>" method="POST">
+                                                 <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
                                             <select name="new_status">
                                                 <option value="">Set Status</option>
                                                 <?php
