@@ -5,7 +5,15 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
+// NEW: Create a log file and a function to write to it
+$debug_log_file = __DIR__ . '/transactions_debug.log';
+function write_debug_log($message) {
+    global $debug_log_file;
+    file_put_contents($debug_log_file, date('Y-m-d H:i:s') . " - " . $message . "\n", FILE_APPEND);
+}
 // --- END OF DEBUGGING CODE ---
+
 
 // CORRECTED PATHS: Use __DIR__ to build a reliable path
 require_once __DIR__ . '/../../Config.php'; 
@@ -387,36 +395,55 @@ function process_transaction_refund(
 
 // --- Handle Transaction Status Update POST Request ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_status'])) {
+    write_debug_log("-----------------------------------------");
+    write_debug_log("NEW POST REQUEST FOR TRANSACTION STATUS UPDATE");
+    write_debug_log("Full POST data: " . print_r($_POST, true));
+
     if (!$transactionsCollection || !$usersCollection || !$accountsCollection || !$refundsCollection) {
         $_SESSION['error_message'] = "Database collections not connected. Cannot process update.";
+        write_debug_log("FATAL ERROR: One or more database collections are not connected.");
     } else {
         $transaction_id_str = filter_var($_POST['transaction_id'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
         $new_status = filter_var($_POST['new_status'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
         $admin_comment_message = filter_var($_POST['message'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
         $admin_username = $_SESSION['admin_username'] ?? 'Admin'; 
 
+        write_debug_log("Sanitized Input: transaction_id=$transaction_id_str, new_status=$new_status, admin_username=$admin_username");
+
         if (empty($transaction_id_str) || empty($new_status)) {
             $_SESSION['error_message'] = "Transaction ID and New Status are required.";
+            write_debug_log("VALIDATION FAILED: Transaction ID or new status is empty.");
         } elseif (!in_array($new_status, $settable_statuses)) {
             $_SESSION['error_message'] = "Invalid status provided for update.";
+            write_debug_log("VALIDATION FAILED: Invalid status '$new_status' provided.");
         } else {
             try {
+                write_debug_log("Attempting to find transaction with ID: $transaction_id_str");
                 $transaction_objectId = new ObjectId($transaction_id_str);
                 $original_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
 
                 if (!$original_tx_details) {
                     $_SESSION['error_message'] = "Transaction not found for ID: " . htmlspecialchars($transaction_id_str) . ".";
+                    write_debug_log("QUERY FAILED: Transaction with ID $transaction_id_str not found in database.");
                 } else {
+                    write_debug_log("Transaction found. Current status: " . $original_tx_details['status']);
+
                     $original_tx_details_arr = (array) $original_tx_details;
                     $user_doc = $usersCollection->findOne(['_id' => new ObjectId($original_tx_details_arr['user_id'])]);
+                    write_debug_log("User details retrieved for user_id: " . $original_tx_details_arr['user_id']);
+
                     $user_email = $user_doc['email'] ?? null;
                     $customer_name = ($user_doc['first_name'] ?? 'Dear') . ' ' . ($user_doc['last_name'] ?? 'Customer');
                     $current_db_status = $original_tx_details_arr['status'];
                     $result_action = ['success' => false, 'message' => 'An unexpected error occurred.', 'transaction_details' => null];
-
+                    
                     $refund_trigger_statuses = ['failed', 'declined', 'refunded'];
+                    
+                    // NEW: Log which action is being triggered
+                    write_debug_log("Checking business logic for status change from '$current_db_status' to '$new_status'");
 
                     if (in_array($new_status, $refund_trigger_statuses)) {
+                        write_debug_log("Triggering `process_transaction_refund` function.");
                         $result_action = process_transaction_refund(
                             $client,
                             $transactionsCollection,
@@ -428,18 +455,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                             $admin_comment_message,
                             $admin_username
                         );
+                        write_debug_log("`process_transaction_refund` returned: " . print_r($result_action, true));
                         if ($result_action['success']) {
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
                             $result_action['transaction_details'] = (array) $updated_tx_details;
+                            write_debug_log("Refund was successful. New transaction details fetched.");
                         }
                     } elseif ($new_status === 'completed' && $current_db_status === 'pending') {
+                        write_debug_log("Triggering `complete_pending_transfer` function.");
                         $result_action = complete_pending_transfer($transactionsCollection, $accountsCollection, $original_tx_details);
+                        write_debug_log("`complete_pending_transfer` returned: " . print_r($result_action, true));
                         
                         if ($result_action['success']) {
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
                             $result_action['transaction_details'] = (array) $updated_tx_details;
+                            write_debug_log("Pending transfer was successful. New transaction details fetched.");
                         }
                     } elseif ($new_status === 'declined' && $current_db_status === 'pending') {
+                        write_debug_log("Triggering `process_transaction_refund` (for a pending decline).");
                         $result_action = process_transaction_refund(
                             $client,
                             $transactionsCollection,
@@ -451,11 +484,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                             $admin_comment_message,
                             $admin_username
                         );
+                        write_debug_log("`process_transaction_refund` returned: " . print_r($result_action, true));
                         if ($result_action['success']) {
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
                             $result_action['transaction_details'] = (array) $updated_tx_details;
+                            write_debug_log("Decline and refund were successful. New transaction details fetched.");
                         }
                     } else {
+                        write_debug_log("Updating transaction directly without special action.");
                         $update_result = $transactionsCollection->updateOne(
                             ['_id' => $transaction_objectId],
                             ['$set' => [
@@ -465,17 +501,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                                 'action_at' => new UTCDateTime()
                             ]]
                         );
+                        write_debug_log("Database update result: Matched=" . $update_result->getMatchedCount() . ", Modified=" . $update_result->getModifiedCount());
+
                         if ($update_result->getModifiedCount() > 0 || $update_result->getMatchedCount() > 0) {
                             $result_action['success'] = true;
                             $result_action['message'] = "Transaction status updated directly to " . ucfirst($new_status) . ".";
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
                             $result_action['transaction_details'] = (array) $updated_tx_details;
+                            write_debug_log("Direct update successful. New transaction details fetched.");
                         } else {
                             $result_action['message'] = "Transaction update had no effect (status might already be " . ucfirst($new_status) . ").";
+                            write_debug_log("Direct update had no effect. Status was already '$new_status'.");
                         }
                     }
 
                     if ($result_action['success']) {
+                        write_debug_log("Final result is a success. Preparing to redirect and send email.");
                         $_SESSION['transaction_alert'] = [
                             'status' => $new_status,
                             'message' => $admin_comment_message,
@@ -489,76 +530,113 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                         $_SESSION['success_message'] = $result_action['message'];
 
                         if ($user_email && $result_action['transaction_details']) {
+                            write_debug_log("Attempting to send email to $user_email.");
                             if (send_transaction_update_email_notification($user_email, $customer_name, $result_action['transaction_details'], $new_status, $admin_comment_message)) {
                                 $_SESSION['info_message'] = "Email notification sent to " . htmlspecialchars($user_email) . ".";
+                                write_debug_log("Email notification successfully sent.");
                             } else {
                                 $_SESSION['error_message'] = "Failed to send email notification to user.";
+                                write_debug_log("ERROR: Failed to send email notification.");
                             }
+                        } else {
+                            write_debug_log("Skipping email notification: user email not found or transaction details missing.");
                         }
                     } else {
                         $_SESSION['error_message'] = $result_action['message'];
+                        write_debug_log("Final result is a failure. Message: " . $result_action['message']);
                     }
                 }
             } catch (MongoDBException | Exception $e) {
                 $_SESSION['error_message'] = "Error processing request: " . $e->getMessage();
                 error_log("Transaction update error: " . $e->getMessage());
+                write_debug_log("EXCEPTION CAUGHT: " . $e->getMessage() . "\n" . $e->getTraceAsString()); // Log the full exception details
             }
         }
     }
-} // End of POST request handling block
+    write_debug_log("Redirecting to dashboard.php");
+    header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/dashboard.php');
+    exit;
+}
+write_debug_log("-----------------------------------------"); // Add a separator for the next request
 
 // --- Fetch Transactions for Display ---
 $filter_query = [];
 if ($status_filter !== 'all') {
     $filter_query['status'] = $status_filter;
+    write_debug_log("Fetching transactions with status filter: " . $status_filter);
+} else {
+    write_debug_log("Fetching all transactions (no status filter).");
 }
+write_debug_log("Final filter query: " . json_encode($filter_query));
 
 $transactions = [];
 try {
     if ($transactionsCollection) {
         // Fetch transactions from MongoDB
+        write_debug_log("Attempting to find transactions with the prepared query.");
         $cursor = $transactionsCollection->find(
             $filter_query,
             ['sort' => ['transaction_date' => -1]] // Sort by latest transactions first
         );
         $transactions = $cursor->toArray();
+        write_debug_log("Found " . count($transactions) . " transactions from the database.");
 
         // Populate sender details for each transaction
         foreach ($transactions as $key => $tx) {
             if (isset($tx['user_id'])) {
                 try {
+                    write_debug_log("Processing transaction ID " . ($tx['_id'] ?? 'N/A') . ". Looking up user ID: " . $tx['user_id']);
                     $user = $usersCollection->findOne(['_id' => new ObjectId($tx['user_id'])]);
-                    $transactions[$key]['sender_fname'] = $user['first_name'] ?? 'Unknown';
-                    $transactions[$key]['sender_lname'] = $user['last_name'] ?? 'User';
+                    
+                    if ($user) {
+                        $transactions[$key]['sender_fname'] = $user['first_name'] ?? 'Unknown';
+                        $transactions[$key]['sender_lname'] = $user['last_name'] ?? 'User';
+                        write_debug_log("User found. Name: " . $transactions[$key]['sender_fname'] . " " . $transactions[$key]['sender_lname']);
+                    } else {
+                        write_debug_log("User not found for ID " . $tx['user_id']);
+                        $transactions[$key]['sender_fname'] = 'Unknown';
+                        $transactions[$key]['sender_lname'] = 'User';
+                    }
                 } catch (MongoDB\Driver\Exception\InvalidArgumentException $e) {
                     error_log("Invalid user ID for transaction " . ($tx['_id'] ?? 'N/A') . ": " . $e->getMessage());
+                    write_debug_log("MONGODB EXCEPTION: Invalid user ID for transaction " . ($tx['_id'] ?? 'N/A') . ": " . $e->getMessage());
                     $transactions[$key]['sender_fname'] = 'Invalid';
                     $transactions[$key]['sender_lname'] = 'User ID';
                 }
+            } else {
+                write_debug_log("Transaction ID " . ($tx['_id'] ?? 'N/A') . " has no user_id field.");
             }
+            
             // Ensure dates are formatted correctly for display
             if (isset($tx['initiated_at']) && $tx['initiated_at'] instanceof UTCDateTime) {
                 $transactions[$key]['initiated_at'] = $tx['initiated_at']->toDateTime()->format('Y-m-d H:i:s');
             } else {
                 $transactions[$key]['initiated_at'] = null; // Or 'N/A'
+                write_debug_log("Transaction ID " . ($tx['_id'] ?? 'N/A') . " has invalid initiated_at date.");
             }
             if (isset($tx['action_at']) && $tx['action_at'] instanceof UTCDateTime) {
                 $transactions[$key]['action_at'] = $tx['action_at']->toDateTime()->format('Y-m-d H:i:s');
             } else {
                 $transactions[$key]['action_at'] = null; // Or 'N/A'
+                write_debug_log("Transaction ID " . ($tx['_id'] ?? 'N/A') . " has invalid action_at date.");
             }
         }
+        write_debug_log("Finished processing all transactions for display.");
     } else {
         $_SESSION['error_message'] = "Transactions collection not available.";
+        write_debug_log("FATAL ERROR: Transactions collection is not available.");
     }
 } catch (MongoDBException $e) {
     error_log("Error fetching transactions: " . $e->getMessage());
+    write_debug_log("MONGODB EXCEPTION: Error fetching transactions - " . $e->getMessage());
     $_SESSION['error_message'] = "Error fetching transactions: " . $e->getMessage();
 } catch (Exception $e) {
     error_log("General error fetching transactions: " . $e->getMessage());
+    write_debug_log("GENERAL EXCEPTION: An unexpected error occurred while fetching transactions - " . $e->getMessage());
     $_SESSION['error_message'] = "An unexpected error occurred while fetching transactions.";
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -975,7 +1053,7 @@ try {
             }
             ?>
 
-            <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/transactions_management.php'; ?>" method="GET">
+            <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/transactions_management.php'; ?>" method="POST">
                 <label for="filter_status">Filter by Status:</label>
                 <select name="status_filter" id="filter_status" onchange="this.form.submit()">
                     <option value="all" <?php echo ($status_filter == 'all') ? 'selected' : ''; ?>>All</option>
