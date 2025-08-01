@@ -1,9 +1,15 @@
 <?php
 // Path: C:\xampp\htdocs\heritagebank\admin\transactions_management.php
+// --- START OF DEBUGGING CODE ---
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
-session_start();
-require_once '../../Config.php'; // Contains database credentials and SMTP settings
-require_once '../../functions.php'; // Contains utility functions like sendEmail
+// CORRECTED PATHS: Use __DIR__ to build a reliable path
+require_once __DIR__ . '/../../Config.php'; 
+require_once __DIR__ . '/../../functions.php'; 
+require_once __DIR__ . '/../../vendor/autoload.php'; // Make sure PHPMailer is loaded
+
 // Ensure MongoDB classes are available
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
