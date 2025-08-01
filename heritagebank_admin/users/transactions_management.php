@@ -548,7 +548,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
     header('Location: ' . rtrim(BASE_URL, '/') . '/heritagebank_admin/dashboard.php');
     exit;
 }
-write_debug_log("-----------------------------------------"); // Add a separator for the next request
 
 // --- Fetch Transactions for Display ---
 $filter_query = [];
