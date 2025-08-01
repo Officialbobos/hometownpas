@@ -51,7 +51,7 @@ try {
 $allowed_filters = ['approved', 'declined', 'completed', 'pending', 'restricted', 'failed', 'on hold', 'refunded', 'all'];
 $settable_statuses = ['pending', 'approved', 'completed', 'declined', 'restricted', 'failed', 'refunded', 'on hold'];
 $recommended_currencies = ['GBP', 'EUR', 'USD'];
-$status_filter = $_GET['status_filter'] ?? 'pending';
+$status_filter = $_POST['status_filter'] ?? $_GET['status_filter'] ?? 'pending';
 
 if (!in_array($status_filter, $allowed_filters)) {
     $status_filter = 'pending';
