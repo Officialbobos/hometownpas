@@ -402,17 +402,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                 if (!$original_tx_details) {
                     $_SESSION['error_message'] = "Transaction not found for ID: " . htmlspecialchars($transaction_id_str) . ".";
                 } else {
-                    $original_tx_details_arr = (array) $original_tx_details; // Convert to array for easier access
+                    $original_tx_details_arr = (array) $original_tx_details;
                     $user_doc = $usersCollection->findOne(['_id' => new ObjectId($original_tx_details_arr['user_id'])]);
                     $user_email = $user_doc['email'] ?? null;
-                    $customer_name = ($user_doc['first_name'] ?? 'Dear') . ' ' . ($user_doc['last_name'] ?? 'Customer'); // Get full name for email
+                    $customer_name = ($user_doc['first_name'] ?? 'Dear') . ' ' . ($user_doc['last_name'] ?? 'Customer');
                     $current_db_status = $original_tx_details_arr['status'];
                     $result_action = ['success' => false, 'message' => 'An unexpected error occurred.', 'transaction_details' => null];
 
                     $refund_trigger_statuses = ['failed', 'declined', 'refunded'];
 
                     if (in_array($new_status, $refund_trigger_statuses)) {
-                        // --- Handle Refund Process ---
                         $result_action = process_transaction_refund(
                             $client,
                             $transactionsCollection,
@@ -424,28 +423,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                             $admin_comment_message,
                             $admin_username
                         );
-                        // After refund, fetch updated details to ensure email gets the latest status
                         if ($result_action['success']) {
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
                             $result_action['transaction_details'] = (array) $updated_tx_details;
                         }
-
                     } elseif ($new_status === 'completed' && $current_db_status === 'pending') {
-                        // Assuming complete_pending_transfer handles status update and balance transfer for recipients
-                        // NOTE: complete_pending_transfer is not defined in this file. Ensure it's available or adapt its logic.
-                        // For a complete solution, you'd need to define or include `complete_pending_transfer` here,
-                        // and it should also ideally use a transaction for consistency if it modifies multiple documents.
-                        // For now, I'm assuming it's available and works as intended for balance transfers.
                         $result_action = complete_pending_transfer($transactionsCollection, $accountsCollection, $original_tx_details);
                         
-                        // Make sure complete_pending_transfer also returns the updated transaction details
                         if ($result_action['success']) {
                             $updated_tx_details = $transactionsCollection->findOne(['_id' => $transaction_objectId]);
                             $result_action['transaction_details'] = (array) $updated_tx_details;
                         }
                     } elseif ($new_status === 'declined' && $current_db_status === 'pending') {
-                        // If 'declined' is chosen from a pending state, it's also a refund scenario.
-                        // We will use the generic refund function for this to ensure consistency.
                         $result_action = process_transaction_refund(
                             $client,
                             $transactionsCollection,
@@ -453,7 +442,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                             $accountsCollection,
                             $refundsCollection,
                             $original_tx_details,
-                            $new_status, // This will be 'declined'
+                            $new_status,
                             $admin_comment_message,
                             $admin_username
                         );
@@ -462,7 +451,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                             $result_action['transaction_details'] = (array) $updated_tx_details;
                         }
                     } else {
-                        // General status update logic (for statuses that don't involve a refund or special transfer)
                         $update_result = $transactionsCollection->updateOne(
                             ['_id' => $transaction_objectId],
                             ['$set' => [
@@ -483,9 +471,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                     }
 
                     if ($result_action['success']) {
-                        // Use $original_tx_details_arr for email parameters that reflect the *original* transaction,
-                        // but use $result_action['transaction_details'] for the new status.
-                        // Ensure transaction_alert reflects the *new* status and any updated comment
                         $_SESSION['transaction_alert'] = [
                             'status' => $new_status,
                             'message' => $admin_comment_message,
@@ -498,7 +483,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                         
                         $_SESSION['success_message'] = $result_action['message'];
 
-                        // Send email notification with the *updated* transaction details if available
                         if ($user_email && $result_action['transaction_details']) {
                             if (send_transaction_update_email_notification($user_email, $customer_name, $result_action['transaction_details'], $new_status, $admin_comment_message)) {
                                 $_SESSION['info_message'] = "Email notification sent to " . htmlspecialchars($user_email) . ".";
@@ -516,7 +500,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
             }
         }
     }
-header("Location: " . rtrim(BASE_URL, '/') . "/heritagebank_admin/users/transactions_management.php?status_filter=" . urlencode($status_filter));    exit;
+    
+    // THE REDIRECT GOES HERE, INSIDE THE POST REQUEST BLOCK
+    header("Location: " . rtrim(BASE_URL, '/') . "/heritagebank_admin/users/transactions_management.php?status_filter=" . urlencode($status_filter));
+    exit;
 }
 
 // --- Fetch Transactions for Display ---
