@@ -19,7 +19,7 @@ use MongoDB\Driver\Exception\Exception as MongoDBException; // Alias for clarity
 // Admin authentication check
 // Redirects to admin login page if not authenticated
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-    header('Location: admin_login.php');
+    header('Location: ' . rtrim(BASE_URL, '/') . '/admin/login');
     exit;
 }
 
@@ -244,7 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
         }
     }
     // Redirect back to the transaction management page to prevent form resubmission
-    header("Location: transactions_management.php?status_filter=" . urlencode($status_filter));
+header("Location: transactions_management.php?status_filter=" . urlencode($status_filter));
     exit;
 }
 
