@@ -1174,4 +1174,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
     header("Location: " . rtrim(BASE_URL, '/') . "/heritagebank_admin/users/transactions_management.php?status_filter=" . urlencode($status_filter));
     exit;
 }
-?>
