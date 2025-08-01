@@ -499,11 +499,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
             }
         }
     }
-    
-    // THE REDIRECT GOES HERE, INSIDE THE POST REQUEST BLOCK
-    header("Location: " . rtrim(BASE_URL, '/') . "/heritagebank_admin/users/transactions_management.php?status_filter=" . urlencode($status_filter));
-    exit;
-}
+} // End of POST request handling block
 
 // --- Fetch Transactions for Display ---
 $filter_query = [];
@@ -558,7 +554,6 @@ try {
 }
 
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1048,19 +1043,19 @@ try {
                                     </td>
                                     <td data-label="Actions">
                                     <form action="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/transactions_management.php?status_filter=' . htmlspecialchars($status_filter); ?>" method="POST">
-                                                 <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
-                                            <select name="new_status">
-                                                <option value="">Set Status</option>
-                                                <?php
-                                                foreach ($settable_statuses as $status_option) {
-                                                    $selected = (isset($tx['status']) && $tx['status'] == $status_option) ? 'selected' : '';
-                                                    echo "<option value=\"" . htmlspecialchars($status_option) . "\" " . $selected . ">" . htmlspecialchars(ucfirst($status_option)) . "</option>";
-                                                }
-                                                ?>
-                                            </select>
-                                            <textarea name="message" rows="3" placeholder="Reason/Comment (optional)" class="admin-comment-textarea"><?php echo htmlspecialchars($tx['Hometown_comment'] ?? ''); ?></textarea>
-                                            <button type="submit" name="update_transaction_status" class="button-small button-edit">Update</button>
-                                        </form>
+                                                <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
+                                                <select name="new_status">
+                                                    <option value="">Set Status</option>
+                                                    <?php
+                                                    foreach ($settable_statuses as $status_option) {
+                                                        $selected = (isset($tx['status']) && $tx['status'] == $status_option) ? 'selected' : '';
+                                                        echo "<option value=\"" . htmlspecialchars($status_option) . "\" " . $selected . ">" . htmlspecialchars(ucfirst($status_option)) . "</option>";
+                                                    }
+                                                    ?>
+                                                </select>
+                                                <textarea name="message" rows="3" placeholder="Reason/Comment (optional)" class="admin-comment-textarea"><?php echo htmlspecialchars($tx['Hometown_comment'] ?? ''); ?></textarea>
+                                                <button type="submit" name="update_transaction_status" class="button-small button-edit">Update</button>
+                                            </form>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -1088,3 +1083,10 @@ try {
 </script>
 </body>
 </html>
+<?php
+// Moved the redirect here to allow session messages to be displayed.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_status'])) {
+    header("Location: " . rtrim(BASE_URL, '/') . "/heritagebank_admin/users/transactions_management.php?status_filter=" . urlencode($status_filter));
+    exit;
+}
+?>
