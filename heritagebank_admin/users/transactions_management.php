@@ -71,7 +71,7 @@ function send_transaction_update_email_notification($user_email, $tx_details, $n
     }
 
     $subject = 'Heritage Bank Transaction Update: ' . ucfirst($new_status);
-    $amount_display = htmlspecialchars(($tx_details['currency'] ?? 'USD') . ' ' . number_format($tx['amount'] ?? 0, 2));
+    $amount_display = htmlspecialchars(($tx_details['currency'] ?? 'USD') . ' ' . number_format($tx_details['amount'] ?? 0, 2));
     $recipient_name_display = htmlspecialchars($tx_details['recipient_name'] ?? 'N/A');
     $transaction_ref_display = htmlspecialchars($tx_details['transaction_reference'] ?? 'N/A');
     $comment_display = !empty($admin_comment) ? htmlspecialchars($admin_comment) : 'N/A';
@@ -132,7 +132,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                 $original_tx_details = (array) $original_tx_details;
                 $user_doc = $usersCollection->findOne(['_id' => new ObjectId($original_tx_details['user_id'])]);
                 $user_email = $user_doc['email'] ?? null;
-                $current_db_status = $original_tx_details['status'];
 
                 $update_result = $transactionsCollection->updateOne(
                     ['_id' => $transaction_objectId],
