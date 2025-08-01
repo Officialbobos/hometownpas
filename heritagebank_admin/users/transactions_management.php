@@ -132,6 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_transaction_st
                 $original_tx_details = (array) $original_tx_details;
                 $user_doc = $usersCollection->findOne(['_id' => new ObjectId($original_tx_details['user_id'])]);
                 $user_email = $user_doc['email'] ?? null;
+                $current_db_status = $original_tx_details['status'];
 
                 $update_result = $transactionsCollection->updateOne(
                     ['_id' => $transaction_objectId],
