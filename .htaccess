@@ -1,0 +1,19 @@
+<IfModule mod_rewrite.c>
+    # Turn on URL rewriting
+    RewriteEngine On
+
+    # If the request is not for a real file (e.g., .css, .js, images)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    # And if the request is not for a real directory
+    RewriteCond %{REQUEST_FILENAME} !-d
+    # Then rewrite the request to index.php
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Ensure PHP files are handled by the PHP interpreter
+<FilesMatch \.php$>
+    SetHandler application/x-httpd-php
+</FilesMatch>
+
+# Prevent directory listings
+Options -Indexes

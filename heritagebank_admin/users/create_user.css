@@ -1,0 +1,202 @@
+ /* General body and container styling */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .dashboard-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            align-items: center;
+        }
+
+        /* Dashboard Header */
+        .dashboard-header {
+            background-color: #004494; /* Darker blue for header */
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box; /* Include padding in width */
+        }
+
+        .dashboard-header .logo {
+            height: 40px; /* Adjust logo size */
+        }
+
+        .dashboard-header h2 {
+            margin: 0;
+            color: white;
+            font-size: 1.8em;
+            text-align: center;
+            flex-grow: 1; /* Allow title to take available space */
+        }
+
+        .dashboard-header .logout-button {
+            background-color: #ffcc29; /* Heritage accent color */
+            color: #004494;
+            padding: 8px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+            white-space: nowrap; /* Prevent button text from wrapping */
+        }
+
+        .dashboard-header .logout-button:hover {
+            background-color: #e0b821;
+        }
+
+        /* Main Content Area */
+        .dashboard-content {
+            padding: 20px; /* Adjusted for smaller screens */
+            width: 100%;
+            max-width: 800px; /* Limit content width */
+            margin: 20px auto; /* Center the content */
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+            box-sizing: border-box; /* Include padding in width */
+        }
+
+        /* Messages */
+        .message {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            text-align: center;
+            border: 1px solid transparent;
+            word-wrap: break-word; /* Ensure long messages break */
+        }
+
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+
+        /* Form Styling */
+        .form-standard {
+            display: grid;
+            grid-template-columns: 1fr; /* Single column by default for mobile */
+            gap: 20px; /* Space between form groups */
+        }
+
+        @media (min-width: 600px) {
+            .form-standard {
+                grid-template-columns: 1fr 1fr; /* Two columns on wider screens */
+            }
+            /* Make specific fields span both columns if needed */
+            .form-group.full-width {
+                grid-column: span 2;
+            }
+             .button-primary {
+                grid-column: span 2; /* Make button span both columns on wider screens */
+            }
+        }
+
+        .form-group {
+            margin-bottom: 0; /* Reset margin due to grid gap */
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+            font-size: 0.95em;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group input[type="password"],
+        .form-group input[type="tel"],
+        .form-group input[type="date"],
+        .form-group input[type="number"],
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+        }
+
+        .form-group input[type="file"] {
+            padding: 5px;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 0.85em;
+        }
+
+        .button-primary {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            width: 100%; /* Full width on small screens */
+            margin-top: 10px; /* Space above button */
+        }
+
+        .button-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 30px;
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive adjustments for header */
+        @media (max-width: 768px) {
+            .dashboard-header {
+                flex-direction: column; /* Stack logo, title, and logout vertically */
+                padding: 10px 15px;
+                text-align: center;
+            }
+            .dashboard-header .logo {
+                margin-bottom: 10px;
+            }
+            .dashboard-header h2 {
+                font-size: 1.5em;
+                margin-bottom: 10px;
+            }
+            .dashboard-header .logout-button {
+                padding: 6px 12px;
+                font-size: 0.9em;
+            }
+        }

@@ -1,0 +1,328 @@
+/* frontend/my_cards.css */
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #f4f7f6;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+.user-header {
+    background-color: #004494; /* Darker blue */
+    color: white;
+    padding: 15px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    width: 100%;
+}
+.user-header .logo {
+    height: 40px;
+}
+.user-header h2 {
+    margin: 0;
+    font-size: 1.8em;
+}
+.user-header .logout-button {
+    background-color: #ffcc29;
+    color: #004494;
+    padding: 8px 15px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+.user-header .logout-button:hover {
+    background-color: #e0b821;
+}
+
+.dashboard-content {
+    padding: 30px;
+    width: 100%;
+    max-width: 900px;
+    margin: 20px auto;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    box-sizing: border-box;
+}
+.section-header {
+    color: #333;
+    margin-bottom: 20px;
+    font-size: 1.8em;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+}
+.message {
+    padding: 10px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    text-align: center;
+}
+.message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+.message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Card Display Styles */
+.card-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+    justify-content: center;
+    margin-top: 30px;
+}
+.card-item {
+    color: white;
+    padding: 25px;
+    border-radius: 15px;
+    width: 350px;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    position: relative;
+    font-family: 'Roboto Mono', monospace;
+    background: linear-gradient(45deg, #004d40, #00796b); /* Default */
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 200px;
+}
+/* Specific card network gradients */
+.card-item.visa {
+    background: linear-gradient(45deg, #2a4b8d, #3f60a9);
+}
+.card-item.mastercard {
+    background: linear-gradient(45deg, #eb001b, #ff5f00);
+}
+.card-item.amex {
+    background: linear-gradient(45deg, #0081c7, #26a5d4);
+}
+.card-item.verve {
+    background: linear-gradient(45deg, #006633, #009933);
+}
+
+.card-item h4 {
+    margin-top: 0;
+    font-size: 1.1em;
+    color: rgba(255,255,255,0.8);
+}
+.card-item .chip {
+    width: 50px;
+    height: 35px;
+    background-color: #d4af37;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+.card-item .card-number {
+    font-size: 1.6em;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    word-wrap: break-word;
+}
+.card-item .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-size: 0.9em;
+}
+.card-item .card-footer .label {
+    font-size: 0.7em;
+    opacity: 0.7;
+    margin-bottom: 3px;
+}
+.card-item .card-footer .value {
+    font-weight: bold;
+}
+.card-logo-img {
+    position: absolute;
+    bottom: 25px;
+    right: 25px;
+    height: 40px;
+    max-width: 80px;
+}
+.card-status {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+.card-status.active {
+    background-color: #28a745;
+    color: white;
+}
+.card-status.inactive {
+    background-color: #dc3545;
+    color: white;
+}
+
+.pin-action {
+    text-align: center;
+    margin-top: 20px;
+}
+.pin-action button,
+.pin-action a {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+.pin-action button:hover,
+.pin-action a:hover {
+    background-color: #0056b3;
+}
+.pin-action button[disabled] {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+/* Responsive adjustments for cards */
+@media (max-width: 768px) {
+    .card-container {
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+    }
+    .card-item {
+        width: 90%;
+        max-width: 350px;
+    }
+}
+
+/* Order Card Form Styles */
+.order-card-section {
+    margin-top: 40px;
+    padding-top: 30px;
+    border-top: 2px solid #eee;
+}
+.order-card-section h3 {
+    font-size: 1.5em;
+    color: #333;
+    margin-bottom: 20px;
+}
+.order-card-form label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #555;
+}
+.order-card-form select,
+.order-card-form input[type="text"],
+.order-card-form input[type="email"],
+.order-card-form textarea { /* Added textarea */
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1em;
+    box-sizing: border-box;
+}
+.order-card-form select:focus,
+.order-card-form input[type="text"]:focus,
+.order-card-form input[type="email"]:focus,
+.order-card-form textarea:focus { /* Added textarea */
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.25);
+}
+.order-card-form button[type="submit"] {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    width: 100%; /* Ensure button is full width */
+    padding: 12px;
+    border-radius: 5px;
+    font-size: 1em;
+}
+.order-card-form button[type="submit"]:hover {
+    background-color: #218838;
+}
+.order-card-form button[type="submit"]:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+/* Message Box Overlay Styles */
+.message-box-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.message-box-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.message-box-content {
+    background: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    position: relative;
+}
+
+.message-box-base {
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.message-box-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.message-box-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.message-box-overlay button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: background-color 0.3s ease;
+}
+
+.message-box-overlay button:hover {
+    background-color: #0056b3;
+}

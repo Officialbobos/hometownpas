@@ -1,0 +1,309 @@
+/* Import Inter font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Basic Reset & Global Styles */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    min-height: 100vh; /* Ensure body takes full viewport height */
+    font-family: 'Inter', sans-serif;
+    display: flex; /* Use flexbox for the entire body to center content */
+    flex-direction: column; /* Arrange content vertically */
+    justify-content: space-between; /* Push login card to center, footer to bottom */
+    align-items: center; /* Center horizontally */
+    overflow: auto; /* Allow scrolling if content overflows */
+}
+
+/* Background Container (if you want a specific background image/pattern) */
+.background-container {
+    position: fixed; /* Fixed to cover the entire viewport */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); /* Gradient background */
+    background-image: url('https://i.imgur.com/ckTfzLv.jpeg');
+    background-size: cover;
+    background-position: center;
+    filter: brightness(0.8); /* Slightly dim the background */
+    z-index: -1; /* Send it to the back */
+}
+
+/* Login Card Container - Used for centering the card */
+.login-card-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    flex-grow: 1; /* Allows this container to take up available space, pushing footer down */
+    padding: 20px; /* Add some padding around the card */
+    box-sizing: border-box; /* Include padding in the element's total width and height */
+}
+
+/* Login Card Styling */
+.login-card {
+    background-color: rgba(255, 255, 255, 0.9); /* Slightly translucent white background */
+    border-radius: 15px; /* Rounded corners */
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); /* Soft shadow */
+    padding: 40px;
+    width: 100%;
+    max-width: 400px; /* Maximum width for desktop */
+    text-align: center;
+    position: relative; /* For potential absolute positioning of elements inside */
+    z-index: 1; /* Bring it above the background */
+}
+
+/* Bank Logo Styling */
+.bank-logo {
+    margin-bottom: 30px;
+}
+
+.bank-logo img {
+    max-width: 180px; /* Adjust logo size */
+    height: auto;
+    display: block; /* Remove extra space below image */
+    margin: 0 auto; /* Center the image */
+    border-radius: 8px; /* Slightly rounded corners for the logo if it's a square image */
+}
+
+/* Form Group Styling */
+.form-group {
+    margin-bottom: 25px;
+    text-align: left; /* Align labels and inputs to the left */
+    position: relative; /* For positioning the forgot password link */
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+.input-label {
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.two-factor-instruction { /* Added for 2FA form instruction */
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.input-wrapper {
+    position: relative;
+}
+
+.input-wrapper input {
+    width: calc(100% - 20px); /* Account for padding */
+    padding: 12px 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px; /* Rounded input fields */
+    font-size: 1rem;
+    color: #333;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.input-wrapper input:focus {
+    outline: none;
+    border-color: #2575fc;
+    box-shadow: 0 0 0 3px rgba(37, 117, 252, 0.2);
+}
+
+/* Forgot Password Link */
+.forgot-password-link {
+    position: absolute;
+    right: 0;
+    bottom: -25px; /* Position below the input field */
+    font-size: 0.85rem;
+    color: #2575fc;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.forgot-password-link:hover {
+    color: #6a11cb;
+    text-decoration: underline;
+}
+
+/* Buttons Group */
+.buttons-group {
+    margin-top: 35px;
+    display: flex; /* Make buttons flex items */
+    flex-direction: column; /* Stack them vertically */
+    gap: 15px; /* Space between buttons */
+}
+
+/* Primary Button Styling */
+.btn-primary {
+    width: 100%;
+    padding: 15px 20px;
+    background: linear-gradient(45deg, #2575fc, #6a11cb); /* Gradient button */
+    color: #ffffff;
+    border: none;
+    border-radius: 10px; /* More rounded button */
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(45deg, #6a11cb, #2575fc); /* Reverse gradient on hover */
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px); /* Slight lift effect */
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Secondary Button Styling (for Resend Code) */
+.btn-secondary {
+    width: 100%;
+    padding: 15px 20px;
+    background-color: #6c757d; /* Grey */
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+    transform: translateY(-2px);
+}
+
+/* Tertiary Button Styling (for Back to Login) */
+.btn-tertiary {
+    width: 100%;
+    padding: 15px 20px;
+    background-color: transparent;
+    color: #2575fc;
+    border: 1px solid #2575fc;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 15px; /* Space above this button */
+}
+
+.btn-tertiary:hover {
+    background-color: rgba(37, 117, 252, 0.1);
+    color: #6a11cb;
+    border-color: #6a11cb;
+}
+
+/* Message Box Styling (for script.js messages) */
+.message-box {
+    margin-top: 20px;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    text-align: center;
+    /* Styles are dynamically set by script.js */
+}
+
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .login-card {
+        padding: 30px 25px; /* Reduce padding on smaller screens */
+        max-width: 90%; /* Allow card to take more width on smaller screens */
+    }
+
+    .bank-logo img {
+        max-width: 150px; /* Smaller logo on mobile */
+    }
+
+    .input-wrapper input {
+        font-size: 0.95rem; /* Slightly smaller font for inputs */
+    }
+
+    .btn-primary, .btn-secondary, .btn-tertiary {
+        font-size: 1rem; /* Slightly smaller font for buttons */
+        padding: 12px 15px;
+    }
+
+    .forgot-password-link {
+        font-size: 0.8rem;
+        bottom: -20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-card {
+        padding: 25px 20px;
+    }
+    .bank-logo {
+        margin-bottom: 20px;
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .buttons-group {
+        gap: 10px;
+    }
+}
+
+/* Accessibility: Hide visually but keep for screen readers */
+.sr-only {
+    border: 0;
+    clip: rect(0, 0, 0, 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+}
+
+/* Footer Styling */
+footer {
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.7); /* Dark, slightly transparent background */
+    color: #ffffff;
+    text-align: center;
+    padding: 20px 0;
+    font-size: 0.9rem;
+    /* margin-top: auto; This is handled by flex-grow on login-card-container */
+    position: relative; /* Ensure it's part of the flow */
+    z-index: 0; /* Below the login card, above background */
+    box-sizing: border-box;
+}
+
+footer p {
+    margin: 0 0 10px 0;
+}
+
+.footer-links {
+    margin-top: 10px;
+}
+
+.footer-links a {
+    color: #ffffff;
+    text-decoration: none;
+    margin: 0 15px;
+    transition: color 0.2s ease;
+}
+
+.footer-links a:hover {
+    color: #2575fc; /* Highlight on hover */
+    text-decoration: underline;
+}
