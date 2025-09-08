@@ -350,8 +350,8 @@ if ($transactionsCollection && $usersCollection) {
                                         ?>
                                     </td>
                                     <td data-label="Actions">
-                                        <form action="transactions_management.php?status_filter=<?php echo htmlspecialchars($status_filter); ?>" method="POST" style="display:inline-block;">
-                                            <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
+                                    <form action="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/users/transactions_management.php?status_filter=<?php echo htmlspecialchars($status_filter); ?>" method="POST" style="display:inline-block;">
+                                    <input type="hidden" name="transaction_id" value="<?php echo htmlspecialchars($tx['_id'] ?? ''); ?>">
                                             <select name="new_status" style="padding: 5px; margin-right: 5px; margin-bottom: 5px;">
                                                 <option value="">Set Status</option>
                                                 <?php
