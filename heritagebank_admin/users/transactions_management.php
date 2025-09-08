@@ -25,7 +25,7 @@ if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) |
 
 // --- MongoDB Connection ---
 $client = null;
-$database = null;
+$database = null; 
 $transactionsCollection = null;
 $usersCollection = null;
 
@@ -232,7 +232,7 @@ if ($transactionsCollection && $usersCollection) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - Transaction Management</title>
     <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/style.css">
-    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/transaction.css">
+    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/users/transaction.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
