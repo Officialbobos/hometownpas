@@ -127,12 +127,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $message_type = $operation_type;
                                 $_POST = array(); // Clear POST data to reset form fields
 
-                                // NEW: Set a session variable for the user's dashboard
+                                // Updated: Set a session variable for the user's dashboard
                                 $_SESSION['user_funds_message'] = [
                                     'title' => 'Account Update',
-                                    'message' => 'Your account has been updated by an administrator. ' . htmlspecialchars($admin_description) . '.<br>Amount: ' . ($operation_type === 'credit' ? '+' : '-') . number_format($amount, 2) . '<br>New Balance: ' . number_format($new_balance, 2),
-                                    'type' => $operation_type === 'credit' ? 'success' : 'error', // Use 'success' and 'error' for general modal styling
-                                    'user_id' => (string)$user_id // Store the user ID to prevent cross-user messages
+                                    'message' => 'Your account has been updated by an administrator. ' . htmlspecialchars($admin_description) . '.<br>Amount: ' . number_format($amount, 2) . '<br>New Balance: ' . number_format($new_balance, 2),
+                                    'type' => $operation_type === 'credit' ? 'success' : 'error',
+                                    'operation_type' => $operation_type, // This is the new key to fix the issue
+                                    'user_id' => (string)$user_id
                                 ];
                             } else {
                                 $message = "Error recording transaction for account " . htmlspecialchars($account_number_input) . ". (Transaction insert failed)";
