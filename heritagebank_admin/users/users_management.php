@@ -103,9 +103,9 @@ if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) |
             <nav class="user-management-nav">
                 <ul>
                     <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/create_user'; ?>">Create New User</a></li>
-                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/users/manage_users'; ?>">Manage Users (Edit/Delete)</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin//manage_users'; ?>">Manage Users (Edit/Delete)</a></li>
                     <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/manage_user_funds'; ?>">Manage User Funds (Credit/Debit)</a></li>
-                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/heritagebank_admin/users/account_status_management.php'; ?>">Manage Account Status</a></li>
+                    <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/account_status_management.php'; ?>">Manage Account Status</a></li>
                     <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/transactions_management'; ?>">Transactions Management</a></li>
                     <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/generate_bank_card'; ?>">Generate Bank Card (Mock)</a></li>
                     <li><a href="<?php echo rtrim(BASE_URL, '/') . '/admin/generate_mock_transaction'; ?>">Generate Mock Transaction</a></li>
