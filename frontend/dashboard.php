@@ -62,6 +62,17 @@ $transaction_alert = $_SESSION['transaction_alert'] ?? null;
 // IMPORTANT: Clear the session variable immediately after fetching it
 unset($_SESSION['transaction_alert']);
 
+// NEW: Check for and display admin-initiated funds message
+$user_funds_message = null;
+if (isset($_SESSION['user_funds_message']) && isset($_SESSION['user_id'])) {
+    // Check that the message is for the currently logged-in user
+    if ($_SESSION['user_funds_message']['user_id'] === (string)$_SESSION['user_id']) {
+        $user_funds_message = $_SESSION['user_funds_message'];
+        // Clear the session message so it's only shown once
+        unset($_SESSION['user_funds_message']);
+    }
+}
+
 
 $user_id = $_SESSION['user_id'];
 // Fetch first_name, last_name, email from session (set during login)
@@ -229,7 +240,7 @@ if (!function_exists('get_currency_symbol')) {
             <div class="accounts-header-row">
                 <h2>Accounts</h2>
                 <div class="view-all-link">
-                   <a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/accounts.php">View all</a>
+                    <a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/accounts.php">View all</a>
                 </div>
             </div>
             <div class="account-cards-container">
@@ -518,6 +529,9 @@ if (!function_exists('get_currency_symbol')) {
         const sessionCardModalMessage = <?php echo json_encode($sessionCardModalMessage); ?>;
         const sessionCardModalType = <?php echo json_encode($sessionCardModalType); ?>;
 
+        // NEW: Admin-initiated credit/debit message
+        const userFundsMessage = <?php echo json_encode($user_funds_message); ?>;
+
 
         document.addEventListener('DOMContentLoaded', function() {
             const dynamicMessageModal = document.getElementById('dynamicMessageModal');
@@ -529,8 +543,12 @@ if (!function_exists('get_currency_symbol')) {
             let titleToShow = '';
             let typeToShow = ''; // To apply class for styling
 
-            // Prioritize session-based modal for immediate notifications
-            if (sessionCardModalDisplay && sessionCardModalMessage) {
+            // Prioritize admin-initiated funds message for immediate alerts
+            if (userFundsMessage) {
+                messageToShow = userFundsMessage.message;
+                titleToShow = userFundsMessage.title;
+                typeToShow = userFundsMessage.type;
+            } else if (sessionCardModalDisplay && sessionCardModalMessage) { // Then check session-based card modal
                 messageToShow = sessionCardModalMessage;
                 titleToShow = "Important Card Update";
                 typeToShow = sessionCardModalType;
