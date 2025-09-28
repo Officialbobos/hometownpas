@@ -130,24 +130,30 @@ function sendEmail(string $to, string $subject, string $body, ?string $altBody =
     $mail = new PHPMailer(true); // Enable exceptions
 
     try {
+        // --- START DEBUG IMPLEMENTATION ---
+        $mail->SMTPDebug  = SMTP::DEBUG_SERVER; // Set to 2 or 3 for detailed server logs (SMTP::DEBUG_SERVER == 2)
+        $mail->Debugoutput = 'error_log';       // Direct debug output to the PHP error log
+        error_log("--- Attempting to send email to $to using PHPMailer Debug ---");
+        // --- END DEBUG IMPLEMENTATION ---
+        
         // Server settings - NOW USING CONSTANTS FROM Config.php
         $mail->isSMTP();
-        $mail->Host       = SMTP_HOST;           // Use constant from Config.php
-        $mail->SMTPAuth   = true;                // Enable SMTP authentication
-        $mail->Username   = SMTP_USERNAME;       // Use constant from Config.php
-        $mail->Password   = SMTP_PASSWORD;       // Use constant from Config.php
+        $mail->Host      = SMTP_HOST;           // Use constant from Config.php
+        $mail->SMTPAuth  = true;                // Enable SMTP authentication
+        $mail->Username  = SMTP_USERNAME;       // Use constant from Config.php
+        $mail->Password  = SMTP_PASSWORD;       // Use constant from Config.php
 
         // Correctly set SMTPSecure based on constant from Config.php
-        // PHPMailer::ENCRYPTION_SMTPS for SSL, PHPMailer::ENCRYPTION_STARTTLS for TLS
         if (defined('SMTP_ENCRYPTION') && strtolower(SMTP_ENCRYPTION) === 'ssl') {
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
         } elseif (defined('SMTP_ENCRYPTION') && strtolower(SMTP_ENCRYPTION) === 'tls') {
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            // Also enable TLS fallback if STARTTLS fails (optional, but good practice)
+            $mail->SMTPAutoTLS = true; 
         } else {
-            // Default or no encryption if not specified, often not recommended for production
-            $mail->SMTPSecure = ''; // No encryption
+            $mail->SMTPSecure = ''; // No encryption (not recommended for Gmail)
         }
-        $mail->Port       = SMTP_PORT;           // Use constant from Config.php
+        $mail->Port      = SMTP_PORT;           // Use constant from Config.php
 
         // Recipients
         $mail->setFrom(SMTP_FROM_EMAIL, SMTP_FROM_NAME); // Use constants from Config.php
@@ -163,12 +169,11 @@ function sendEmail(string $to, string $subject, string $body, ?string $altBody =
         error_log("Email sent successfully to $to. Subject: $subject");
         return true;
     } catch (PHPMailerException $e) { // Use the aliased exception here
-        // Log the error for debugging. These errors are critical for email delivery.
-        error_log("Email could not be sent to $to. Mailer Error: {$mail->ErrorInfo}. Exception: {$e->getMessage()}");
+        // The Debugoutput will already have logged the connection/authentication details
+        error_log("Email could not be sent to $to. FINAL Mailer Error: {$mail->ErrorInfo}. Exception: {$e->getMessage()}");
         return false;
     }
 }
-
 
 // --- Helper Functions for Currency and Financial Math (bcmath) ---
 
