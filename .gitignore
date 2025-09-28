@@ -3,9 +3,9 @@
 composer.lock  # Optional: If you want to let Composer manage lock file on deploy, but generally it's better to commit this.
 
 # Environment variables file (CRUCIAL for security!)
+
 .env
 .env.*.local # Ignore any local environment override files like .env.local
-
 # IDE and OS specific files
 .idea/             # JetBrains IDEs (IntelliJ, PhpStorm, WebStorm, etc.)
 .vscode/           # VS Code settings
@@ -34,3 +34,8 @@ cache/
 
 # If you have specific development-only config files not meant for repo
 # Config.local.php
+
+
+
+
+
