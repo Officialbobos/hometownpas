@@ -79,6 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
     $description = sanitize_input($_POST['description'] ?? '');
     $transfer_method = sanitize_input($_POST['transfer_method'] ?? '');
     $recipient_name = sanitize_input($_POST['recipient_name'] ?? '');
+    // Get the submitted Transfer PIN
+    $transfer_pin = sanitize_input($_POST['transfer_pin'] ?? ''); 
 
     // Store current form data for re-population in case of error
     $_SESSION['form_data'] = $_POST;
@@ -91,6 +93,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         header('Location: ' . BASE_URL . '/frontend/transfer.php');
         exit;
     }
+    
+    // START MODIFIED PIN VALIDATION BLOCK (Only checks for 4-digit format)
+
+    // Validate Transfer PIN format
+    if (empty($transfer_pin) || !preg_match('/^\d{4}$/', $transfer_pin)) {
+        $_SESSION['message'] = "A valid 4-digit Transfer PIN is required to complete the transfer.";
+        $_SESSION['message_type'] = "error";
+        error_log("make_transfer.php: Validation error - invalid or missing Transfer PIN format.");
+        header('Location: ' . BASE_URL . '/frontend/transfer.php');
+        exit;
+    }
+
+    // *** SECURITY NOTE: The previous code block for fetching and verifying the PIN 
+    //     has been intentionally removed to satisfy the user request of accepting 
+    //     "any number for transfer pin". The transfer proceeds as long as a 
+    //     4-digit number is provided. ***
+
+    // END MODIFIED PIN VALIDATION BLOCK
 
     // Convert source_account_id to ObjectId
     try {
@@ -326,7 +346,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             $destination_account_display = "USA Bank: " . htmlspecialchars($recipient_usa_routing_number) . " Acc: " . htmlspecialchars($recipient_usa_account_number);
             break;
 
-        case 'external_canada_eft': // ADDED: Canadian Electronic Funds Transfer (EFT)
+        case 'external_canada_eft': // Canadian Electronic Funds Transfer (EFT)
             $recipient_bank_name_canada = sanitize_input($_POST['recipient_bank_name_canada'] ?? '');
             $recipient_transit_number_canada = sanitize_input($_POST['recipient_transit_number_canada'] ?? '');
             $recipient_institution_number_canada = sanitize_input($_POST['recipient_institution_number_canada'] ?? '');

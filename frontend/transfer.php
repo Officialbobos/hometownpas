@@ -137,12 +137,13 @@ switch ($active_transfer_method) {
     case 'domestic_wire':
         $active_transfer_method = 'external_usa_account';
         break;
-    case 'canada_bank': // ADDED: New case for Canadian transfer
-        $active_transfer_method = 'external_canada_account';
+    case 'canada_bank':
+        // *** MODIFIED: Renamed to match the make_transfer.php backend logic 'external_canada_eft' ***
+        $active_transfer_method = 'external_canada_eft';
         break;
     default:
         // If it's not one of the recognized types or form data values, default to internal_self
-        if (!in_array($active_transfer_method, ['internal_self', 'internal_heritage', 'external_iban', 'external_sort_code', 'external_usa_account', 'external_canada_account'])) {
+        if (!in_array($active_transfer_method, ['internal_self', 'internal_heritage', 'external_iban', 'external_sort_code', 'external_usa_account', 'external_canada_eft'])) {
             $active_transfer_method = 'internal_self';
         }
         break;
@@ -218,11 +219,11 @@ switch ($active_transfer_method) {
                             <option value="external_iban" <?php echo ($active_transfer_method === 'external_iban' ? 'selected' : ''); ?>>International Bank Transfer (IBAN/SWIFT)</option>
                             <option value="external_sort_code" <?php echo ($active_transfer_method === 'external_sort_code' ? 'selected' : ''); ?>>UK Bank Transfer (Sort Code/Account No)</option>
                             <option value="external_usa_account" <?php echo ($active_transfer_method === 'external_usa_account' ? 'selected' : ''); ?>>USA Bank Transfer (Routing/Account No)</option>
-                            <option value="external_canada_account" <?php echo ($active_transfer_method === 'external_canada_account' ? 'selected' : ''); ?>>Canadian Bank Transfer (Transit/Institution No)</option>
+                            <option value="external_canada_eft" <?php echo ($active_transfer_method === 'external_canada_eft' ? 'selected' : ''); ?>>Canadian Bank Transfer (Transit/Institution No)</option>
                         </select>
                     </div>
 
-                   <div class="form-group">
+                    <div class="form-group">
                         <label for="source_account_id">From Account:</label>
                         <select id="source_account_id" name="source_account_id" class="form-control" required>
                             <option value="">-- Select Your Account --</option>
@@ -338,22 +339,22 @@ switch ($active_transfer_method) {
                         </div>
                     </div>
                     
-                    <div id="fields_external_canada_account" class="external-fields">
+                    <div id="fields_external_canada_eft" class="external-fields">
                         <div class="form-group">
                             <label for="recipient_bank_name_canada">Recipient Bank Name:</label>
                             <input type="text" id="recipient_bank_name_canada" name="recipient_bank_name_canada" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_bank_name_canada'] ?? ''); ?>">
                         </div>
                         <div class="form-group">
-                            <label for="recipient_institution_number">Recipient Institution Number (3 digits):</label>
-                            <input type="text" id="recipient_institution_number" name="recipient_institution_number" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_institution_number'] ?? ''); ?>" pattern="\d{3}" title="Institution Number must be 3 digits">
+                            <label for="recipient_institution_number_canada">Recipient Institution Number (3 digits):</label>
+                            <input type="text" id="recipient_institution_number_canada" name="recipient_institution_number_canada" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_institution_number_canada'] ?? ''); ?>" pattern="\d{3}" title="Institution Number must be 3 digits">
                         </div>
                         <div class="form-group">
-                            <label for="recipient_transit_number">Recipient Transit Number (5 digits):</label>
-                            <input type="text" id="recipient_transit_number" name="recipient_transit_number" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_transit_number'] ?? ''); ?>" pattern="\d{5}" title="Transit Number must be 5 digits">
+                            <label for="recipient_transit_number_canada">Recipient Transit Number (5 digits):</label>
+                            <input type="text" id="recipient_transit_number_canada" name="recipient_transit_number_canada" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_transit_number_canada'] ?? ''); ?>" pattern="\d{5}" title="Transit Number must be 5 digits">
                         </div>
                         <div class="form-group">
-                            <label for="recipient_canada_account_number">Recipient Account Number:</label>
-                            <input type="text" id="recipient_canada_account_number" name="recipient_canada_account_number" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_canada_account_number'] ?? ''); ?>">
+                            <label for="recipient_external_account_number_canada">Recipient Account Number (7-12 digits):</label>
+                            <input type="text" id="recipient_external_account_number_canada" name="recipient_external_account_number_canada" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_external_account_number_canada'] ?? ''); ?>">
                         </div>
                         <div class="form-group">
                             <label for="recipient_address_canada">Recipient Address:</label>
@@ -374,7 +375,6 @@ switch ($active_transfer_method) {
                         <label for="description">Description (Optional):</label>
                         <textarea id="description" name="description" rows="3" class="form-control"><?php echo htmlspecialchars($form_data['description'] ?? ''); ?></textarea>
                     </div>
-
                     <button type="submit" class="button-primary">Initiate Transfer</button>
                 </form>
             </div>
@@ -430,7 +430,8 @@ switch ($active_transfer_method) {
         const APP_DATA = {
             userAccountsData: <?php echo json_encode($user_accounts); ?>,
             initialSelectedFromAccount: '<?php echo htmlspecialchars($form_data['source_account_id'] ?? ''); ?>',
-            initialTransferMethod: '<?php echo htmlspecialchars($active_transfer_method); ?>',
+            // MODIFIED: Use 'external_canada_eft' for consistency
+            initialTransferMethod: '<?php echo htmlspecialchars($active_transfer_method); ?>', 
             showModal: <?php echo $show_modal_on_load ? 'true' : 'false'; ?>,
             modalDetails: <?php echo json_encode($transfer_success_details); ?>
         };
