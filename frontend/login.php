@@ -71,38 +71,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
             if ($user) {
                 // User found and credentials match
+
+                // --- START OF REMOVED 2FA LOGIC ---
+                /*
                 $twoFactorEnabled = $user['two_factor_enabled'] ?? false;
                 $twoFactorMethod = $user['two_factor_method'] ?? 'email'; // Default to 'email' if not set
-
-                // --- IMPORTANT SECURITY CHANGE for USER-ONLY LOGIN ---
-                // If this login.php is ONLY for regular users, we should NOT be checking or setting
-                // $_SESSION['is_admin'] here, as an admin should log in via a separate portal/page.
-                // For a user login, the 'role' would typically be 'user' or 'customer'.
-                // If a user *happens* to have 'is_admin' true in the DB, this frontend login should still
-                // treat them as a regular user for this interface, or prevent them from logging in here.
-
-                // For the purpose of separating user/admin login flows:
-                // Let's assume ANY user successfully logging in via this specific frontend/login.php
-                // will be treated as a standard user for this frontend.
-                // If you *must* block admin accounts from logging in here, you'd add:
-                // if (($user['role'] ?? 'user') === 'admin' || ($user['is_admin'] ?? false)) {
-                //      $message = "Administrators must log in via the admin portal.";
-                //      $message_type = "error";
-                //      // Maybe log this attempt
-                // } else { ... proceed with user login }
-
 
                 if ($twoFactorEnabled && $twoFactorMethod !== 'none') {
                     // 2FA is enabled for this user. Redirect to verification page.
                     $_SESSION['auth_step'] = 'awaiting_2fa';
-                    // temp_user_id is already set as user_id above, but explicitly setting for clarity in 2FA flow.
-                    // This is for verify_code.php to pick up the user.
                     $_SESSION['temp_user_id'] = (string) $user['_id'];
-                    $_SESSION['email'] = $user['email'] ?? ''; // Store user's email for display in verify_code.php
+                    $_SESSION['email'] = $user['email'] ?? '';
 
                     error_log("Login.php: 2FA enabled for user: " . $user['email'] . ". Setting session vars for 2FA.");
                     error_log("Login.php: Session dump before 2FA code generation: " . print_r($_SESSION, true));
-
 
                     // If 2FA method is email, generate and send code
                     if ($twoFactorMethod === 'email') {
@@ -163,8 +145,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
                 } else {
                     // No 2FA enabled for this user or method is 'none', log them in directly
+                */
+                // --- END OF REMOVED 2FA LOGIC ---
+
+                    // Log them in directly (this is the original 'else' block's content, now moved up)
                     $_SESSION['logged_in'] = true; // Mark as fully logged in
-                    $_SESSION['2fa_verified'] = true; // No 2FA, so consider it verified immediately
+                    $_SESSION['2fa_verified'] = true; // Bypassed 2FA, so consider it verified immediately
                     // Assuming you have a user ID or similar to store for the actual logged-in session
                     $_SESSION['user_id'] = (string)$user['_id']; 
                     // Set other necessary session vars for a logged-in user (e.g., first_name, role)
@@ -173,14 +159,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                     $_SESSION['email'] = $user['email'] ?? '';
 
 
-                    error_log("Login.php: 2FA NOT enabled for user " . $user['email'] . ". Logging in directly.");
+                    error_log("Login.php: Logging user in directly (2FA Bypassed).");
                     error_log("Login.php: Session dump before direct login redirect: " . print_r($_SESSION, true));
 
                     ob_end_clean(); // Discard any buffered output
                     $redirect_path = ($_SESSION['is_admin'] ?? false) ? '/admin' : '/dashboard';
                     header('Location: ' . BASE_URL . $redirect_path);
                     exit;
-                }
+                // } // The original 'else' closing brace
+
             } else {
                 // User not found or credentials do not match
                 $message = "Invalid last name or membership number.";
