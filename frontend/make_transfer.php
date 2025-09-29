@@ -132,7 +132,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             ['projection' => [
                 'transfer_pin_hash' => 1, 
                 'show_transfer_modal' => 1, 
-                'transfer_modal_message' => 1
+                'transfer_modal_message' => 1,
+                'transfer_fail_and_display' => 1 // FETCH THE NEW FLAG
             ]]
         );
     } catch (MongoDBException $e) {
@@ -167,9 +168,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
     // Capture Modal State after successful PIN verification
     $should_display_admin_modal = $user_data['show_transfer_modal'] ?? false;
     $admin_modal_message = $user_data['transfer_modal_message'] ?? '';
+    $transfer_fail_and_display = $user_data['transfer_fail_and_display'] ?? false; // CAPTURE NEW FLAG
     
     // END SECURE PIN VALIDATION BLOCK
 
+    // =========================================================================
+    // !!! NEW CRITICAL LOGIC: TRANSFER BLOCK CHECK !!!
+    // =========================================================================
+    if ($transfer_fail_and_display === true && $should_display_admin_modal === true && !empty($admin_modal_message)) {
+        // The admin has enabled the block AND the message is set to be displayed.
+        
+        // 1. Set the admin message for display on the next page load.
+        $_SESSION['admin_transfer_modal_message'] = $admin_modal_message;
+        $_SESSION['show_modal_on_load'] = true;
+
+        // 2. Set an error message indicating the block.
+        // We use a general message, but the modal provides the specific admin reason.
+        $_SESSION['message'] = "The transaction could not be processed due to a temporary hold on your account. Please review the message below.";
+        $_SESSION['message_type'] = "error";
+        
+        // 3. Log the event.
+        error_log("make_transfer.php: CRITICAL BLOCK: Transfer blocked by admin setting 'transfer_fail_and_display' for user " . $user_id);
+        
+        // 4. Redirect immediately, preventing any further transaction logic.
+        header('Location: ' . BASE_URL . '/frontend/transfer.php');
+        exit;
+    }
+    // =========================================================================
+    
     // Convert source_account_id to ObjectId
     try {
         $sourceAccountIdObject = new ObjectId($source_account_id);
@@ -215,7 +241,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
 
     $destination_account_display = null; // Initialize for use in modal details and email
 
-    // Handle different transfer methods
+    // Handle different transfer methods (omitting large switch-case for brevity, as it remains unchanged)
+    // NOTE: The switch statement logic is correct and remains in the final code.
     switch ($transfer_method) {
         case 'internal_self':
             $destination_account_id_self = sanitize_input($_POST['destination_account_id_self'] ?? '');
@@ -495,7 +522,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         // 3. Update the user's show_transfer_modal to false, so the admin message is only shown once
         $usersCollection->updateOne(
             ['_id' => new ObjectId($user_id)],
-            ['$set' => ['show_transfer_modal' => false]],
+            // IMPORTANT: Only unset the block if the transfer was successful and completed.
+            // If the block was NOT active, this field simply doesn't exist or is false, 
+            // and this update keeps it false/unset if it was already.
+            ['$set' => ['show_transfer_modal' => false]], 
             ['session' => $session]
         );
 
@@ -506,11 +536,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         $_SESSION['message_type'] = "success";
         $_SESSION['show_modal_on_load'] = true;
 
-        // Conditional Admin Modal Message Check
+        // Conditional Admin Modal Message Check (Even on success, display if the admin just wanted to show the message)
         if ($should_display_admin_modal && !empty($admin_modal_message)) {
             // If the admin had set the flag and a message, store it for override display in transfer.php
             $_SESSION['admin_transfer_modal_message'] = $admin_modal_message;
-            error_log("make_transfer.php: Admin-mandated transfer modal will display for user " . $user_id);
+            error_log("make_transfer.php: Admin-mandated transfer modal will display for user " . $user_id . " (Success).");
         }
 
         $_SESSION['transfer_success_details'] = [
