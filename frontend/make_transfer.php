@@ -73,23 +73,47 @@ try {
 // Check if form was submitted
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer'])) {
 
-    // Sanitize and validate common inputs
+    // ----------------------------------------------------------------------
+    // 🔥 FIX START: Decode the transfer data payload from the PIN form
+    // ----------------------------------------------------------------------
+    if (isset($_POST['transfer_data_payload']) && !empty($_POST['transfer_data_payload'])) {
+        $payload_data = json_decode($_POST['transfer_data_payload'], true);
+        
+        if (json_last_error() === JSON_ERROR_NONE && is_array($payload_data)) {
+            // Merge the decoded payload into the $_POST array.
+            // This makes the original form data available to the script 
+            // under the correct keys (e.g., $_POST['source_account_id']).
+            $_POST = array_merge($_POST, $payload_data);
+        } else {
+            // Log JSON decoding error and terminate
+            error_log("make_transfer.php: Error decoding transfer_data_payload JSON. Error: " . json_last_error_msg());
+            $_SESSION['message'] = "A critical data submission error occurred during security verification. Please try again.";
+            $_SESSION['message_type'] = "error";
+            header('Location: ' . BASE_URL . '/frontend/transfer.php');
+            exit;
+        }
+    }
+    // ----------------------------------------------------------------------
+    // 🔥 FIX END
+    // ----------------------------------------------------------------------
+
+    // Sanitize and validate common inputs (These now correctly read from the merged $_POST)
     $source_account_id = sanitize_input($_POST['source_account_id'] ?? '');
     $amount = filter_var($_POST['amount'] ?? 0, FILTER_VALIDATE_FLOAT);
     $description = sanitize_input($_POST['description'] ?? '');
     $transfer_method = sanitize_input($_POST['transfer_method'] ?? '');
     $recipient_name = sanitize_input($_POST['recipient_name'] ?? '');
-    // Get the submitted Transfer PIN
+    // Get the submitted Transfer PIN (this is sent directly, not in the payload)
     $transfer_pin = sanitize_input($_POST['transfer_pin'] ?? ''); 
 
     // Store current form data for re-population in case of error
     $_SESSION['form_data'] = $_POST;
 
-    // Basic validation
+    // Basic validation (This validation block now succeeds because of the fix above)
     if (empty($source_account_id) || $amount === false || $amount <= 0 || empty($transfer_method)) {
         $_SESSION['message'] = "Invalid transfer details. Please ensure all required fields are filled correctly.";
         $_SESSION['message_type'] = "error";
-        error_log("make_transfer.php: Validation error - missing or invalid basic fields.");
+        error_log("make_transfer.php: Validation error - missing or invalid basic fields after payload merge.");
         header('Location: ' . BASE_URL . '/frontend/transfer.php');
         exit;
     }
@@ -541,24 +565,24 @@ $email_body = '
 </div>
 ';
 
-// Assuming sendEmail function exists in functions.php
-// The sendEmail function should handle proper email headers (e.g., Content-Type for HTML)
-$email_sent = sendEmail($user_email, $email_subject, $email_body);
+        // Assuming sendEmail function exists in functions.php
+        // The sendEmail function should handle proper email headers (e.g., Content-Type for HTML)
+        $email_sent = sendEmail($user_email, $email_subject, $email_body);
 
-            if (!$email_sent) {
-                error_log("make_transfer.php: Failed to send transfer receipt email to " . $user_email . " for Ref: " . $transaction_data['reference_number']);
-            }
-        } else {
-            error_log("make_transfer.php: User email not found for notification for user_id: " . $user_id);
+        if (!$email_sent) {
+            error_log("make_transfer.php: Failed to send transfer receipt email to " . $user_email . " for Ref: " . $transaction_data['reference_number']);
         }
-        // --- End of Email Notification for User ---
+    } else {
+        error_log("make_transfer.php: User email not found for notification for user_id: " . $user_id);
+    }
+    // --- End of Email Notification for User ---
 
-        // Clear form data from session after success
-        unset($_SESSION['form_data']);
+    // Clear form data from session after success
+    unset($_SESSION['form_data']);
 
-        error_log("make_transfer.php: Transfer successful for user " . $user_id . ", Reference: " . $transaction_data['reference_number']);
-        header('Location: ' . BASE_URL . '/frontend/transfer.php');
-        exit;
+    error_log("make_transfer.php: Transfer successful for user " . $user_id . ", Reference: " . $transaction_data['reference_number']);
+    header('Location: ' . BASE_URL . '/frontend/transfer.php');
+    exit;
 
     } catch (MongoDBException $e) {
         if (isset($session) && $session->inTransaction()) {
