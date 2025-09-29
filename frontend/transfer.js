@@ -72,7 +72,12 @@ document.addEventListener('DOMContentLoaded', function() {
         allExternalFields.forEach(fieldDiv => {
             fieldDiv.style.display = 'none';
             fieldDiv.querySelectorAll('input, select, textarea').forEach(input => {
-                input.removeAttribute('required');
+                // Ensure required attributes are removed
+                input.removeAttribute('required'); 
+                // Ensure all Canadian fields are re-enabled if they were disabled by the saved payee select
+                if (input.id.includes('_canada')) { 
+                    input.disabled = false;
+                }
             });
         });
 
@@ -92,9 +97,16 @@ document.addEventListener('DOMContentLoaded', function() {
         let fieldsToShow = [];
         let recipientNameRequired = false;
 
+        // Element for internal self transfer
+        const destinationAccountSelf = document.getElementById('destination_account_id_self');
+
         switch (method) {
             case 'internal_self':
                 fieldsToShow.push('fields_internal_self');
+                // *** MODIFICATION: Explicitly set 'To My Account' as required immediately ***
+                if (destinationAccountSelf) {
+                    destinationAccountSelf.setAttribute('required', 'required'); 
+                }
                 break;
             case 'internal_heritage':
                 fieldsToShow.push('fields_internal_heritage');
@@ -126,7 +138,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 div.style.display = 'block';
                 div.querySelectorAll('input, select, textarea').forEach(input => {
                     // Only make required if not description or recipient name (handled separately)
-                    if (input.name && input.name !== 'description' && input.id !== 'recipient_name') {
+                    // and not the 'To My Account' field, which is handled in the switch block for internal_self
+                    if (input.name && input.name !== 'description' && input.id !== 'recipient_name' && input.id !== 'destination_account_id_self') {
                         input.setAttribute('required', 'required');
                     }
                 });
@@ -380,6 +393,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 1. Temporarily remove 'required' from ALL fields (except for the core fields which must be required)
         formElements.forEach(input => {
+            // Note: source_account_id, transfer_method, and amount are the core fields always required.
             if (input.id !== 'amount' && input.id !== 'source_account_id' && input.id !== 'transfer_method') {
                  input.removeAttribute('required');
             }
@@ -391,7 +405,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         switch (method) {
             case 'internal_self':
-                fieldsToRequire.push('destination_account_id_self');
+                fieldsToRequire.push('destination_account_id_self'); // Already set by showFieldsForMethod, but good to ensure here too.
                 break;
             case 'internal_heritage':
                 fieldsToRequire.push('recipient_account_number_internal');
