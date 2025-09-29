@@ -15,28 +15,28 @@ error_log("--- SCRIPT START (index.php) ---");
 // This is essential as Config.php and potentially functions.php depend on it (e.g., for Dotenv and MongoDB classes).
 require __DIR__ . '/vendor/autoload.php';
 
-// --- CONDITIONAL DOTENV LOADING (UPDATED FOR PXXL/GENERIC HOSTING) ---
-// We check if a critical environment variable is ALREADY set. If it is, we assume 
-// a hosting service (like pxxl) has provided it and skip loading the local .env file.
+// --- CONDITIONAL DOTENV LOADING ---
+// This block ensures that .env variables are loaded ONLY if not on Render.com.
+// Render provides environment variables directly, so dotenv is not needed there.
+$isRender = (getenv('RENDER') === 'true' || (isset($_SERVER['RENDER']) && $_SERVER['RENDER'] === 'true'));
 
-// Use getenv() to check for the presence of a critical variable.
-$isLocalEnvironment = !getenv('MONGODB_CONNECTION_URI'); 
-
-if ($isLocalEnvironment) {
-    // We are NOT on a host with pre-loaded variables (likely local development), so load .env file
+if (!$isRender) {
+    // We are NOT on Render (likely local development), so load .env file
     try {
         // Create an immutable Dotenv instance, pointing to the root of your project
+        // (where your .env file should be, typically the same directory as index.php)
         $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
         $dotenv->load();
         error_log("index.php: .env file loaded successfully locally.");
     } catch (Dotenv\Exception\InvalidPathException $e) {
         // This means the .env file wasn't found locally.
+        // It's a notice, not a fatal error, because we're handling it.
         error_log("index.php: NOTICE: .env file not found at " . __DIR__ . ". Assuming environment variables are pre-loaded or not needed for this environment. Error: " . $e->getMessage());
     }
 } else {
-    // We are on a hosting platform (like pxxl.app), environment variables are pre-loaded by the system.
+    // We are on Render, so environment variables are pre-loaded by the system.
     // No need to load a .env file.
-    error_log("index.php: Running on a hosting environment (e.g., pxxl.app), environment variables are pre-loaded by the system. Skipping .env file load.");
+    error_log("index.php: Running on Render.com, environment variables are pre-loaded by the system. Skipping .env file load.");
 }
 // --- END CONDITIONAL DOTENV LOADING ---
 
@@ -321,4 +321,3 @@ switch ($path) {
         break;
 }
 error_log("--- SCRIPT END ---");
-?>
