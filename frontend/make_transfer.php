@@ -513,76 +513,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             'transfer_method' => str_replace('_', ' ', $transfer_method)
         ];
 
-        // --- Start of Email Notification for User ---
-        // Fetch user's email for notification
-        // Note: The user data was already fetched once for the PIN, but refetching/re-projecting here for robustness is fine.
-        $user = $usersCollection->findOne(['_id' => new ObjectId($user_id)], ['projection' => ['email' => 1, 'first_name' => 1, 'last_name' => 1]]);
-        if ($user && isset($user['email'])) {
-            $user_email = $user['email'];
-            $user_full_name = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
-            if (empty($user_full_name)) {
-                $user_full_name = "Valued Customer"; // Fallback name
-            }
+        // ----------------------------------------------------------------------
+        // 🔥 REMOVED: Email Notification for User Block
+        // The block starting with 'if ($user && isset($user['email'])) { ...' 
+        // and ending with '... // --- End of Email Notification for User ---' is removed here.
+        // ----------------------------------------------------------------------
 
-            $email_subject = "Your Transfer Request Confirmation - Ref: " . $transaction_data['reference_number'];
+        // Clear form data from session after success
+        unset($_SESSION['form_data']);
 
-$email_body = '
-<div style="font-family: Arial, sans-serif; background-color: #1a1532; color: #FFFFFF; padding: 30px; line-height: 1.6;">
-    <div style="max-width: 600px; margin: 0 auto; background-color: #2e285a; padding: 25px; border-radius: 12px; border: 1px solid #4a4087; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);">
-        <div style="text-align: center; margin-bottom: 25px;">
-            <h1 style="color: #FFFFFF; font-size: 28px; text-shadow: 0 0 8px #9f91d0;">HomeTown Bank Pa</h1>
-            <p style="color: #d0c8e2; font-size: 16px;">Transfer Request Confirmation</p>
-        </div>
-
-        <p style="color: #e0dced; margin-bottom: 20px;">Dear <strong style="color: #FFFFFF;">' . htmlspecialchars($user_full_name) . '</strong>,</p>
-
-        <p style="color: #e0dced; margin-bottom: 20px;">Thank you for initiating a transfer. Your request has been successfully submitted and is currently <strong style="color: #c7baf1; text-shadow: 0 0 5px #c7baf1;">awaiting approval</strong>.</p>
-
-        <div style="background-color: #3b3472; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-            <h2 style="color: #FFFFFF; margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #5a5193; padding-bottom: 10px;">Transfer Details</h2>
-            <ul style="list-style: none; padding-left: 0; color: #d0c8e2;">
-                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Reference Number:</strong> <span style="color: #FFFFFF;">' . htmlspecialchars($transaction_data['reference_number']) . '</span></li>
-                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Amount:</strong> <span style="color: #FFFFFF;">' . get_currency_symbol($sourceAccount['currency']) . ' ' . number_format($amount, 2) . '</span></li>
-                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">From Account:</strong> <span style="color: #FFFFFF;">' . htmlspecialchars($sourceAccount['account_type'] . ' (' . $sourceAccount['account_number'] . ')') . '</span></li>
-                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">To Recipient:</strong> <span style="color: #FFFFFF;">' . htmlspecialchars($transaction_data['recipient_name']) . '</span></li>
-                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Recipient Details:</strong> <span style="color: #FFFFFF;">' . htmlspecialchars($destination_account_display) . '</span></li>
-                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Description:</strong> <span style="color: #FFFFFF;">' . htmlspecialchars($description) . '</span></li>
-                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Initiated On:</strong> <span style="color: #FFFFFF;">' . date('M d, Y H:i:s T') . '</span></li>
-                <li style="margin-bottom: 10px;"><strong style="color: #c7baf1;">Current Status:</strong> <span style="color: #c7baf1; text-shadow: 0 0 5px #c7baf1;">Pending Approval</span></li>
-            </ul>
-        </div>
-
-        <p style="color: #e0dced; margin-bottom: 20px;">We will notify you once your transfer has been reviewed and its status changes. You can also track your transfer status in your dashboard.</p>
-
-        <p style="color: #e0dced; margin-bottom: 15px;">If you have any questions, please do not hesitate to contact our support team.</p>
-
-        <p style="color: #e0dced;">Sincerely,</p>
-        <p style="color: #FFFFFF; font-weight: bold;">The HomeTown Bank Pa Team</p>
-    </div>
-    <div style="text-align: center; margin-top: 25px; color: #8880a1; font-size: 12px;">
-        <p>This is an automated confirmation email. Please do not reply.</p>
-    </div>
-</div>
-';
-
-        // Assuming sendEmail function exists in functions.php
-        // The sendEmail function should handle proper email headers (e.g., Content-Type for HTML)
-        $email_sent = sendEmail($user_email, $email_subject, $email_body);
-
-        if (!$email_sent) {
-            error_log("make_transfer.php: Failed to send transfer receipt email to " . $user_email . " for Ref: " . $transaction_data['reference_number']);
-        }
-    } else {
-        error_log("make_transfer.php: User email not found for notification for user_id: " . $user_id);
-    }
-    // --- End of Email Notification for User ---
-
-    // Clear form data from session after success
-    unset($_SESSION['form_data']);
-
-    error_log("make_transfer.php: Transfer successful for user " . $user_id . ", Reference: " . $transaction_data['reference_number']);
-    header('Location: ' . BASE_URL . '/frontend/transfer.php');
-    exit;
+        error_log("make_transfer.php: Transfer successful for user " . $user_id . ", Reference: " . $transaction_data['reference_number']);
+        header('Location: ' . BASE_URL . '/frontend/transfer.php');
+        exit;
 
     } catch (MongoDBException $e) {
         if (isset($session) && $session->inTransaction()) {
