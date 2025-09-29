@@ -1,6 +1,6 @@
 {
     "require": {
-        "php": "^8.3",
+        "php": ">=8.2.0",  
         "phpmailer/phpmailer": "*",
         "mongodb/mongodb": "^2.1",
         "vlucas/phpdotenv": "^5.0",
@@ -10,7 +10,10 @@
     },
     "config": {
         "platform": {
-            "php": "8.3"
+            "php": "8.2.16" 
+        },
+        "allow-plugins": {
+         
         }
     }
 }
