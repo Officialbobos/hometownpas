@@ -473,7 +473,7 @@ if (!function_exists('get_currency_symbol')) {
                 <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/accounts"><i class="fas fa-wallet"></i> Accounts</a></li>
                 <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/transfer"><i class="fas fa-exchange-alt"></i> Transfers</a></li>
                 <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/statements"><i class="fas fa-file-invoice"></i> Statements</a></li>
-                <li><a href="<?php rtrim(BASE_URL, '/'); ?>/profile"><i class="fas fa-user"></i> Profile</a></li>
+                <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/profile"><i class="fas fa-user"></i> Profile</a></li>
                 <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/settings"><i class="fas fa-cog"></i> Settings</a></li>
                 <li><a href="<?php echo rtrim(BASE_URL, '/'); ?>/bank_cards"><i class="fas fa-credit-card"></i> Bank Cards</a></li>
             </ul>
@@ -579,7 +579,7 @@ if (!function_exists('get_currency_symbol')) {
                         dynamicMessageModal.style.display = 'none';
                         // If this was a session-based card modal, signal to clear it on dismissal
                         if (sessionCardModalDisplay && sessionCardModalMessage) {
-                            fetch(BASE_URL_JS + '/api/clear_card_modal_session.php', {
+                            fetch(BASE_URL_JS + 'api/clear_card_modal_session.php', { // Corrected URL to use BASE_URL_JS correctly
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -604,7 +604,7 @@ if (!function_exists('get_currency_symbol')) {
                         dynamicMessageModal.style.display = 'none';
                         // Same logic for dismissing by clicking outside
                         if (sessionCardModalDisplay && sessionCardModalMessage) {
-                            fetch(BASE_URL_JS + '/api/clear_card_modal_session.php', {
+                            fetch(BASE_URL_JS + 'api/clear_card_modal_session.php', { // Corrected URL
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',

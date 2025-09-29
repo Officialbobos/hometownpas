@@ -164,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
                     ob_end_clean(); // Discard any buffered output
                     $redirect_path = ($_SESSION['is_admin'] ?? false) ? '/admin' : '/dashboard';
-                    header('Location: ' . BASE_URL . $redirect_path);
+                    header('Location: ' . rtrim(BASE_URL, '/') . $redirect_path);
                     exit;
                 // } // The original 'else' closing brace
 

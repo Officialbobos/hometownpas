@@ -26,7 +26,7 @@ if (file_exists($dotenvDir . '/.env')) {
     error_log("NOTICE: .env file not found at " . $dotenvDir . "/.env. Assuming environment variables are pre-loaded by the system.");
 }
 
-// --- START: DEBUGGING ENVIRONMENT VARIABLES ---
+// --- START: DEBUGGING ENVIRONMENT VARIABLES (Leaving this block untouched) ---
 error_log("--- PHP Environment Variable Debug Start ---");
 error_log("Listing contents of \$_ENV:");
 foreach ($_ENV as $key => $value) {
@@ -78,8 +78,7 @@ error_log("--- PHP Environment Variable Debug End ---");
 define('MONGODB_CONNECTION_URI', $_ENV['MONGODB_CONNECTION_URI'] ?? getenv('MONGODB_CONNECTION_URI') ?? null);
 define('MONGODB_DB_NAME', $_ENV['MONGODB_DB_NAME'] ?? getenv('MONGODB_DB_NAME') ?? 'HometownBankPA'); // Default if not set
 
-define('TWO_FACTOR_CODE_LENGTH', 6); // Standard length for most authenticator apps
-define('TWO_FACTOR_CODE_EXPIRY_MINUTES', 5); // Example: Code valid for 5 minutes
+// --- REMOVED TWO_FACTOR_CODE_LENGTH AND TWO_FACTOR_CODE_EXPIRY_MINUTES ---
 
 if (!defined('MONGODB_CONNECTION_URI') || empty(MONGODB_CONNECTION_URI)) {
     error_log("FATAL ERROR: MONGODB_CONNECTION_URI constant is still empty after Config.php execution. Check environment variables (e.g., on Render dashboard).");
