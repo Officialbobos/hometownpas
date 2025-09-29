@@ -124,11 +124,20 @@ $message_type = $_SESSION['message_type'] ?? '';
 $show_modal_on_load = $_SESSION['show_modal_on_load'] ?? false;
 $transfer_success_details = $_SESSION['transfer_success_details'] ?? [];
 
+// IMPORTANT: Check for the single-display admin message from the session
+$admin_transfer_modal_message_once = $_SESSION['admin_transfer_modal_message'] ?? '';
+// If the success message is present, and we have a one-time admin message, use it instead of the DB check
+if ($show_modal_on_load && !empty($admin_transfer_modal_message_once)) {
+    $admin_transfer_message = $admin_transfer_modal_message_once;
+}
+
+
 // Clear session variables after retrieving them
 unset($_SESSION['message']);
 unset($_SESSION['message_type']);
 unset($_SESSION['show_modal_on_load']);
 unset($_SESSION['transfer_success_details']);
+unset($_SESSION['admin_transfer_modal_message']); // Clear the one-time message
 
 // Restore form data if there was an error
 $form_data = $_SESSION['form_data'] ?? [];
@@ -420,7 +429,7 @@ switch ($active_transfer_method) {
                             <input type="text" id="recipient_zip_usa" name="recipient_zip_usa" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_zip_usa'] ?? ''); ?>">
                         </div>
                     </div>
-                    
+
                     <div id="fields_external_canada_eft" class="external-fields">
                         <div class="form-group">
                             <label for="recipient_saved_account_id_canada">Select Saved Recipient (Optional):</label>
@@ -568,7 +577,7 @@ switch ($active_transfer_method) {
             modalDetails: <?php echo json_encode($transfer_success_details); ?>,
             // NEW: Pass saved Canadian accounts for auto-filling fields
             savedCanadianAccounts: <?php echo json_encode($user_saved_canada_accounts); ?>,
-            // NEW: Pass the admin message
+            // NEW: Pass the admin message (either DB version or the one-time session version)
             adminTransferMessage: '<?php echo htmlspecialchars(addslashes($admin_transfer_message)); ?>'
         };
     </script>

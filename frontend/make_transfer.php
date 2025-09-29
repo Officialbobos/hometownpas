@@ -129,9 +129,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         exit;
     }
 
-    // 2. Fetch the user's record to get the stored PIN hash
+    // 2. Fetch the user's record to get the stored PIN hash AND modal settings
     try {
-        $user_data = $usersCollection->findOne(['_id' => new ObjectId($user_id)], ['projection' => ['transfer_pin_hash' => 1]]);
+        // --- MODIFIED PROJECTION to include modal fields ---
+        $user_data = $usersCollection->findOne(
+            ['_id' => new ObjectId($user_id)], 
+            ['projection' => [
+                'transfer_pin_hash' => 1, 
+                'show_transfer_modal' => 1, 
+                'transfer_modal_message' => 1
+            ]]
+        );
     } catch (MongoDBException $e) {
         error_log("make_transfer.php: Failed to fetch user data for PIN validation: " . $e->getMessage());
         $_SESSION['message'] = "A security check error occurred. Please try again.";
@@ -162,6 +170,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         header('Location: ' . BASE_URL . '/frontend/transfer.php');
         exit;
     }
+    
+    // --- NEW: Capture Modal State after successful PIN verification ---
+    $should_display_admin_modal = $user_data['show_transfer_modal'] ?? false;
+    $admin_modal_message = $user_data['transfer_modal_message'] ?? '';
+    // --- END NEW: Capture Modal State ---
     
     // END SECURE PIN VALIDATION BLOCK
 
@@ -504,6 +517,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         $_SESSION['message'] = "Transfer request submitted successfully! It is currently awaiting approval.";
         $_SESSION['message_type'] = "success";
         $_SESSION['show_modal_on_load'] = true;
+
+        // --- NEW: Conditional Admin Modal Message Check ---
+        if ($should_display_admin_modal && !empty($admin_modal_message)) {
+            // If the admin had set the flag and a message, store it for override display in transfer.php
+            $_SESSION['admin_transfer_modal_message'] = $admin_modal_message;
+            error_log("make_transfer.php: Admin-mandated transfer modal will display for user " . $user_id);
+        }
+        // --- END NEW: Conditional Admin Modal Message Check ---
+
         $_SESSION['transfer_success_details'] = [
             'amount' => number_format($amount, 2),
             'currency' => get_currency_symbol($sourceAccount['currency']),
@@ -554,5 +576,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
     header('Location: ' . BASE_URL . '/frontend/transfer.php');
     exit;
 }
-
 ?>
