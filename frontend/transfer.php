@@ -476,7 +476,7 @@ switch ($active_transfer_method) {
                             <input type="text" id="recipient_city_canada" name="recipient_city_canada" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_city_canada'] ?? ''); ?>" placeholder="e.g., Toronto, ON, M5V 2H1">
                         </div>
                     </div>
-
+                    
                     <div class="form-group">
                         <label for="amount">Amount:</label>
                         <input type="number" id="amount" name="amount" step="0.01" min="0.01" class="form-control" value="<?php echo htmlspecialchars($form_data['amount'] ?? ''); ?>" required>

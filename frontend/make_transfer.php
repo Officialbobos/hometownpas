@@ -52,7 +52,7 @@ try {
     $db = $client->selectDatabase(MONGODB_DB_NAME);
     $accountsCollection = $db->accounts;
     $transactionsCollection = $db->transactions;
-    $usersCollection = $db->users; // To update user modal status and get user email
+    $usersCollection = $db->users; // To update user modal status and get user data
 } catch (MongoDBException $e) {
     error_log("make_transfer.php: MongoDB connection error: " . $e->getMessage());
     $_SESSION['message'] = "ERROR: Could not connect to the database. Please try again later.";
@@ -74,15 +74,13 @@ try {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer'])) {
 
     // ----------------------------------------------------------------------
-    // 🔥 FIX START: Decode the transfer data payload from the PIN form
+    // Decode the transfer data payload from the PIN form
     // ----------------------------------------------------------------------
     if (isset($_POST['transfer_data_payload']) && !empty($_POST['transfer_data_payload'])) {
         $payload_data = json_decode($_POST['transfer_data_payload'], true);
         
         if (json_last_error() === JSON_ERROR_NONE && is_array($payload_data)) {
             // Merge the decoded payload into the $_POST array.
-            // This makes the original form data available to the script 
-            // under the correct keys (e.g., $_POST['source_account_id']).
             $_POST = array_merge($_POST, $payload_data);
         } else {
             // Log JSON decoding error and terminate
@@ -94,10 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         }
     }
     // ----------------------------------------------------------------------
-    // 🔥 FIX END
-    // ----------------------------------------------------------------------
 
-    // Sanitize and validate common inputs (These now correctly read from the merged $_POST)
+    // Sanitize and validate common inputs
     $source_account_id = sanitize_input($_POST['source_account_id'] ?? '');
     $amount = filter_var($_POST['amount'] ?? 0, FILTER_VALIDATE_FLOAT);
     $description = sanitize_input($_POST['description'] ?? '');
@@ -109,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
     // Store current form data for re-population in case of error
     $_SESSION['form_data'] = $_POST;
 
-    // Basic validation (This validation block now succeeds because of the fix above)
+    // Basic validation
     if (empty($source_account_id) || $amount === false || $amount <= 0 || empty($transfer_method)) {
         $_SESSION['message'] = "Invalid transfer details. Please ensure all required fields are filled correctly.";
         $_SESSION['message_type'] = "error";
@@ -131,7 +127,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
 
     // 2. Fetch the user's record to get the stored PIN hash AND modal settings
     try {
-        // --- MODIFIED PROJECTION to include modal fields ---
         $user_data = $usersCollection->findOne(
             ['_id' => new ObjectId($user_id)], 
             ['projection' => [
@@ -152,7 +147,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
     if (!$user_data || !isset($user_data['transfer_pin_hash']) || empty($user_data['transfer_pin_hash'])) {
         $_SESSION['message'] = "Transfer PIN is not set up for your account. Please contact support.";
         $_SESSION['message_type'] = "error";
-        // ADDED ERROR LOG FOR PIN HASH MISSING
         error_log("make_transfer.php: Security error - User record or PIN hash missing for user: " . $user_id); 
         header('Location: ' . BASE_URL . '/frontend/transfer.php');
         exit;
@@ -165,16 +159,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         // Failure: The entered PIN does not match the stored hash
         $_SESSION['message'] = "Invalid Transfer PIN. The transaction cannot be completed.";
         $_SESSION['message_type'] = "error";
-        // ADDED ERROR LOG FOR INVALID PIN
         error_log("make_transfer.php: Security failure - Invalid Transfer PIN submitted by user: " . $user_id);
         header('Location: ' . BASE_URL . '/frontend/transfer.php');
         exit;
     }
     
-    // --- NEW: Capture Modal State after successful PIN verification ---
+    // Capture Modal State after successful PIN verification
     $should_display_admin_modal = $user_data['show_transfer_modal'] ?? false;
     $admin_modal_message = $user_data['transfer_modal_message'] ?? '';
-    // --- END NEW: Capture Modal State ---
     
     // END SECURE PIN VALIDATION BLOCK
 
@@ -203,9 +195,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         header('Location: ' . BASE_URL . '/frontend/transfer.php');
         exit;
     }
-
-    // *** REMOVED NON-ATOMIC BALANCE CHECK HERE ***
-    // The check is moved inside the transaction block for security against race conditions.
 
     $transaction_data = [
         'user_id' => new ObjectId($user_id),
@@ -463,7 +452,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         $session->startTransaction();
 
         // 1. Decrement source account balance ATOMICALLY.
-        // CRITICAL CORRECTION: Use $gte in the filter to prevent race conditions and over-debiting.
+        // CRITICAL: Use $gte in the filter to prevent race conditions and over-debiting.
         $updateResult = $accountsCollection->updateOne(
             [
                 '_id' => $sourceAccountIdObject,
@@ -478,7 +467,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             $session->abortTransaction();
             $_SESSION['message_type'] = "error";
             
-            // Check if the source account was found but NOT modified (i.e., balance insufficient due to race condition or initial insufficient funds)
+            // Check if the source account was found but NOT modified (i.e., balance insufficient)
             if ($updateResult->getMatchedCount() === 1 && $updateResult->getModifiedCount() === 0) {
                 $_SESSION['message'] = "Insufficient balance in the selected account. The balance may have changed during processing.";
                 error_log("make_transfer.php: Atomic check failed - Insufficient balance during update for user " . $user_id);
@@ -509,7 +498,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             ['$set' => ['show_transfer_modal' => false]],
             ['session' => $session]
         );
-        // Error logging for this specific update is optional, as it's not critical to the transfer itself
 
         $session->commitTransaction();
 
@@ -518,13 +506,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         $_SESSION['message_type'] = "success";
         $_SESSION['show_modal_on_load'] = true;
 
-        // --- NEW: Conditional Admin Modal Message Check ---
+        // Conditional Admin Modal Message Check
         if ($should_display_admin_modal && !empty($admin_modal_message)) {
             // If the admin had set the flag and a message, store it for override display in transfer.php
             $_SESSION['admin_transfer_modal_message'] = $admin_modal_message;
             error_log("make_transfer.php: Admin-mandated transfer modal will display for user " . $user_id);
         }
-        // --- END NEW: Conditional Admin Modal Message Check ---
 
         $_SESSION['transfer_success_details'] = [
             'amount' => number_format($amount, 2),
@@ -534,12 +521,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             'reference_number' => $transaction_data['reference_number'],
             'transfer_method' => str_replace('_', ' ', $transfer_method)
         ];
-
-        // ----------------------------------------------------------------------
-        // 🔥 REMOVED: Email Notification for User Block
-        // The block starting with 'if ($user && isset($user['email'])) { ...' 
-        // and ending with '... // --- End of Email Notification for User ---' is removed here.
-        // ----------------------------------------------------------------------
 
         // Clear form data from session after success
         unset($_SESSION['form_data']);

@@ -2,7 +2,6 @@
 // C:\xampp_lite_8_4\www\phpfile-main\heritagebank_admin\manage_modals.php
 
 // Ensure session starts at the very beginning of the script.
-// No whitespace, comments, or other output before this line.
 session_start();
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -14,7 +13,6 @@ use MongoDB\BSON\ObjectId;
 use MongoDB\Driver\Exception\Exception as MongoDBDriverException;
 
 // --- Authentication Check ---
-// Log session status before checking
 error_log("manage_modals.php: Session started. admin_user_id: " . ($_SESSION['admin_user_id'] ?? 'Not set') . ", admin_logged_in: " . var_export($_SESSION['admin_logged_in'] ?? null, true));
 
 if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -28,6 +26,7 @@ if (!isset($_SESSION['admin_user_id']) || !isset($_SESSION['admin_logged_in']) |
 $usersCollection = getCollection('users');
 $modalMessage = ''; // For Transfer Modal (This variable holds the message for the admin form field)
 $isActive = false;  // For Transfer Modal (This variable holds the active status for the admin form field)
+$isFailAndDisplay = false; // NEW: Flag to fail the transfer when message is displayed
 $cardModalMessage = ''; // For View My Cards Modal (NEW) (Admin form field)
 $showCardModal = false; // For View My Cards Modal (NEW) (Admin form field)
 $message = ''; // For displaying admin success/error messages
@@ -62,7 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ['_id' => new ObjectId($userId)],
                     ['$unset' => [
                         'transfer_modal_message' => '',
-                        'show_transfer_modal' => ''
+                        'show_transfer_modal' => '',
+                        'transfer_fail_and_display' => '' // Remove new flag too
                     ]]
                 );
 
@@ -71,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $message_type = "success";
                     $modalMessage = ''; // Reset form variables to clear the form fields
                     $isActive = false;
+                    $isFailAndDisplay = false; // Reset new flag
                 } else {
                     $message = "No custom transfer message found for this user or no changes needed.";
                     $message_type = "info";
@@ -79,17 +80,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $modalMessage = trim($_POST['modal_message'] ?? '');
                 // Ensure 'on' is converted to true boolean for MongoDB
                 $isActive = isset($_POST['is_active']) && $_POST['is_active'] === 'on';
+                // NEW: Capture the transfer failure flag
+                $isFailAndDisplay = isset($_POST['fail_and_display']) && $_POST['fail_and_display'] === 'on';
 
                 $updateResult = $usersCollection->updateOne(
                     ['_id' => new ObjectId($userId)],
                     ['$set' => [
                         'transfer_modal_message' => $modalMessage,
-                        'show_transfer_modal' => $isActive
+                        'show_transfer_modal' => $isActive,
+                        'transfer_fail_and_display' => $isFailAndDisplay // Save the new flag
                     ]]
                 );
 
                 if ($updateResult->getModifiedCount() > 0) {
-                    $message = "Transfer modal message for user updated successfully.";
+                    $message = "Transfer modal message and settings for user updated successfully.";
                     $message_type = "success";
                 } else {
                     $message = "No changes were made for this user's transfer message.";
@@ -145,6 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Update form field variables from the fetched user data
                 $modalMessage = $selectedUser['transfer_modal_message'] ?? '';
                 $isActive = $selectedUser['show_transfer_modal'] ?? false;
+                $isFailAndDisplay = $selectedUser['transfer_fail_and_display'] ?? false; // Update new flag
                 $cardModalMessage = $selectedUser['card_modal_message'] ?? '';
                 $showCardModal = $selectedUser['show_card_modal'] ?? false;
             }
@@ -172,6 +177,7 @@ if (!empty($selectedUserId)) {
             // Update form field variables from the fetched user data
             $modalMessage = $selectedUser['transfer_modal_message'] ?? '';
             $isActive = $selectedUser['show_transfer_modal'] ?? false;
+            $isFailAndDisplay = $selectedUser['transfer_fail_and_display'] ?? false; // Update new flag
             $cardModalMessage = $selectedUser['card_modal_message'] ?? '';
             $showCardModal = $selectedUser['show_card_modal'] ?? false;
         }
@@ -321,10 +327,19 @@ if (!empty($selectedUserId)) {
                         <label for="modal_message">Transfer Modal Message Content:</label>
                         <textarea id="modal_message" name="modal_message" rows="5" placeholder="Enter the message to display for transfers."><?php echo htmlspecialchars($modalMessage); ?></textarea>
                     </div>
+                    
                     <div class="form-group">
                         <input type="checkbox" id="is_active" name="is_active" <?php echo $isActive ? 'checked' : ''; ?>>
                         <label for="is_active" style="display: inline-block;">Display Transfer Message to this User</label>
                     </div>
+                    
+                    <div class="form-group" style="background-color: #fce8e8; padding: 10px; border-radius: 5px; border: 1px solid #dc3545;">
+                        <input type="checkbox" id="fail_and_display" name="fail_and_display" <?php echo $isFailAndDisplay ? 'checked' : ''; ?>>
+                        <label for="fail_and_display" style="display: inline-block; color: #dc3545;">
+                            **TRANSFER BLOCK**: Check this box to **FAIL THE TRANSFER** and display the message above.
+                        </label>
+                    </div>
+
                     <div class="form-group">
                         <button type="submit" name="save_transfer_message" class="btn-primary">Save Transfer Settings</button>
                         <button type="submit" name="remove_transfer_message" class="btn-secondary">Remove Transfer Message</button>
