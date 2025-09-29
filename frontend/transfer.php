@@ -13,6 +13,34 @@ require_once __DIR__ . '/../Config.php';
 // Then load functions.php, which might depend on constants or autoloader from Config.php.
 require_once __DIR__ . '/../functions.php';
 
+// --- START: Missing PHP Helper Function (Define if not in functions.php) ---
+if (!function_exists('get_currency_symbol')) {
+    /**
+     * Returns the appropriate currency symbol for a given currency code.
+     * Assumed to be required for displaying balances.
+     * @param string $currency The three-letter currency code (e.g., 'USD', 'GBP').
+     * @return string The currency symbol or the code itself if not found.
+     */
+    function get_currency_symbol($currency) {
+        switch (strtoupper($currency)) {
+            case 'USD':
+                return '$';
+            case 'GBP':
+                return '£';
+            case 'EUR':
+                return '€';
+            case 'CAD':
+                return 'C$';
+            case 'NGN':
+                return '₦';
+            default:
+                return strtoupper($currency) . ' '; // Fallback to code + space
+        }
+    }
+}
+// --- END: Missing PHP Helper Function ---
+
+
 // Now, Composer classes are available because Config.php loaded autoload.php.
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
@@ -20,7 +48,6 @@ use MongoDB\Exception\Exception as MongoDBException;
 
 
 // Check login, etc.
-// *** CORRECTION: Use $_SESSION['logged_in'] for consistency with dashboard.php ***
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
     // Use defined BASE_URL constant for redirection
     header('Location: ' . BASE_URL . '/login.php'); // Changed /login to /login.php for direct access
@@ -39,7 +66,6 @@ if (empty($full_name)) {
 // Establish MongoDB connection
 try {
     // Check if constants are defined before using them
-    // These checks are good, but if Config.php is working correctly, they should always be true.
     if (!defined('MONGODB_CONNECTION_URI') || empty(MONGODB_CONNECTION_URI)) {
         throw new Exception("MONGODB_CONNECTION_URI is not defined or empty.");
     }
@@ -417,7 +443,7 @@ switch ($active_transfer_method) {
                 <i class="fas fa-times"></i>
             </button>
             <div class="sidebar-profile">
-                <img src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
+            <img src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
 
                 <h3><span id="sidebarUserName"><?php echo htmlspecialchars($full_name); ?></span></h3>
                 <p><span id="sidebarUserEmail"><?php echo htmlspecialchars($user_email); ?></span></p>
@@ -464,7 +490,7 @@ switch ($active_transfer_method) {
                 <div class="modal-body">
                     <p>Please enter your **4-digit Transfer PIN** to securely confirm and submit this transaction.</p>
                     <input type="password" class="form-control" id="modalPinInput" maxlength="4" pattern="\d{4}" placeholder="••••" required style="font-size: 24px; text-align: center; letter-spacing: 5px;">
-                    <div id="pinError" style="color: red; margin-top: 10px; display: none;">Please enter a valid 4-digit PIN.</div>
+                    <div id="pinError" style="color: red; margin-top: 10px; display: none;">Please enter a valid 4-digit numeric PIN.</div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -472,15 +498,14 @@ switch ($active_transfer_method) {
                 </div>
             </div>
         </div>
-    </div>
-
+    </div> 
+    
     <script>
         // This object makes PHP variables available to your JavaScript file.
         // It's defined once and can be accessed globally by your script.
         const APP_DATA = {
             userAccountsData: <?php echo json_encode($user_accounts); ?>,
             initialSelectedFromAccount: '<?php echo htmlspecialchars($form_data['source_account_id'] ?? ''); ?>',
-            // MODIFIED: Use 'external_canada_eft' for consistency
             initialTransferMethod: '<?php echo htmlspecialchars($active_transfer_method); ?>', 
             showModal: <?php echo $show_modal_on_load ? 'true' : 'false'; ?>,
             modalDetails: <?php echo json_encode($transfer_success_details); ?>
@@ -529,7 +554,10 @@ switch ($active_transfer_method) {
                 $('#pinEntryModal').modal('hide'); 
                 
                 // 3. Programmatically submit the main form
-                $('#transferForm').submit();
+                // Use a slight delay to ensure the modal is fully hidden before navigation
+                setTimeout(function() {
+                    $('#transferForm').submit();
+                }, 100); 
             } else {
                 // PIN is invalid (not 4 digits or contains non-numbers)
                 $('#pinError').text("Please enter a valid 4-digit numeric PIN.").show();
@@ -545,10 +573,10 @@ switch ($active_transfer_method) {
             }
         });
         
-        // Bind the existing transfer.js script (which contains logic for account balances, etc.)
-        // This should be the last loaded script.
+        // This script is crucial for dynamically showing the correct form fields and updating balances.
+        // You MUST ensure this file exists and contains the logic provided in the previous step.
+        $.getScript("<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer.js");
     });
     </script>
-    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer.js"></script>
 </body>
 </html>
