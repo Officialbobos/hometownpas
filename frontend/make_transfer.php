@@ -120,7 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
     if (!$user_data || !isset($user_data['transfer_pin_hash']) || empty($user_data['transfer_pin_hash'])) {
         $_SESSION['message'] = "Transfer PIN is not set up for your account. Please contact support.";
         $_SESSION['message_type'] = "error";
-        error_log("make_transfer.php: Security error - User record or PIN hash missing for user: " . $user_id);
+        // ADDED ERROR LOG FOR PIN HASH MISSING
+        error_log("make_transfer.php: Security error - User record or PIN hash missing for user: " . $user_id); 
         header('Location: ' . BASE_URL . '/frontend/transfer.php');
         exit;
     }
@@ -132,6 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         // Failure: The entered PIN does not match the stored hash
         $_SESSION['message'] = "Invalid Transfer PIN. The transaction cannot be completed.";
         $_SESSION['message_type'] = "error";
+        // ADDED ERROR LOG FOR INVALID PIN
         error_log("make_transfer.php: Security failure - Invalid Transfer PIN submitted by user: " . $user_id);
         header('Location: ' . BASE_URL . '/frontend/transfer.php');
         exit;
@@ -165,14 +167,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         exit;
     }
 
-    // Check if sufficient balance
-    if ($sourceAccount['balance'] < $amount) {
-        $_SESSION['message'] = "Insufficient balance in the selected account.";
-        $_SESSION['message_type'] = "error";
-        error_log("make_transfer.php: Insufficient balance. Account: " . $sourceAccount['account_number'] . ", Tried: " . $amount . ", Available: " . $sourceAccount['balance']);
-        header('Location: ' . BASE_URL . '/frontend/transfer.php');
-        exit;
-    }
+    // *** REMOVED NON-ATOMIC BALANCE CHECK HERE ***
+    // The check is moved inside the transaction block for security against race conditions.
 
     $transaction_data = [
         'user_id' => new ObjectId($user_id),
@@ -423,23 +419,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             exit;
     }
 
+
     try {
         // Start a MongoDB session for ACID properties on critical updates
         $session = $client->startSession();
         $session->startTransaction();
 
-        // 1. Decrement source account balance
+        // 1. Decrement source account balance ATOMICALLY.
+        // CRITICAL CORRECTION: Use $gte in the filter to prevent race conditions and over-debiting.
         $updateResult = $accountsCollection->updateOne(
-            ['_id' => $sourceAccountIdObject],
+            [
+                '_id' => $sourceAccountIdObject,
+                // Atomic balance check
+                'balance' => ['$gte' => $amount] 
+            ],
             ['$inc' => ['balance' => -$amount]],
             ['session' => $session]
         );
 
         if ($updateResult->getModifiedCount() !== 1) {
             $session->abortTransaction();
-            $_SESSION['message'] = "Failed to update source account balance. Please try again.";
             $_SESSION['message_type'] = "error";
-            error_log("make_transfer.php: Failed to decrement source account " . $source_account_id . " for user " . $user_id);
+            
+            // Check if the source account was found but NOT modified (i.e., balance insufficient due to race condition or initial insufficient funds)
+            if ($updateResult->getMatchedCount() === 1 && $updateResult->getModifiedCount() === 0) {
+                $_SESSION['message'] = "Insufficient balance in the selected account. The balance may have changed during processing.";
+                error_log("make_transfer.php: Atomic check failed - Insufficient balance during update for user " . $user_id);
+            } else {
+                $_SESSION['message'] = "Failed to update source account balance. Please try again.";
+                error_log("make_transfer.php: Failed to decrement source account " . $source_account_id . " for user " . $user_id . ". Matched: " . $updateResult->getMatchedCount() . ", Modified: " . $updateResult->getModifiedCount());
+            }
+
             header('Location: ' . BASE_URL . '/frontend/transfer.php');
             exit;
         }
@@ -479,8 +489,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             'transfer_method' => str_replace('_', ' ', $transfer_method)
         ];
 
-        // --- Start of NEW: Email Notification for User ---
+        // --- Start of Email Notification for User ---
         // Fetch user's email for notification
+        // Note: The user data was already fetched once for the PIN, but refetching/re-projecting here for robustness is fine.
         $user = $usersCollection->findOne(['_id' => new ObjectId($user_id)], ['projection' => ['email' => 1, 'first_name' => 1, 'last_name' => 1]]);
         if ($user && isset($user['email'])) {
             $user_email = $user['email'];
@@ -489,7 +500,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
                 $user_full_name = "Valued Customer"; // Fallback name
             }
 
-          $email_subject = "Your Transfer Request Confirmation - Ref: " . $transaction_data['reference_number'];
+            $email_subject = "Your Transfer Request Confirmation - Ref: " . $transaction_data['reference_number'];
 
 $email_body = '
 <div style="font-family: Arial, sans-serif; background-color: #1a1532; color: #FFFFFF; padding: 30px; line-height: 1.6;">
@@ -540,7 +551,7 @@ $email_sent = sendEmail($user_email, $email_subject, $email_body);
         } else {
             error_log("make_transfer.php: User email not found for notification for user_id: " . $user_id);
         }
-        // --- End of NEW: Email Notification for User ---
+        // --- End of Email Notification for User ---
 
         // Clear form data from session after success
         unset($_SESSION['form_data']);
@@ -550,7 +561,7 @@ $email_sent = sendEmail($user_email, $email_subject, $email_body);
         exit;
 
     } catch (MongoDBException $e) {
-        if ($session->inTransaction()) {
+        if (isset($session) && $session->inTransaction()) {
             $session->abortTransaction();
         }
         error_log("make_transfer.php: MongoDB transaction error: " . $e->getMessage());
@@ -559,7 +570,7 @@ $email_sent = sendEmail($user_email, $email_subject, $email_body);
         header('Location: ' . BASE_URL . '/frontend/transfer.php');
         exit;
     } catch (Exception $e) {
-        if ($session->inTransaction()) {
+        if (isset($session) && $session->inTransaction()) {
             $session->abortTransaction();
         }
         error_log("make_transfer.php: General error during transfer: " . $e->getMessage());
