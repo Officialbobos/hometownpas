@@ -94,9 +94,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         exit;
     }
     
-    // START MODIFIED PIN VALIDATION BLOCK (Only checks for 4-digit format)
-
-    // Validate Transfer PIN format
+    // START SECURE PIN VALIDATION BLOCK 
+    
+    // 1. Validate Transfer PIN format
     if (empty($transfer_pin) || !preg_match('/^\d{4}$/', $transfer_pin)) {
         $_SESSION['message'] = "A valid 4-digit Transfer PIN is required to complete the transfer.";
         $_SESSION['message_type'] = "error";
@@ -105,12 +105,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
         exit;
     }
 
-    // *** SECURITY NOTE: The previous code block for fetching and verifying the PIN 
-    //     has been intentionally removed to satisfy the user request of accepting 
-    //     "any number for transfer pin". The transfer proceeds as long as a 
-    //     4-digit number is provided. ***
+    // 2. Fetch the user's record to get the stored PIN hash
+    try {
+        $user_data = $usersCollection->findOne(['_id' => new ObjectId($user_id)], ['projection' => ['transfer_pin_hash' => 1]]);
+    } catch (MongoDBException $e) {
+        error_log("make_transfer.php: Failed to fetch user data for PIN validation: " . $e->getMessage());
+        $_SESSION['message'] = "A security check error occurred. Please try again.";
+        $_SESSION['message_type'] = "error";
+        header('Location: ' . BASE_URL . '/frontend/transfer.php');
+        exit;
+    }
 
-    // END MODIFIED PIN VALIDATION BLOCK
+
+    if (!$user_data || !isset($user_data['transfer_pin_hash']) || empty($user_data['transfer_pin_hash'])) {
+        $_SESSION['message'] = "Transfer PIN is not set up for your account. Please contact support.";
+        $_SESSION['message_type'] = "error";
+        error_log("make_transfer.php: Security error - User record or PIN hash missing for user: " . $user_id);
+        header('Location: ' . BASE_URL . '/frontend/transfer.php');
+        exit;
+    }
+
+    $stored_pin_hash = $user_data['transfer_pin_hash'];
+
+    // 3. Verify the submitted PIN against the stored hash
+    if (!password_verify($transfer_pin, $stored_pin_hash)) {
+        // Failure: The entered PIN does not match the stored hash
+        $_SESSION['message'] = "Invalid Transfer PIN. The transaction cannot be completed.";
+        $_SESSION['message_type'] = "error";
+        error_log("make_transfer.php: Security failure - Invalid Transfer PIN submitted by user: " . $user_id);
+        header('Location: ' . BASE_URL . '/frontend/transfer.php');
+        exit;
+    }
+    
+    // END SECURE PIN VALIDATION BLOCK
 
     // Convert source_account_id to ObjectId
     try {
