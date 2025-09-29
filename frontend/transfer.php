@@ -201,7 +201,7 @@ switch ($active_transfer_method) {
             color: #ff9800; /* Orange for emphasis */
         }
         /* Styles for the new PIN Modal */
-        .pin-modal-overlay {
+        .pin-modal-overlay, .modal-overlay { /* Added .modal-overlay here to share basic overlay style */
             position: fixed;
             top: 0;
             left: 0;
@@ -216,11 +216,11 @@ switch ($active_transfer_method) {
             opacity: 0;
             transition: visibility 0s, opacity 0.3s;
         }
-        .pin-modal-overlay.active {
+        .pin-modal-overlay.active, .modal-overlay.active {
             visibility: visible;
             opacity: 1;
         }
-        .pin-modal-content {
+        .pin-modal-content, .modal-content { /* Added .modal-content here to share basic content style */
             background: #fff;
             padding: 30px;
             border-radius: 8px;
@@ -229,7 +229,7 @@ switch ($active_transfer_method) {
             max-width: 400px;
             text-align: center;
         }
-        .pin-modal-content h3 {
+        .pin-modal-content h3, .modal-content h3 {
             color: #007bff; /* Primary color for title */
             margin-bottom: 15px;
         }
@@ -243,7 +243,7 @@ switch ($active_transfer_method) {
             text-align: center;
             letter-spacing: 5px;
         }
-        .pin-modal-content .modal-button {
+        .pin-modal-content .modal-button, .modal-content .modal-button {
             width: 100%;
             padding: 10px;
             background-color: #007bff;
@@ -254,9 +254,14 @@ switch ($active_transfer_method) {
             font-size: 16px;
             transition: background-color 0.2s;
         }
-        .pin-modal-content .modal-button:hover {
+        .pin-modal-content .modal-button:hover, .modal-content .modal-button:hover {
             background-color: #0056b3;
         }
+        /* Specific modal adjustments */
+        .modal-content p { text-align: left; }
+        .modal-content strong { float: right; }
+        .admin-modal-text { text-align: left; margin-bottom: 20px; }
+        #adminModalAcceptBtn { margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -507,7 +512,7 @@ switch ($active_transfer_method) {
             <i class="fas fa-sign-out-alt"></i> Logout
         </button>
     </div>
-
+    
     <div class="modal-overlay" id="transferSuccessModal">
         <div class="modal-content">
             <h3>Transfer Initiated!</h3>
@@ -539,6 +544,18 @@ switch ($active_transfer_method) {
             <p id="pinError" style="color: red; margin-top: 10px; display: none;">Invalid PIN. Please try again.</p>
         </div>
     </div>
+    
+    <div class="modal-overlay" id="adminMessageModal">
+        <div class="modal-content">
+            <h3>Important Transfer Notice</h3>
+            <p class="admin-modal-text" id="adminModalMessageText">
+                </p>
+            <div style="margin-top: 20px;">
+                <button class="modal-button" id="adminModalAcceptBtn">Accept and Continue</button>
+                <button type="button" class="modal-button" id="adminModalCancelBtn" style="background-color: #dc3545; margin-top: 10px;">Cancel Transfer</button>
+            </div>
+        </div>
+    </div>
     <script>
         // This object makes PHP variables available to your JavaScript file.
         // It's defined once and can be accessed globally by your script.
@@ -550,7 +567,9 @@ switch ($active_transfer_method) {
             showModal: <?php echo $show_modal_on_load ? 'true' : 'false'; ?>,
             modalDetails: <?php echo json_encode($transfer_success_details); ?>,
             // NEW: Pass saved Canadian accounts for auto-filling fields
-            savedCanadianAccounts: <?php echo json_encode($user_saved_canada_accounts); ?>
+            savedCanadianAccounts: <?php echo json_encode($user_saved_canada_accounts); ?>,
+            // NEW: Pass the admin message
+            adminTransferMessage: '<?php echo htmlspecialchars(addslashes($admin_transfer_message)); ?>'
         };
     </script>
 

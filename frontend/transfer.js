@@ -36,6 +36,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const cancelPinBtn = document.getElementById('cancelPinBtn');
     const pinError = document.getElementById('pinError');
     const transferDataPayload = document.getElementById('transfer_data_payload'); // Hidden field for form data
+    
+    // --- NEW ADMIN MESSAGE MODAL ELEMENTS (ADDED) ---
+    const adminMessageModal = document.getElementById('adminMessageModal');
+    const adminModalMessageText = document.getElementById('adminModalMessageText');
+    const adminModalAcceptBtn = document.getElementById('adminModalAcceptBtn');
+    const adminModalCancelBtn = document.getElementById('adminModalCancelBtn');
+
 
     // --- NEW CANADIAN ELEMENTS ---
     const canadaPayeeSelect = document.getElementById('recipient_saved_account_id_canada');
@@ -75,8 +82,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (recipientNameInput) {
             recipientNameInput.removeAttribute('required');
-            // Do NOT clear recipientNameInput.value here if it was set via form_data restoration.
-            // Only clear if it's explicitly cleared by the method logic.
         }
     }
 
@@ -136,7 +141,6 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 commonExternalFieldsDiv.style.display = 'none';
                 recipientNameInput.removeAttribute('required');
-                // recipientNameInput.value = ''; // Don't clear here, rely on form_data restoration
             }
         }
     }
@@ -184,6 +188,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Balance and Currency Display Logic ---
     
+    // Helper to get currency symbol
+    function getCurrencySymbol(currencyCode) {
+        switch (currencyCode ? currencyCode.toUpperCase() : '') {
+            case 'USD': return '$';
+            case 'EUR': return '€';
+            case 'GBP': return '£';
+            case 'JPY': return '¥';
+            case 'CAD': return 'C$'; // Added CAD
+            case 'NGN': return '₦'; 
+            default: return currencyCode || '';
+        }
+    }
+
     // Function to update balance display
     function updateBalanceDisplay() {
         const selectedOption = sourceAccountIdSelect.options[sourceAccountIdSelect.selectedIndex];
@@ -205,59 +222,78 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Helper to get currency symbol
-    function getCurrencySymbol(currencyCode) {
-        switch (currencyCode ? currencyCode.toUpperCase() : '') {
-            case 'USD': return '$';
-            case 'EUR': return '€';
-            case 'GBP': return '£';
-            case 'JPY': return '¥';
-            case 'CAD': return 'C$'; // Added CAD
-            case 'NGN': return '₦'; 
-            default: return currencyCode || '';
+    // --- Transfer PIN/Admin Modal Logic (UPDATED) ---
+
+    // Function to handle the actual PIN modal sequence (Step 2/Final Step)
+    function initiatePinModalSequence() {
+        // Clear previous errors from the PIN modal
+        if (pinError) pinError.style.display = 'none';
+        
+        // Serialize all form data and store it in the hidden PIN modal field
+        const formData = new FormData(transferForm);
+        const data = {};
+        formData.forEach((value, key) => {
+            // Exclude the button's name/value if it exists
+            if (key !== 'initiate_transfer_btn') { 
+                data[key] = value;
+            }
+        });
+        
+        // Set the JSON payload for the PIN confirmation form
+        if (transferDataPayload) transferDataPayload.value = JSON.stringify(data);
+
+        // Open the PIN modal
+        if (transferPinModal) transferPinModal.classList.add('active');
+        if (transferPinInput) {
+            transferPinInput.value = ''; // Clear PIN input every time
+            transferPinInput.focus();
         }
     }
 
-    // --- Transfer PIN Modal Logic (NEW) ---
-    
     // Step 1: Intercept the "Initiate Transfer" button click
     if (initiateTransferBtn) {
         initiateTransferBtn.addEventListener('click', function(e) {
             e.preventDefault();
             
-            // Temporarily ensure required attributes are set for browser validation
+            // 1. Validate the main form fields
             validateFormBeforePinModal(); 
-
-            // Check if the form is valid using the browser's native reportValidity()
             if (!transferForm.checkValidity()) {
                 transferForm.reportValidity();
-                return; // Stop if form is not valid
+                return; 
             }
 
-            // Clear previous errors
-            pinError.style.display = 'none';
-            
-            // Serialize all form data and store it in the hidden PIN modal field
-            const formData = new FormData(transferForm);
-            const data = {};
-            formData.forEach((value, key) => {
-                // Exclude the button's name/value if it exists
-                if (key !== 'initiate_transfer_btn') { 
-                    data[key] = value;
-                }
-            });
-            
-            // Set the JSON payload for the PIN confirmation form
-            transferDataPayload.value = JSON.stringify(data);
+            // 2. Check for Admin Message (assuming APP_DATA is globally available)
+            const adminMessage = window.APP_DATA ? window.APP_DATA.adminTransferMessage : null;
 
-            // Open the PIN modal
-            transferPinModal.classList.add('active');
-            transferPinInput.value = ''; // Clear PIN input every time
-            transferPinInput.focus();
+            if (adminMessage && adminMessageModal && adminModalMessageText) {
+                // If message exists, show the Admin Notice Modal
+                adminModalMessageText.innerHTML = adminMessage;
+                adminMessageModal.classList.add('active');
+            } else {
+                // If no message, skip directly to the PIN modal
+                initiatePinModalSequence();
+            }
         });
     }
 
-    // Step 2: Handle the PIN confirmation form submission
+    // Step 2: Handle Admin Modal Accept (Proceed to PIN)
+    if (adminModalAcceptBtn) {
+        adminModalAcceptBtn.addEventListener('click', function() {
+            if (adminMessageModal) adminMessageModal.classList.remove('active');
+            // Now, proceed to the PIN modal sequence
+            initiatePinModalSequence();
+        });
+    }
+
+    // Step 2: Handle Admin Modal Cancel (Stop transfer)
+    if (adminModalCancelBtn) {
+        adminModalCancelBtn.addEventListener('click', function() {
+            if (adminMessageModal) adminMessageModal.classList.remove('active');
+            // The transfer is cancelled and the user remains on the page
+        });
+    }
+
+    // Step 3: Handle the PIN confirmation form submission (Existing logic remains)
     if (pinConfirmationForm) {
         pinConfirmationForm.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -267,30 +303,24 @@ document.addEventListener('DOMContentLoaded', function() {
             // Client-side PIN format validation (4 digits)
             if (pinValue.length === 4 && /^\d{4}$/.test(pinValue)) {
                 
-                // IMPORTANT: The form already has the necessary hidden fields, 
-                // including the serialized payload and the actual PIN input.
-                // We just need to submit the PIN confirmation form now.
-                // The `make_transfer.php` endpoint will receive:
-                // 1. initiate_transfer=1
-                // 2. transfer_data_payload (JSON of all transfer fields)
-                // 3. transfer_pin (The 4-digit PIN)
-                
                 // Re-submit the form
                 this.submit(); 
                 
             } else {
-                pinError.textContent = "Transfer PIN must be a 4-digit number.";
-                pinError.style.display = 'block';
-                transferPinInput.focus();
+                if (pinError) {
+                    pinError.textContent = "Transfer PIN must be a 4-digit number.";
+                    pinError.style.display = 'block';
+                }
+                if (transferPinInput) transferPinInput.focus();
             }
         });
     }
 
-    // Step 3: Handle PIN modal cancellation
+    // Step 4: Handle PIN modal cancellation (Existing logic remains)
     if (cancelPinBtn) {
         cancelPinBtn.addEventListener('click', function() {
-            transferPinModal.classList.remove('active');
-            pinError.style.display = 'none';
+            if (transferPinModal) transferPinModal.classList.remove('active');
+            if (pinError) pinError.style.display = 'none';
         });
     }
 
@@ -334,7 +364,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showFieldsForMethod(this.value);
             // Clear Canadian fields whenever method changes
             if (canadaPayeeSelect) canadaPayeeSelect.value = '';
-            canadaPayeeSelect.dispatchEvent(new Event('change')); 
+            if (canadaPayeeSelect) canadaPayeeSelect.dispatchEvent(new Event('change')); 
         });
     }
 
