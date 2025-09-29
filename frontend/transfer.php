@@ -13,34 +13,6 @@ require_once __DIR__ . '/../Config.php';
 // Then load functions.php, which might depend on constants or autoloader from Config.php.
 require_once __DIR__ . '/../functions.php';
 
-// --- START: Missing PHP Helper Function (Define if not in functions.php) ---
-if (!function_exists('get_currency_symbol')) {
-    /**
-     * Returns the appropriate currency symbol for a given currency code.
-     * Assumed to be required for displaying balances.
-     * @param string $currency The three-letter currency code (e.g., 'USD', 'GBP').
-     * @return string The currency symbol or the code itself if not found.
-     */
-    function get_currency_symbol($currency) {
-        switch (strtoupper($currency)) {
-            case 'USD':
-                return '$';
-            case 'GBP':
-                return '£';
-            case 'EUR':
-                return '€';
-            case 'CAD':
-                return 'C$';
-            case 'NGN':
-                return '₦';
-            default:
-                return strtoupper($currency) . ' '; // Fallback to code + space
-        }
-    }
-}
-// --- END: Missing PHP Helper Function ---
-
-
 // Now, Composer classes are available because Config.php loaded autoload.php.
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
@@ -48,6 +20,7 @@ use MongoDB\Exception\Exception as MongoDBException;
 
 
 // Check login, etc.
+// *** CORRECTION: Use $_SESSION['logged_in'] for consistency with dashboard.php ***
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || !isset($_SESSION['user_id'])) {
     // Use defined BASE_URL constant for redirection
     header('Location: ' . BASE_URL . '/login.php'); // Changed /login to /login.php for direct access
@@ -66,6 +39,7 @@ if (empty($full_name)) {
 // Establish MongoDB connection
 try {
     // Check if constants are defined before using them
+    // These checks are good, but if Config.php is working correctly, they should always be true.
     if (!defined('MONGODB_CONNECTION_URI') || empty(MONGODB_CONNECTION_URI)) {
         throw new Exception("MONGODB_CONNECTION_URI is not defined or empty.");
     }
@@ -184,7 +158,6 @@ switch ($active_transfer_method) {
     <title>HomeTown Bank Pa - Transfer</title>
     <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> 
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* Inline CSS for initial hidden states for JS to control */
@@ -206,30 +179,6 @@ switch ($active_transfer_method) {
         }
         .admin-message-alert strong {
             color: #ff9800; /* Orange for emphasis */
-        }
-
-        /* Style for the custom modal (if not using full Bootstrap styling) */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: none; /* Controlled by JS/CSS */
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .modal-content {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-            width: 90%;
-            max-width: 400px;
-            text-align: center;
         }
     </style>
 </head>
@@ -260,8 +209,6 @@ switch ($active_transfer_method) {
 
                 <form action="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/make_transfer.php" method="POST" id="transferForm">
                     <input type="hidden" name="initiate_transfer" value="1">
-                    
-                    <input type="hidden" name="transfer_pin" id="transfer_pin_hidden" value="">
 
                     <div class="form-group">
                         <label for="transfer_method">Select Transfer Method:</label>
@@ -428,8 +375,7 @@ switch ($active_transfer_method) {
                         <label for="description">Description (Optional):</label>
                         <textarea id="description" name="description" rows="3" class="form-control"><?php echo htmlspecialchars($form_data['description'] ?? ''); ?></textarea>
                     </div>
-                    
-                    <button type="button" class="button-primary" data-toggle="modal" data-target="#pinEntryModal" id="initiateTransferBtn">Initiate Transfer</button>
+                    <button type="submit" class="button-primary">Initiate Transfer</button>
                 </form>
             </div>
             <p style="text-align: center; margin-top: 20px;"><a href="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/dashboard.php" class="back-link">&larr; Back to Dashboard</a></p>
@@ -443,7 +389,7 @@ switch ($active_transfer_method) {
                 <i class="fas fa-times"></i>
             </button>
             <div class="sidebar-profile">
-            <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
+                <img src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
 
                 <h3><span id="sidebarUserName"><?php echo htmlspecialchars($full_name); ?></span></h3>
                 <p><span id="sidebarUserEmail"><?php echo htmlspecialchars($user_email); ?></span></p>
@@ -477,106 +423,20 @@ switch ($active_transfer_method) {
             <button class="modal-button" id="modalCloseButton">Got It!</button>
         </div>
     </div>
-    
-    <div class="modal fade" id="pinEntryModal" tabindex="-1" role="dialog" aria-labelledby="pinEntryModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="pinEntryModalLabel">Authorize Transfer</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <p>Please enter your **4-digit Transfer PIN** to securely confirm and submit this transaction.</p>
-                    <input type="password" class="form-control" id="modalPinInput" maxlength="4" pattern="\d{4}" placeholder="••••" required style="font-size: 24px; text-align: center; letter-spacing: 5px;">
-                    <div id="pinError" style="color: red; margin-top: 10px; display: none;">Please enter a valid 4-digit numeric PIN.</div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="confirmTransferWithPin">Confirm Transfer</button>
-                </div>
-            </div>
-        </div>
-    </div> 
-    
-    <script>
+
+   <script>
         // This object makes PHP variables available to your JavaScript file.
         // It's defined once and can be accessed globally by your script.
         const APP_DATA = {
             userAccountsData: <?php echo json_encode($user_accounts); ?>,
             initialSelectedFromAccount: '<?php echo htmlspecialchars($form_data['source_account_id'] ?? ''); ?>',
+            // MODIFIED: Use 'external_canada_eft' for consistency
             initialTransferMethod: '<?php echo htmlspecialchars($active_transfer_method); ?>', 
             showModal: <?php echo $show_modal_on_load ? 'true' : 'false'; ?>,
             modalDetails: <?php echo json_encode($transfer_success_details); ?>
         };
     </script>
-    
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <script>
-    $(document).ready(function() {
-        // Function to check if the main form fields are valid (required HTML5 validation)
-        function isFormValid() {
-            var form = document.getElementById('transferForm');
-            // Check HTML5 validity for all required fields
-            if (!form.checkValidity()) {
-                // If invalid, the browser should display the native error messages.
-                form.reportValidity();
-                return false;
-            }
-            return true;
-        }
 
-        // Handle the click on the "Initiate Transfer" button
-        $('#initiateTransferBtn').on('click', function(e) {
-            // First, ensure all fields currently visible and required are filled out.
-            if (isFormValid()) {
-                // If valid, show the PIN modal
-                $('#pinEntryModal').modal('show');
-                // Clear any previous PIN and error message
-                $('#modalPinInput').val('');
-                $('#pinError').hide();
-            }
-        });
-
-        // Handle the click on the "Confirm Transfer" button inside the modal
-        $('#confirmTransferWithPin').on('click', function() {
-            var pin = $('#modalPinInput').val();
-            var pinRegex = /^\d{4}$/;
-
-            if (pinRegex.test(pin)) {
-                // 1. PIN is valid. Set the value to the hidden input field.
-                $('#transfer_pin_hidden').val(pin);
-                
-                // 2. Hide the modal
-                $('#pinEntryModal').modal('hide'); 
-                
-                // 3. Programmatically submit the main form
-                // Use a slight delay to ensure the modal is fully hidden before navigation
-                setTimeout(function() {
-                    $('#transferForm').submit();
-                }, 100); 
-            } else {
-                // PIN is invalid (not 4 digits or contains non-numbers)
-                $('#pinError').text("Please enter a valid 4-digit numeric PIN.").show();
-                $('#modalPinInput').focus();
-            }
-        });
-        
-        // Allow pressing Enter key in the PIN input to submit
-        $('#modalPinInput').keypress(function(event) {
-            if (event.keyCode === 13) { // 13 is the key code for Enter
-                event.preventDefault(); // Prevent default form submission
-                $('#confirmTransferWithPin').click(); // Trigger the confirm button click
-            }
-        });
-        
-        // This script is crucial for dynamically showing the correct form fields and updating balances.
-        // You MUST ensure this file exists and contains the logic provided in the previous step.
-        $.getScript("<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer.js");
-    });
-    </script>
+    <script src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/transfer.js"></script>
 </body>
 </html>
