@@ -1,7 +1,3 @@
-# Composer-specific ignores
-/vendor/
-composer.lock  # Optional: If you want to let Composer manage lock file on deploy, but generally it's better to commit this.
-
 # Environment variables file (CRUCIAL for security!)
 
 .env
