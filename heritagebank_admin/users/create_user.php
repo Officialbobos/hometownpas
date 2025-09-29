@@ -669,6 +669,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -679,31 +680,185 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/users/create_user.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
+        /* BASE STYLES for all views */
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #28a745;
+            --danger-color: #dc3545;
+            --background-light: #f8f9fa;
+            --card-background: #ffffff;
+            --border-color: #ddd;
+            --padding-base: 20px;
+        }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background-light);
+            margin: 0;
+            padding: 0;
+        }
+        
         .readonly-field { background-color: #e9e9e9; cursor: not-allowed; }
-        .required-asterisk { color: red; font-weight: bold; margin-left: 5px; }
-        .dashboard-container { display: flex; flex-direction: column; min-height: 100vh; background-color: #fff; margin: 20px; border-radius: 8px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.1); overflow: hidden; }
-        .dashboard-header { background-color: #007bff; color: white; padding: 20px 30px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0056b3; }
-        .dashboard-header .logo { max-height: 50px; width: auto; margin-right: 20px; }
-        .dashboard-header h2 { margin: 0; font-size: 1.8em; flex-grow: 1; }
-        .logout-button { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; }
+        .required-asterisk { color: var(--danger-color); font-weight: bold; margin-left: 5px; }
+
+        /* HEADER */
+        .dashboard-container { 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+            background-color: var(--card-background); 
+            margin: 0; /* Remove margin from container for full width on mobile */
+            box-shadow: none; /* Remove shadow for mobile, add only for desktop */
+            overflow: hidden; 
+        }
+        .dashboard-header { 
+            background-color: var(--primary-color); 
+            color: white; 
+            padding: 15px var(--padding-base); /* Adjusted padding */
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            border-bottom: 1px solid #0056b3; 
+        }
+        .dashboard-header .logo { 
+            max-height: 30px; /* Smaller logo for better mobile fit */
+            width: auto; 
+            margin-right: 15px; 
+        }
+        .dashboard-header h2 { 
+            margin: 0; 
+            font-size: 1.4em; /* Smaller font for mobile */
+            flex-grow: 1; 
+        }
+        .logout-button { 
+            background-color: var(--danger-color); 
+            color: white; 
+            padding: 8px 15px; /* Smaller padding */
+            border: none; 
+            border-radius: 5px; 
+            text-decoration: none; 
+            font-weight: bold; 
+            transition: background-color 0.3s ease; 
+            font-size: 0.9em;
+        }
         .logout-button:hover { background-color: #c82333; }
-        .dashboard-content { padding: 330px; flex-grow: 1; }
-        .dashboard-content h3 { color: #007bff; font-size: 1.6em; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
-        .form-standard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .form-standard .full-width { grid-column: 1 / -1; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+
+        /* CONTENT */
+        .dashboard-content { 
+            padding: var(--padding-base); /* Reduced top padding */
+            flex-grow: 1; 
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto; /* Center content on desktop */
+        }
+        .dashboard-content h3 { 
+            color: var(--primary-color); 
+            font-size: 1.4em; /* Adjusted font size */
+            margin-top: 25px;
+            margin-bottom: 15px; 
+            border-bottom: 2px solid #e9ecef; 
+            padding-bottom: 10px; 
+        }
+
+        /* FORM - MOBILE FIRST (Single Column) */
+        .form-standard { 
+            display: flex; /* Use flexbox for single column stacking on mobile */
+            flex-direction: column;
+            gap: 15px; 
+            padding: 0; /* Remove form padding to use content padding */
+        }
+        .form-standard .full-width { 
+            width: 100%; 
+            order: -1; /* Reset order for flex */
+        }
+        .form-group { 
+            margin-bottom: 0; /* Gap handles spacing */
+        }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 6px; 
+            font-weight: bold; 
+            color: #333; /* Darker text */
+        }
         .form-group input, .form-group select, .form-group textarea {
             width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
+            padding: 10px; /* Reduced padding */
+            border: 1px solid var(--border-color);
+            border-radius: 4px; /* Slightly smaller border radius */
             box-sizing: border-box;
             font-size: 1em;
         }
-        .form-group .button-primary { background-color: #28a745; color: white; padding: 12px 25px; border: none; border-radius: 6px; font-size: 1.1em; cursor: pointer; transition: background-color 0.3s ease; grid-column: 1 / -1; }
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            font-size: 0.85em;
+            color: #6c757d;
+        }
+
+        /* SUBMIT BUTTON */
+        .form-group .button-primary { 
+            background-color: var(--secondary-color); 
+            color: white; 
+            padding: 12px 25px; 
+            border: none; 
+            border-radius: 6px; 
+            font-size: 1.1em; 
+            cursor: pointer; 
+            transition: background-color 0.3s ease; 
+            width: 100%;
+            margin-top: 10px;
+        }
         .form-group .button-primary:hover { background-color: #218838; }
-        .message.success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-        .message.error { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+
+        /* Message Styles */
+        .message.success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .message.error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        
+        /* BACK LINK */
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        /* DESKTOP VIEW (Media Query) */
+        @media (min-width: 768px) {
+            .dashboard-container {
+                margin: var(--padding-base);
+                border-radius: 8px;
+                box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            }
+            
+            .dashboard-header {
+                padding: 20px 30px;
+            }
+            .dashboard-header .logo { 
+                max-height: 50px; 
+            }
+            .dashboard-header h2 { 
+                font-size: 1.8em; 
+            }
+            
+            /* Form switches to two columns on desktop */
+            .form-standard { 
+                display: grid; 
+                grid-template-columns: 1fr 1fr; 
+                gap: 25px 30px; /* Adjusted gap */
+            }
+            .form-standard .full-width { 
+                grid-column: 1 / -1; 
+            }
+            
+            .form-group .button-primary {
+                width: auto;
+                justify-self: start; /* Align button to the left */
+            }
+        }
     </style>
 </head>
 <body>
@@ -783,19 +938,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="form-group">
-                    <label for="initial_balance">Initial Balance Amount (Optional)</label>
-                    <input type="number" id="initial_balance" name="initial_balance" step="0.01" value="<?php echo htmlspecialchars($_POST['initial_balance'] ?? '0.00'); ?>">
-                    <small>Enter an amount to initially fund the user's chosen account type. Leave 0.00 if no initial funding.</small>
-                </div>
-                <div class="form-group">
                     <label for="currency">Account Currency <span class="required-asterisk">*</span></label>
                     <select id="currency" name="currency" required>
                         <option value="GBP" <?php echo (($_POST['currency'] ?? 'GBP') == 'GBP') ? 'selected' : ''; ?>>GBP</option>
                         <option value="EUR" <?php echo (($_POST['currency'] ?? '') == 'EUR') ? 'selected' : ''; ?>>EURO</option>
                         <option value="USD" <?php echo (($_POST['currency'] ?? '') == 'USD') ? 'selected' : ''; ?>>USD</option>
-                        <option value="CAD" <?php echo (($_POST['currency'] ?? '') == 'CAD') ? 'selected' : ''; ?>>CAD</option> </select>
+                        <option value="CAD" <?php echo (($_POST['currency'] ?? '') == 'CAD') ? 'selected' : ''; ?>>CAD</option>
+                    </select>
                 </div>
-
+                
+                <div class="form-group">
+                    <label for="initial_balance">Initial Balance Amount (Optional)</label>
+                    <input type="number" id="initial_balance" name="initial_balance" step="0.01" value="<?php echo htmlspecialchars($_POST['initial_balance'] ?? '0.00'); ?>">
+                    <small>Enter an amount to initially fund the user's chosen account type. Leave 0.00 if no initial funding.</small>
+                </div>
                 <div class="form-group">
                     <label for="fund_account_type">Fund Which Account? (Optional)</label>
                     <select id="fund_account_type" name="fund_account_type">
@@ -811,6 +967,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <input type="datetime-local" id="admin_created_at" name="admin_created_at" value="<?php echo htmlspecialchars($_POST['admin_created_at'] ?? date('Y-m-d\TH:i')); ?>" required>
                     <small>Set the exact date and time the account was (or should be) created.</small>
                 </div>
+                
+                <div class="form-group"></div> 
 
                 <div class="full-width">
                     <button type="submit" class="button-primary">Create User</button>
