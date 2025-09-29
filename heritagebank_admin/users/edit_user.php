@@ -781,7 +781,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
                                     <option value="USD" <?php echo (($account['currency'] ?? '') == 'USD') ? 'selected' : ''; ?>>USD</option>
                                     <option value="EUR" <?php echo (($account['currency'] ?? '') == 'EUR') ? 'selected' : ''; ?>>EUR</option>
                                     <option value="GBP" <?php echo (($account['currency'] ?? '') == 'GBP') ? 'selected' : ''; ?>>GBP</option>
-                                    <option value="NGN" <?php echo (($account['currency'] ?? '') == 'NGN') ? 'selected' : ''; ?>>NGN</option>
+                                    <option value="NGN" <?php echo (($account['currency'] ?? '') == 'CAD') ? 'selected' : ''; ?>>CAD</option>
                                 </select>
                             </div>
                             <div class="form-group">

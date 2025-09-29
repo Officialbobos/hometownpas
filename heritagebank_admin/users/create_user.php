@@ -41,6 +41,9 @@ define('HOMETOWN_BANK_UK_SORT_CODE_PREFIX', '90');
 define('HOMETOWN_BANK_EUR_BIC', 'HOMTDEFF5678');
 define('HOMETOWN_BANK_EUR_BANK_CODE_BBAN', '50070010');
 define('HOMETOWN_BANK_USD_BIC', 'HOMTUS333232');
+// NEW: Fictional identifiers for CAD
+define('HOMETOWN_BANK_CAD_BIC', 'HOMTCA2C300');
+define('HOMETOWN_BANK_CAD_BANK_INSTITUTION_NUMBER', '010'); // Example Canadian Institution Number
 
 /**
  * Helper function to generate a unique numeric ID of a specific length.
@@ -118,6 +121,7 @@ function calculateIbanCheckDigits(string $countryCode, string $bban): string {
             $numeric_string .= $char;
         }
     }
+    // Using bcmod for large number support
     $checksum_val = bcmod($numeric_string, '97');
     $check_digits = 98 - (int)$checksum_val;
     return str_pad($check_digits, 2, '0', STR_PAD_LEFT);
@@ -143,6 +147,7 @@ function generateUniqueUkIban($accountsCollection, string $sortCode, string $int
             error_log("MongoDB Error during IBAN uniqueness check: " . $e->getMessage());
             return false;
         }
+        // In case of a collision, regenerate the internal account number and retry (unlikely for UK, but safer)
         $internalAccountNumber8Digits = str_pad(mt_rand(0, 99999999), 8, '0', STR_PAD_LEFT);
     }
     error_log("Failed to generate a unique UK IBAN after $max_attempts attempts.");
@@ -169,6 +174,7 @@ function generateUniqueEurIban($accountsCollection, string $internalAccountNumbe
             error_log("MongoDB Error during EUR IBAN uniqueness check: " . $e->getMessage());
             return false;
         }
+        // In case of a collision, regenerate the internal account number and retry
         $internalAccountNumber10Digits = str_pad(mt_rand(0, 9999999999), 10, '0', STR_PAD_LEFT);
     }
     error_log("Failed to generate a unique EUR IBAN after $max_attempts attempts.");
@@ -177,21 +183,26 @@ function generateUniqueEurIban($accountsCollection, string $internalAccountNumbe
 
 /**
  * Generates a unique US-style "IBAN" (simulating a BBAN with routing number).
+ * Returns an array: ['iban' => $iban_candidate, 'routing_number' => $generatedRoutingNumber]
  */
 function generateUniqueUsdIban($accountsCollection, string $internalAccountNumberForUSD): array|false {
     $countryCode = 'US';
+    // Use the function to get a unique 9-digit routing number
     $generatedRoutingNumber = generateUniqueNumericId($accountsCollection, 'routing_number', 9);
     if ($generatedRoutingNumber === false) {
         error_log("Failed to generate a unique US Routing Number for IBAN.");
         return false;
     }
+    // Use the last 10 digits of the internal account number as the account number part
     $accountNumberPart = str_pad(substr($internalAccountNumberForUSD, -10), 10, '0', STR_PAD_LEFT);
     $max_attempts = 100;
     for ($attempt = 0; $attempt < $max_attempts; $attempt++) {
+        // BBAN equivalent is Routing Number + Account Number Part
         $bban_for_checksum = $generatedRoutingNumber . $accountNumberPart;
         $checkDigits = calculateIbanCheckDigits($countryCode, $bban_for_checksum);
         $iban_candidate = $countryCode . $checkDigits . $generatedRoutingNumber . $accountNumberPart;
         try {
+            // Check for duplicate IBAN/BBAN
             $existing_account = $accountsCollection->findOne(['iban' => $iban_candidate], ['projection' => ['_id' => 1]]);
             if (!$existing_account) {
                 return ['iban' => $iban_candidate, 'routing_number' => $generatedRoutingNumber];
@@ -200,9 +211,47 @@ function generateUniqueUsdIban($accountsCollection, string $internalAccountNumbe
             error_log("MongoDB Error during USD 'IBAN' uniqueness check: " . $e->getMessage());
             return false;
         }
+        // In case of a collision, regenerate the account number part and retry
         $accountNumberPart = str_pad(mt_rand(0, 9999999999), 10, '0', STR_PAD_LEFT);
     }
     error_log("Failed to generate a unique US 'IBAN' after $max_attempts attempts.");
+    return false;
+}
+
+/**
+ * Generates a unique Canadian-style BBAN/Account structure.
+ * Returns an array: ['iban' => $bban_candidate, 'transit_number' => $generatedTransitNumber]
+ * Note: CAD does not use IBAN; the 'iban' field is used for the combined BBAN equivalent (Institution+Transit+Account).
+ */
+function generateUniqueCadBban($accountsCollection, string $internalAccountNumberForCAD): array|false {
+    $institution_number = HOMETOWN_BANK_CAD_BANK_INSTITUTION_NUMBER; // 3-digit
+    // Use the function to get a unique 5-digit Transit/Branch number
+    $generatedTransitNumber = generateUniqueNumericId($accountsCollection, 'transit_number', 5);
+    if ($generatedTransitNumber === false) {
+        error_log("Failed to generate a unique CAD Transit Number.");
+        return false;
+    }
+    // Use the last 7 digits of the internal account number as the account number part (Standard is 7-12 digits)
+    $accountNumberPart = str_pad(substr($internalAccountNumberForCAD, -7), 7, '0', STR_PAD_LEFT);
+    $max_attempts = 100;
+
+    for ($attempt = 0; $attempt < $max_attempts; $attempt++) {
+        // CAD BBAN equivalent (Institution + Transit + Account)
+        $bban_candidate = $institution_number . $generatedTransitNumber . $accountNumberPart;
+        try {
+            // Check for duplicate BBAN
+            $existing_account = $accountsCollection->findOne(['iban' => $bban_candidate], ['projection' => ['_id' => 1]]);
+            if (!$existing_account) {
+                return ['iban' => $bban_candidate, 'transit_number' => $generatedTransitNumber];
+            }
+        } catch (MongoDBException $e) {
+            error_log("MongoDB Error during CAD BBAN uniqueness check: " . $e->getMessage());
+            return false;
+        }
+        // In case of a collision, regenerate the account number part and retry
+        $accountNumberPart = str_pad(mt_rand(0, 9999999), 7, '0', STR_PAD_LEFT);
+    }
+    error_log("Failed to generate a unique CAD BBAN after $max_attempts attempts.");
     return false;
 }
 
@@ -237,7 +286,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $gender = trim($_POST['gender'] ?? '');
     $occupation = trim($_POST['occupation'] ?? '');
     $initial_balance = floatval($_POST['initial_balance'] ?? 0);
-    $currency = trim($_POST['currency'] ?? 'GBP');
+    // CAD added here
+    $currency = trim($_POST['currency'] ?? 'GBP'); 
     $fund_account_type = trim($_POST['fund_account_type'] ?? '');
 
     $admin_created_at_raw = trim($_POST['admin_created_at'] ?? '');
@@ -271,8 +321,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($initial_balance < 0) {
         $message = 'Initial balance cannot be negative.';
         $message_type = 'error';
-    } elseif (!in_array($currency, ['GBP', 'EUR', 'USD'])) {
-        $message = 'Invalid currency selected. Only GBP, EURO, and USD are allowed.';
+    // CAD added to the allowed currencies
+    } elseif (!in_array($currency, ['GBP', 'EUR', 'USD', 'CAD'])) {
+        $message = 'Invalid currency selected. Only GBP, EURO, USD, and CAD are allowed.';
         $message_type = 'error';
     } elseif (!in_array($gender, ['Male', 'Female', 'Other'])) {
         $message = 'Invalid gender selected.';
@@ -371,6 +422,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $original_username = $username_for_db;
             $counter = 1;
             while (true) {
+                // Check if the username exists within the transaction
                 $existing_username = $usersCollection->findOne(['username' => $username_for_db], ['projection' => ['_id' => 1]], ['session' => $session]);
                 if (!$existing_username) {
                     break;
@@ -403,6 +455,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'two_factor_enabled' => true
             ];
 
+            // Insert User Document
             $insert_user_result = $usersCollection->insertOne($user_document, ['session' => $session]);
             $new_user_id = $insert_user_result->getInsertedId();
 
@@ -414,6 +467,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $common_sort_code = NULL;
             $common_swift_bic = NULL;
             $common_routing_number = NULL;
+            $common_transit_number = NULL; // New: For CAD
 
             if ($currency === 'GBP') {
                 $common_sort_code = generateUniqueUkSortCode($accountsCollection);
@@ -427,6 +481,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif ($currency === 'USD') {
                 $common_sort_code = NULL;
                 $common_swift_bic = HOMETOWN_BANK_USD_BIC;
+            // NEW: Handle CAD currency specifics
+            } elseif ($currency === 'CAD') { 
+                $common_sort_code = NULL;
+                $common_swift_bic = HOMETOWN_BANK_CAD_BIC;
             }
 
             // 1. Create Checking Account
@@ -438,6 +496,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $checking_iban = NULL;
             $checking_sort_code = NULL;
             $checking_routing_number = NULL;
+            $checking_transit_number = NULL; // New: For CAD
 
             if ($currency === 'GBP') {
                 $uk_iban_part_account_number = str_pad(substr($checking_account_number, -8), 8, '0', STR_PAD_LEFT);
@@ -454,6 +513,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $common_routing_number = $checking_routing_number;
                 } else {
                     throw new Exception("Failed to generate unique USD 'IBAN' and Routing Number for Checking account.");
+                }
+            // NEW: CAD account generation
+            } elseif ($currency === 'CAD') {
+                $cad_bban_details = generateUniqueCadBban($accountsCollection, $checking_account_number);
+                if ($cad_bban_details !== false) {
+                    $checking_iban = $cad_bban_details['iban'];
+                    $checking_transit_number = $cad_bban_details['transit_number'];
+                    $common_transit_number = $checking_transit_number;
+                } else {
+                    throw new Exception("Failed to generate unique CAD BBAN and Transit Number for Checking account.");
                 }
             }
 
@@ -472,6 +541,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'currency' => $currency,
                 'sort_code' => $checking_sort_code,
                 'routing_number' => $checking_routing_number,
+                'transit_number' => $checking_transit_number, // New field
                 'iban' => $checking_iban,
                 'swift_bic' => $common_swift_bic,
                 'created_at' => new MongoDB\BSON\UTCDateTime($admin_created_at->getTimestamp() * 1000),
@@ -489,6 +559,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $savings_iban = NULL;
             $savings_sort_code = NULL;
             $savings_routing_number = NULL;
+            $savings_transit_number = NULL; // New: For CAD
 
             if ($currency === 'GBP') {
                 $uk_iban_part_account_number = str_pad(substr($savings_account_number, -8), 8, '0', STR_PAD_LEFT);
@@ -499,11 +570,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $savings_iban = generateUniqueEurIban($accountsCollection, $eur_iban_part_account_number);
             } elseif ($currency === 'USD') {
                 $usd_iban_details_savings = generateUniqueUsdIban($accountsCollection, $savings_account_number);
+                // Note: For USD, we re-use the common routing number, but regenerate the IBAN/BBAN for uniqueness check
                 if ($usd_iban_details_savings !== false) {
                     $savings_iban = $usd_iban_details_savings['iban'];
-                    $savings_routing_number = $common_routing_number ?? $usd_iban_details_savings['routing_number'];
+                    // We explicitly set the routing number to the common one, which was set by the checking account, 
+                    // although the USD generation function re-generated one internally for the IBAN checksum, 
+                    // the common one is what would be used for wire transfers.
+                    $savings_routing_number = $common_routing_number; 
                 } else {
                     throw new Exception("Failed to generate unique USD 'IBAN' for Savings account.");
+                }
+            // NEW: CAD account generation (re-using common transit number)
+            } elseif ($currency === 'CAD') {
+                $cad_bban_details_savings = generateUniqueCadBban($accountsCollection, $savings_account_number);
+                if ($cad_bban_details_savings !== false) {
+                    $savings_iban = $cad_bban_details_savings['iban'];
+                    $savings_transit_number = $common_transit_number;
+                } else {
+                    throw new Exception("Failed to generate unique CAD BBAN for Savings account.");
                 }
             }
 
@@ -522,6 +606,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'currency' => $currency,
                 'sort_code' => $savings_sort_code,
                 'routing_number' => $savings_routing_number,
+                'transit_number' => $savings_transit_number, // New field
                 'iban' => $savings_iban,
                 'swift_bic' => $common_swift_bic,
                 'created_at' => new MongoDB\BSON\UTCDateTime($admin_created_at->getTimestamp() * 1000),
@@ -532,6 +617,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($common_sort_code) $accounts_created_messages[] = "User's Common Sort Code: **" . $common_sort_code . "**";
             if ($common_routing_number) $accounts_created_messages[] = "User's Common Routing Number: **" . $common_routing_number . "**";
+            if ($common_transit_number) $accounts_created_messages[] = "User's Common Transit Number: **" . $common_transit_number . "** (Institution: " . HOMETOWN_BANK_CAD_BANK_INSTITUTION_NUMBER . ")";
             if ($common_swift_bic) $accounts_created_messages[] = "User's Common SWIFT/BIC: **" . $common_swift_bic . "**";
 
             $session->commitTransaction();
@@ -557,8 +643,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             error_log("General Exception: " . $e->getMessage());
         } finally {
             if (isset($session)) {
+                // Check if a transaction is still active (e.g., if an exception occurred before commit)
+                try {
+                    $session->abortTransaction();
+                } catch (\MongoDB\Driver\Exception\CommandException $e) {
+                    // Ignore if transaction was already committed/aborted
+                }
                 $session->endSession();
             }
+            // Image cleanup logic on rollback
             if (!$transaction_success && $profile_image_b2_key && isset($b2Client)) {
                 try {
                     $b2Client->deleteObject([
@@ -576,7 +669,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -595,7 +687,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .dashboard-header h2 { margin: 0; font-size: 1.8em; flex-grow: 1; }
         .logout-button { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.3s ease; }
         .logout-button:hover { background-color: #c82333; }
-        .dashboard-content { padding: 30px; flex-grow: 1; }
+        .dashboard-content { padding: 330px; flex-grow: 1; }
         .dashboard-content h3 { color: #007bff; font-size: 1.6em; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
         .form-standard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .form-standard .full-width { grid-column: 1 / -1; }
@@ -685,9 +777,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <h3 class="full-width">Account Details</h3>
 
                 <div class="form-group">
-                    <label for="routing_number_display">Routing Number</label>
+                    <label for="routing_number_display">Routing/Transit Number</label>
                     <input type="text" id="routing_number_display" name="routing_number_display" value="Auto-generated upon creation" readonly class="readonly-field">
-                    <small>This will be automatically generated and assigned to the user's account(s) if USD is selected.</small>
+                    <small>This is automatically generated based on the currency (Routing for USD, Transit for CAD).</small>
                 </div>
 
                 <div class="form-group">
@@ -701,7 +793,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <option value="GBP" <?php echo (($_POST['currency'] ?? 'GBP') == 'GBP') ? 'selected' : ''; ?>>GBP</option>
                         <option value="EUR" <?php echo (($_POST['currency'] ?? '') == 'EUR') ? 'selected' : ''; ?>>EURO</option>
                         <option value="USD" <?php echo (($_POST['currency'] ?? '') == 'USD') ? 'selected' : ''; ?>>USD</option>
-                    </select>
+                        <option value="CAD" <?php echo (($_POST['currency'] ?? '') == 'CAD') ? 'selected' : ''; ?>>CAD</option> </select>
                 </div>
 
                 <div class="form-group">

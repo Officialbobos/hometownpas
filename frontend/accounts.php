@@ -123,7 +123,7 @@ if (!function_exists('formatCurrency')) {
             case 'GBP': $symbol = '£'; break;
             case 'USD': $symbol = '$'; break;
             case 'EUR': $symbol = '€'; break;
-            case 'NGN': $symbol = '₦'; break; // Added NGN symbol explicitly
+            case 'CAD': $symbol = '$'; break; // Added CAD symbol explicitly
             default: $symbol = ''; // Default to no symbol if unknown
         }
         return $symbol . number_format($amount, 2);
@@ -137,7 +137,7 @@ if (!function_exists('get_currency_symbol')) {
             case 'GBP': return '£';
             case 'USD': return '$';
             case 'EUR': return '€';
-            case 'NGN': return '₦';
+            case 'CAD': return '$';
             default: return '';
         }
     }
