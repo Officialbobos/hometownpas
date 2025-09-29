@@ -46,6 +46,14 @@ define('HOMETOWN_BANK_CAD_BIC', 'HOMTCA2C300');
 define('HOMETOWN_BANK_CAD_BANK_INSTITUTION_NUMBER', '010'); // Example Canadian Institution Number
 
 /**
+ * Helper function to generate a secure, random 4-digit PIN.
+ * @return string The 4-digit numeric PIN.
+ */
+function generateRandomPin(): string {
+    return str_pad(mt_rand(1000, 9999), 4, '0', STR_PAD_LEFT);
+}
+
+/**
  * Helper function to generate a unique numeric ID of a specific length.
  * Ensures the generated ID does not already exist in the specified MongoDB collection and field.
  *
@@ -279,6 +287,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $last_name = trim($_POST['last_name'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
+    $transfer_pin = $_POST['transfer_pin'] ?? ''; // NEW: Transfer PIN
     $home_address = trim($_POST['home_address'] ?? '');
     $phone_number = trim($_POST['phone_number'] ?? '');
     $nationality = trim($_POST['nationality'] ?? '');
@@ -317,6 +326,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message_type = 'error';
     } elseif (strlen($password) < 6) {
         $message = 'Password must be at least 6 characters long.';
+        $message_type = 'error';
+    // NEW: Transfer PIN Validation
+    } elseif (!preg_match('/^\d{4}$/', $transfer_pin)) {
+        $message = 'Transfer PIN must be exactly 4 numeric digits.';
         $message_type = 'error';
     } elseif ($initial_balance < 0) {
         $message = 'Initial balance cannot be negative.';
@@ -409,6 +422,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $session->startTransaction();
 
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            $hashed_transfer_pin = password_hash($transfer_pin, PASSWORD_DEFAULT); // NEW: Hash the Transfer PIN
 
             $membership_number = generateUniqueNumericId($usersCollection, 'membership_number', 12);
             if ($membership_number === false) {
@@ -439,6 +453,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'last_name' => $last_name,
                 'email' => $email,
                 'password_hash' => $hashed_password,
+                'transfer_pin_hash' => $hashed_transfer_pin, // NEW: Store the HASHED PIN
                 'home_address' => $home_address,
                 'phone_number' => $phone_number,
                 'nationality' => $nationality,
@@ -549,7 +564,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
             $accountsCollection->insertOne($account_document_checking, ['session' => $session]);
             $accounts_created_messages[] = "Checking Account: **" . $checking_account_number . "** (Balance: " . number_format($checking_initial_balance, 2) . " " . $currency . ")<br>IBAN/BBAN: **" . $checking_iban . "**";
-
+            
             // 2. Create Savings Account
             $savings_account_number = generateUniqueNumericId($accountsCollection, 'account_number', 12);
             if ($savings_account_number === false) {
@@ -619,6 +634,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($common_routing_number) $accounts_created_messages[] = "User's Common Routing Number: **" . $common_routing_number . "**";
             if ($common_transit_number) $accounts_created_messages[] = "User's Common Transit Number: **" . $common_transit_number . "** (Institution: " . HOMETOWN_BANK_CAD_BANK_INSTITUTION_NUMBER . ")";
             if ($common_swift_bic) $accounts_created_messages[] = "User's Common SWIFT/BIC: **" . $common_swift_bic . "**";
+            $accounts_created_messages[] = "User's Transfer PIN (Unhashed): **{$transfer_pin}**"; // IMPORTANT: Show unhashed PIN to Admin ONLY upon creation
 
             $session->commitTransaction();
             $transaction_success = true;
@@ -668,314 +684,169 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
-?>
 
+// Generate a default PIN for the form input
+$default_pin = generateRandomPin(); 
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeTown Bank - Create User</title>
-    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/style.css">
-    <link rel="stylesheet" href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/users/create_user.css">
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-        /* BASE STYLES for all views */
-        :root {
-            --primary-color: #007bff;
-            --secondary-color: #28a745;
-            --danger-color: #dc3545;
-            --background-light: #f8f9fa;
-            --card-background: #ffffff;
-            --border-color: #ddd;
-            --padding-base: 20px;
-        }
-        
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--background-light);
-            margin: 0;
-            padding: 0;
-        }
-        
+        /* Custom styles to mimic common app layout and colors */
+        .bg-primary { background-color: #007bff; }
+        .text-primary { color: #007bff; }
+        .bg-secondary { background-color: #28a745; }
+        .bg-danger { background-color: #dc3545; }
+        .bg-card { background-color: #ffffff; }
+        .border-gray-light { border-color: #ddd; }
+        .bg-gray-lighter { background-color: #f8f9fa; }
+        .required-asterisk { color: #dc3545; font-weight: bold; margin-left: 5px; }
         .readonly-field { background-color: #e9e9e9; cursor: not-allowed; }
-        .required-asterisk { color: var(--danger-color); font-weight: bold; margin-left: 5px; }
-
-        /* HEADER */
-        .dashboard-container { 
-            display: flex; 
-            flex-direction: column; 
-            min-height: 100vh; 
-            background-color: var(--card-background); 
-            margin: 0; /* Remove margin from container for full width on mobile */
-            box-shadow: none; /* Remove shadow for mobile, add only for desktop */
-            overflow: hidden; 
-        }
-        .dashboard-header { 
-            background-color: var(--primary-color); 
-            color: white; 
-            padding: 15px var(--padding-base); /* Adjusted padding */
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            border-bottom: 1px solid #0056b3; 
-        }
-        .dashboard-header .logo { 
-            max-height: 30px; /* Smaller logo for better mobile fit */
-            width: auto; 
-            margin-right: 15px; 
-        }
-        .dashboard-header h2 { 
-            margin: 0; 
-            font-size: 1.4em; /* Smaller font for mobile */
-            flex-grow: 1; 
-        }
-        .logout-button { 
-            background-color: var(--danger-color); 
-            color: white; 
-            padding: 8px 15px; /* Smaller padding */
-            border: none; 
-            border-radius: 5px; 
-            text-decoration: none; 
-            font-weight: bold; 
-            transition: background-color 0.3s ease; 
-            font-size: 0.9em;
-        }
-        .logout-button:hover { background-color: #c82333; }
-
-        /* CONTENT */
-        .dashboard-content { 
-            padding: var(--padding-base); /* Reduced top padding */
-            flex-grow: 1; 
-            max-width: 1200px;
-            width: 100%;
-            margin: 0 auto; /* Center content on desktop */
-        }
-        .dashboard-content h3 { 
-            color: var(--primary-color); 
-            font-size: 1.4em; /* Adjusted font size */
-            margin-top: 25px;
-            margin-bottom: 15px; 
-            border-bottom: 2px solid #e9ecef; 
-            padding-bottom: 10px; 
-        }
-
-        /* FORM - MOBILE FIRST (Single Column) */
-        .form-standard { 
-            display: flex; /* Use flexbox for single column stacking on mobile */
-            flex-direction: column;
-            gap: 15px; 
-            padding: 0; /* Remove form padding to use content padding */
-        }
-        .form-standard .full-width { 
-            width: 100%; 
-            order: -1; /* Reset order for flex */
-        }
-        .form-group { 
-            margin-bottom: 0; /* Gap handles spacing */
-        }
-        .form-group label { 
-            display: block; 
-            margin-bottom: 6px; 
-            font-weight: bold; 
-            color: #333; /* Darker text */
-        }
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 10px; /* Reduced padding */
-            border: 1px solid var(--border-color);
-            border-radius: 4px; /* Slightly smaller border radius */
-            box-sizing: border-box;
-            font-size: 1em;
-        }
-        .form-group small {
-            display: block;
-            margin-top: 5px;
-            font-size: 0.85em;
-            color: #6c757d;
-        }
-
-        /* SUBMIT BUTTON */
-        .form-group .button-primary { 
-            background-color: var(--secondary-color); 
-            color: white; 
-            padding: 12px 25px; 
-            border: none; 
-            border-radius: 6px; 
-            font-size: 1.1em; 
-            cursor: pointer; 
-            transition: background-color 0.3s ease; 
-            width: 100%;
-            margin-top: 10px;
-        }
-        .form-group .button-primary:hover { background-color: #218838; }
-
-        /* Message Styles */
-        .message.success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-        .message.error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-        
-        /* BACK LINK */
-        .back-link {
-            display: inline-block;
-            margin-top: 20px;
-            color: var(--primary-color);
-            text-decoration: none;
-            font-weight: bold;
-        }
-        .back-link:hover {
-            text-decoration: underline;
-        }
-
-        /* DESKTOP VIEW (Media Query) */
-        @media (min-width: 768px) {
-            .dashboard-container {
-                margin: var(--padding-base);
-                border-radius: 8px;
-                box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-            }
-            
-            .dashboard-header {
-                padding: 20px 30px;
-            }
-            .dashboard-header .logo { 
-                max-height: 50px; 
-            }
-            .dashboard-header h2 { 
-                font-size: 1.8em; 
-            }
-            
-            /* Form switches to two columns on desktop */
-            .form-standard { 
-                display: grid; 
-                grid-template-columns: 1fr 1fr; 
-                gap: 25px 30px; /* Adjusted gap */
-            }
-            .form-standard .full-width { 
-                grid-column: 1 / -1; 
-            }
-            
-            .form-group .button-primary {
-                width: auto;
-                justify-self: start; /* Align button to the left */
-            }
-        }
     </style>
 </head>
-<body>
-    <div class="dashboard-container">
-        <header class="dashboard-header">
-            <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/logo.png" alt="HomeTown Bank Pa Logo" class="logo">
-            <h2>Create New User</h2>
-            <a href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/logout.php" class="logout-button">Logout</a>
+<body class="font-sans bg-gray-lighter p-4 md:p-8 min-h-screen">
+    <div class="max-w-7xl mx-auto rounded-xl shadow-2xl bg-card flex flex-col min-h-full">
+        <header class="bg-primary text-white p-4 md:p-6 flex items-center justify-between rounded-t-xl">
+            <div class="flex items-center">
+                <img src="<?php echo rtrim(BASE_URL, '/'); ?>/images/logo.png" alt="HomeTown Bank Logo" class="h-8 w-auto mr-4">
+                <h2 class="text-2xl font-bold">Create New User</h2>
+            </div>
+            <a href="<?php echo rtrim(BASE_URL, '/'); ?>/heritagebank_admin/logout.php" class="bg-danger hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 text-sm">Logout</a>
         </header>
 
-        <main class="dashboard-content">
+        <main class="p-6 md:p-10 flex-grow">
             <?php if (!empty($message)): ?>
-                <p class="message <?php echo htmlspecialchars($message_type); ?>"><?php echo nl2br(htmlspecialchars($message)); ?></p>
+                <p class="p-4 mb-6 rounded-lg font-medium 
+                    <?php echo ($message_type === 'success') ? 'bg-green-100 text-green-700 border border-green-400' : 'bg-red-100 text-red-700 border border-red-400'; ?>">
+                    <?php echo nl2br(htmlspecialchars($message)); ?>
+                </p>
             <?php endif; ?>
 
-            <form action="<?php echo htmlspecialchars(rtrim(BASE_URL, '/')); ?>/heritagebank_admin/users/create_user.php" method="POST" class="form-standard" enctype="multipart/form-data">
-                <h3 class="full-width">Personal Information</h3>
-                <div class="form-group">
-                    <label for="first_name">First Name <span class="required-asterisk">*</span></label>
-                    <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($_POST['first_name'] ?? ''); ?>" required>
+            <form action="<?php echo htmlspecialchars(rtrim(BASE_URL, '/')); ?>/heritagebank_admin/users/create_user.php" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-6" enctype="multipart/form-data">
+                
+                <h3 class="md:col-span-2 text-xl font-bold text-primary border-b pb-2 mb-4">Personal Information</h3>
+                
+                <div class="flex flex-col">
+                    <label for="first_name" class="font-semibold text-gray-700 mb-1">First Name <span class="required-asterisk">*</span></label>
+                    <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($_POST['first_name'] ?? ''); ?>" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
                 </div>
-                <div class="form-group">
-                    <label for="last_name">Last Name <span class="required-asterisk">*</span></label>
-                    <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($_POST['last_name'] ?? ''); ?>" required>
+                <div class="flex flex-col">
+                    <label for="last_name" class="font-semibold text-gray-700 mb-1">Last Name <span class="required-asterisk">*</span></label>
+                    <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($_POST['last_name'] ?? ''); ?>" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
                 </div>
-                <div class="form-group">
-                    <label for="email">Email Address <span class="required-asterisk">*</span></label>
-                    <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" required>
+                
+                <div class="flex flex-col">
+                    <label for="email" class="font-semibold text-gray-700 mb-1">Email Address <span class="required-asterisk">*</span></label>
+                    <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
                 </div>
-                <div class="form-group">
-                    <label for="password">Password <span class="required-asterisk">*</span></label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                <div class="form-group full-width">
-                    <label for="home_address">Home Address <span class="required-asterisk">*</span></label>
-                    <textarea id="home_address" name="home_address" rows="3" required><?php echo htmlspecialchars($_POST['home_address'] ?? ''); ?></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="phone_number">Phone Number <span class="required-asterisk">*</span></label>
-                    <input type="tel" id="phone_number" name="phone_number" value="<?php echo htmlspecialchars($_POST['phone_number'] ?? ''); ?>" required>
-                </div>
-                <div class="form-group">
-                    <label for="nationality">Nationality <span class="required-asterisk">*</span></label>
-                    <input type="text" id="nationality" name="nationality" value="<?php echo htmlspecialchars($_POST['nationality'] ?? ''); ?>" required>
+                <div class="flex flex-col">
+                    <label for="password" class="font-semibold text-gray-700 mb-1">Password <span class="required-asterisk">*</span></label>
+                    <input type="password" id="password" name="password" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
                 </div>
 
-                <div class="form-group">
-                    <label for="date_of_birth">Date of Birth <span class="required-asterisk">*</span></label>
-                    <input type="date" id="date_of_birth" name="date_of_birth" value="<?php echo htmlspecialchars($_POST['date_of_birth'] ?? ''); ?>" required>
+                <div class="flex flex-col md:col-span-2">
+                    <label for="transfer_pin" class="font-semibold text-gray-700 mb-1">Transfer PIN (4 Digits) <span class="required-asterisk">*</span></label>
+                    <input type="text" 
+                        id="transfer_pin" 
+                        name="transfer_pin" 
+                        maxlength="4"
+                        placeholder="e.g., 1234"
+                        value="<?php echo htmlspecialchars($_POST['transfer_pin'] ?? $default_pin); ?>" 
+                        required 
+                        pattern="\d{4}" 
+                        title="Transfer PIN must be exactly 4 numeric digits."
+                        class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary w-full md:w-1/2">
+                    <small class="mt-1 text-sm text-gray-500">This 4-digit PIN is required for all customer transfers. **Must be numeric.**</small>
                 </div>
-                <div class="form-group">
-                    <label for="gender">Gender <span class="required-asterisk">*</span></label>
-                    <select id="gender" name="gender" required>
+                
+                <div class="flex flex-col md:col-span-2">
+                    <label for="home_address" class="font-semibold text-gray-700 mb-1">Home Address <span class="required-asterisk">*</span></label>
+                    <textarea id="home_address" name="home_address" rows="3" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"><?php echo htmlspecialchars($_POST['home_address'] ?? ''); ?></textarea>
+                </div>
+                <div class="flex flex-col">
+                    <label for="phone_number" class="font-semibold text-gray-700 mb-1">Phone Number <span class="required-asterisk">*</span></label>
+                    <input type="tel" id="phone_number" name="phone_number" value="<?php echo htmlspecialchars($_POST['phone_number'] ?? ''); ?>" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                </div>
+                <div class="flex flex-col">
+                    <label for="nationality" class="font-semibold text-gray-700 mb-1">Nationality <span class="required-asterisk">*</span></label>
+                    <input type="text" id="nationality" name="nationality" value="<?php echo htmlspecialchars($_POST['nationality'] ?? ''); ?>" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                </div>
+
+                <div class="flex flex-col">
+                    <label for="date_of_birth" class="font-semibold text-gray-700 mb-1">Date of Birth <span class="required-asterisk">*</span></label>
+                    <input type="date" id="date_of_birth" name="date_of_birth" value="<?php echo htmlspecialchars($_POST['date_of_birth'] ?? ''); ?>" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                </div>
+                <div class="flex flex-col">
+                    <label for="gender" class="font-semibold text-gray-700 mb-1">Gender <span class="required-asterisk">*</span></label>
+                    <select id="gender" name="gender" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
                         <option value="">-- Select Gender --</option>
                         <option value="Male" <?php echo (($_POST['gender'] ?? '') == 'Male') ? 'selected' : ''; ?>>Male</option>
                         <option value="Female" <?php echo (($_POST['gender'] ?? '') == 'Female') ? 'selected' : ''; ?>>Female</option>
                         <option value="Other" <?php echo (($_POST['gender'] ?? '') == 'Other') ? 'selected' : ''; ?>>Other</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="occupation">Occupation <span class="required-asterisk">*</span></label>
-                    <input type="text" id="occupation" name="occupation" value="<?php echo htmlspecialchars($_POST['occupation'] ?? ''); ?>" required>
+                <div class="flex flex-col">
+                    <label for="occupation" class="font-semibold text-gray-700 mb-1">Occupation <span class="required-asterisk">*</span></label>
+                    <input type="text" id="occupation" name="occupation" value="<?php echo htmlspecialchars($_POST['occupation'] ?? ''); ?>" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
                 </div>
 
-                <div class="form-group">
-                    <label for="profile_image">Profile Image (Max 5MB, JPG, PNG, GIF)</label>
-                    <input type="file" id="profile_image" name="profile_image" accept="image/*">
-                    <small>Optional: You can upload a profile picture for the user.</small>
+                <div class="flex flex-col">
+                    <label for="profile_image" class="font-semibold text-gray-700 mb-1">Profile Image (Max 5MB, JPG, PNG, GIF)</label>
+                    <input type="file" id="profile_image" name="profile_image" accept="image/*" class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                    <small class="mt-1 text-sm text-gray-500">Optional: You can upload a profile picture for the user.</small>
                 </div>
 
-                <h3 class="full-width">Account Details</h3>
+                <h3 class="md:col-span-2 text-xl font-bold text-primary border-b pb-2 mb-4 mt-4">Account Details</h3>
 
-                <div class="form-group">
-                    <label for="routing_number_display">Routing/Transit Number</label>
-                    <input type="text" id="routing_number_display" name="routing_number_display" value="Auto-generated upon creation" readonly class="readonly-field">
-                    <small>This is automatically generated based on the currency (Routing for USD, Transit for CAD).</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="currency">Account Currency <span class="required-asterisk">*</span></label>
-                    <select id="currency" name="currency" required>
+                <div class="flex flex-col">
+                    <label for="currency" class="font-semibold text-gray-700 mb-1">Account Currency <span class="required-asterisk">*</span></label>
+                    <select id="currency" name="currency" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
                         <option value="GBP" <?php echo (($_POST['currency'] ?? 'GBP') == 'GBP') ? 'selected' : ''; ?>>GBP</option>
                         <option value="EUR" <?php echo (($_POST['currency'] ?? '') == 'EUR') ? 'selected' : ''; ?>>EURO</option>
                         <option value="USD" <?php echo (($_POST['currency'] ?? '') == 'USD') ? 'selected' : ''; ?>>USD</option>
                         <option value="CAD" <?php echo (($_POST['currency'] ?? '') == 'CAD') ? 'selected' : ''; ?>>CAD</option>
                     </select>
                 </div>
-                
-                <div class="form-group">
-                    <label for="initial_balance">Initial Balance Amount (Optional)</label>
-                    <input type="number" id="initial_balance" name="initial_balance" step="0.01" value="<?php echo htmlspecialchars($_POST['initial_balance'] ?? '0.00'); ?>">
-                    <small>Enter an amount to initially fund the user's chosen account type. Leave 0.00 if no initial funding.</small>
+                <div class="flex flex-col">
+                    <label for="routing_number_display" class="font-semibold text-gray-700 mb-1">Routing/Transit Number</label>
+                    <input type="text" id="routing_number_display" name="routing_number_display" value="Auto-generated upon creation" readonly class="readonly-field p-3 border border-gray-300 rounded-lg">
+                    <small class="mt-1 text-sm text-gray-500">This is automatically generated based on the currency (Routing for USD, Transit for CAD).</small>
                 </div>
-                <div class="form-group">
-                    <label for="fund_account_type">Fund Which Account? (Optional)</label>
-                    <select id="fund_account_type" name="fund_account_type">
+
+                <div class="flex flex-col">
+                    <label for="initial_balance" class="font-semibold text-gray-700 mb-1">Initial Balance Amount (Optional)</label>
+                    <input type="number" id="initial_balance" name="initial_balance" step="0.01" value="<?php echo htmlspecialchars($_POST['initial_balance'] ?? '0.00'); ?>" class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                    <small class="mt-1 text-sm text-gray-500">Enter an amount to initially fund the user's chosen account type. Leave 0.00 if no initial funding.</small>
+                </div>
+                <div class="flex flex-col">
+                    <label for="fund_account_type" class="font-semibold text-gray-700 mb-1">Fund Which Account? (Optional)</label>
+                    <select id="fund_account_type" name="fund_account_type" class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
                         <option value="">-- Select Account Type (Optional) --</option>
                         <option value="Checking" <?php echo (($_POST['fund_account_type'] ?? '') == 'Checking') ? 'selected' : ''; ?>>Checking Account</option>
                         <option value="Savings" <?php echo (($_POST['fund_account_type'] ?? '') == 'Savings') ? 'selected' : ''; ?>>Savings Account</option>
                     </select>
-                    <small>If an initial balance is provided, you must select an account type here.</small>
+                    <small class="mt-1 text-sm text-gray-500">If an initial balance is provided, you must select an account type here.</small>
                 </div>
 
-                <div class="form-group">
-                    <label for="admin_created_at">Account Creation Date & Time <span class="required-asterisk">*</span></label>
-                    <input type="datetime-local" id="admin_created_at" name="admin_created_at" value="<?php echo htmlspecialchars($_POST['admin_created_at'] ?? date('Y-m-d\TH:i')); ?>" required>
-                    <small>Set the exact date and time the account was (or should be) created.</small>
+                <div class="flex flex-col md:col-span-2">
+                    <label for="admin_created_at" class="font-semibold text-gray-700 mb-1">Account Creation Date & Time <span class="required-asterisk">*</span></label>
+                    <input type="datetime-local" id="admin_created_at" name="admin_created_at" value="<?php echo htmlspecialchars($_POST['admin_created_at'] ?? date('Y-m-d\TH:i')); ?>" required class="p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary w-full md:w-1/2">
+                    <small class="mt-1 text-sm text-gray-500">Set the exact date and time the account was (or should be) created.</small>
                 </div>
                 
-                <div class="form-group"></div> 
-
-                <div class="full-width">
-                    <button type="submit" class="button-primary">Create User</button>
+                <div class="md:col-span-2 pt-4">
+                    <button type="submit" class="w-full md:w-auto bg-secondary hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300 text-lg">
+                        Create User
+                    </button>
                 </div>
             </form>
 
-            <p><a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/users/users_management.php" class="back-link">&larr; Back to User Management</a></p>
+            <p class="mt-6"><a href="<?php echo rtrim(BASE_URL, '/'); ?>/admin/users/users_management.php" class="text-primary hover:underline font-semibold">&larr; Back to User Management</a></p>
         </main>
     </div>
 </body>
