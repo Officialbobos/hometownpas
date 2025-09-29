@@ -6,11 +6,6 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-// Enable error display for debugging. (Good for local dev, but Config.php's APP_DEBUG should control this in prod)
-// ini_set('display_errors', 1); // Commented out - should be controlled by Config.php
-// ini_set('display_startup_errors', 1); // Commented out - should be controlled by Config.php
-// error_reporting(E_ALL); // Commented out - should be controlled by Config.php
-
 // Load Config.php first. It handles Composer's autoload.php and defines global constants like BASE_URL.
 // __DIR__ . '/../' points from 'frontend/' up to the project root.
 require_once __DIR__ . '/../Config.php';
@@ -73,15 +68,10 @@ if (!empty($user_id)) {
             // If show_transfer_modal is true and there's a message, capture it
             if (($currentUser['show_transfer_modal'] ?? false) && !empty($currentUser['transfer_modal_message'] ?? '')) {
                 $admin_transfer_message = $currentUser['transfer_modal_message'];
-                // Optionally, unset show_transfer_modal here if you want it to appear only once
-                // This would be done in make_transfer.php as part of a successful transaction
-                // or if the user clicks "understood" on a dedicated modal for this.
-                // For now, let's just display it if the flag is true.
             }
         }
     } catch (Exception $e) {
         error_log("Error fetching user modal message in transfer.php: " . $e->getMessage());
-        // Do not set $admin_transfer_message if there's an error fetching it
     }
 }
 // --- END NEW LOGIC ---
@@ -147,9 +137,12 @@ switch ($active_transfer_method) {
     case 'domestic_wire':
         $active_transfer_method = 'external_usa_account';
         break;
+    case 'canada_bank': // ADDED: New case for Canadian transfer
+        $active_transfer_method = 'external_canada_account';
+        break;
     default:
         // If it's not one of the recognized types or form data values, default to internal_self
-        if (!in_array($active_transfer_method, ['internal_self', 'internal_heritage', 'external_iban', 'external_sort_code', 'external_usa_account'])) {
+        if (!in_array($active_transfer_method, ['internal_self', 'internal_heritage', 'external_iban', 'external_sort_code', 'external_usa_account', 'external_canada_account'])) {
             $active_transfer_method = 'internal_self';
         }
         break;
@@ -225,24 +218,25 @@ switch ($active_transfer_method) {
                             <option value="external_iban" <?php echo ($active_transfer_method === 'external_iban' ? 'selected' : ''); ?>>International Bank Transfer (IBAN/SWIFT)</option>
                             <option value="external_sort_code" <?php echo ($active_transfer_method === 'external_sort_code' ? 'selected' : ''); ?>>UK Bank Transfer (Sort Code/Account No)</option>
                             <option value="external_usa_account" <?php echo ($active_transfer_method === 'external_usa_account' ? 'selected' : ''); ?>>USA Bank Transfer (Routing/Account No)</option>
+                            <option value="external_canada_account" <?php echo ($active_transfer_method === 'external_canada_account' ? 'selected' : ''); ?>>Canadian Bank Transfer (Transit/Institution No)</option>
                         </select>
                     </div>
 
                    <div class="form-group">
-    <label for="source_account_id">From Account:</label>
-    <select id="source_account_id" name="source_account_id" class="form-control" required>
-        <option value="">-- Select Your Account --</option>
-        <?php foreach ($user_accounts as $account): ?>
-            <option value="<?php echo htmlspecialchars($account['id']); ?>"
-                data-balance="<?php echo htmlspecialchars($account['balance']); ?>"
-                data-currency="<?php echo htmlspecialchars($account['currency']); ?>"
-                <?php echo ((string)($form_data['source_account_id'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
-                <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], 4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <strong><?php echo number_format(abs((float)$account['balance']), 2); ?></strong>
-            </option>
-        <?php endforeach; ?>
-    </select>
-    <p>Available Balance: <span id="amount_currency_symbol_for_balance"></span><span id="display_current_balance" style="color: green;">N/A</span> <span id="current_currency_display"></span></p>
-</div>
+                        <label for="source_account_id">From Account:</label>
+                        <select id="source_account_id" name="source_account_id" class="form-control" required>
+                            <option value="">-- Select Your Account --</option>
+                            <?php foreach ($user_accounts as $account): ?>
+                                <option value="<?php echo htmlspecialchars($account['id']); ?>"
+                                    data-balance="<?php echo htmlspecialchars($account['balance']); ?>"
+                                    data-currency="<?php echo htmlspecialchars($account['currency']); ?>"
+                                    <?php echo ((string)($form_data['source_account_id'] ?? '') === (string)$account['id']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($account['account_type']); ?> (****<?php echo substr($account['account_number'], 4); ?>) - <?php echo get_currency_symbol($account['currency'] ?? 'USD'); ?> <strong><?php echo number_format(abs((float)$account['balance']), 2); ?></strong>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p>Available Balance: <span id="amount_currency_symbol_for_balance"></span><span id="display_current_balance" style="color: green;">N/A</span> <span id="current_currency_display"></span></p>
+                    </div>
 
                     <div class="form-group external-fields common-external-fields">
                         <label for="recipient_name">Recipient Full Name:</label>
@@ -343,6 +337,33 @@ switch ($active_transfer_method) {
                             <input type="text" id="recipient_zip_usa" name="recipient_zip_usa" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_zip_usa'] ?? ''); ?>">
                         </div>
                     </div>
+                    
+                    <div id="fields_external_canada_account" class="external-fields">
+                        <div class="form-group">
+                            <label for="recipient_bank_name_canada">Recipient Bank Name:</label>
+                            <input type="text" id="recipient_bank_name_canada" name="recipient_bank_name_canada" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_bank_name_canada'] ?? ''); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label for="recipient_institution_number">Recipient Institution Number (3 digits):</label>
+                            <input type="text" id="recipient_institution_number" name="recipient_institution_number" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_institution_number'] ?? ''); ?>" pattern="\d{3}" title="Institution Number must be 3 digits">
+                        </div>
+                        <div class="form-group">
+                            <label for="recipient_transit_number">Recipient Transit Number (5 digits):</label>
+                            <input type="text" id="recipient_transit_number" name="recipient_transit_number" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_transit_number'] ?? ''); ?>" pattern="\d{5}" title="Transit Number must be 5 digits">
+                        </div>
+                        <div class="form-group">
+                            <label for="recipient_canada_account_number">Recipient Account Number:</label>
+                            <input type="text" id="recipient_canada_account_number" name="recipient_canada_account_number" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_canada_account_number'] ?? ''); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label for="recipient_address_canada">Recipient Address:</label>
+                            <input type="text" id="recipient_address_canada" name="recipient_address_canada" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_address_canada'] ?? ''); ?>" placeholder="Street Address">
+                        </div>
+                        <div class="form-group">
+                            <label for="recipient_city_canada">Recipient City, Province/Territory, Postal Code:</label>
+                            <input type="text" id="recipient_city_canada" name="recipient_city_canada" class="form-control" value="<?php echo htmlspecialchars($form_data['recipient_city_canada'] ?? ''); ?>" placeholder="e.g., Toronto, ON, M5V 2H1">
+                        </div>
+                    </div>
 
                     <div class="form-group">
                         <label for="amount">Amount:</label>
@@ -368,7 +389,7 @@ switch ($active_transfer_method) {
                 <i class="fas fa-times"></i>
             </button>
             <div class="sidebar-profile">
-               <img src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
+                <img src="<?php echo rtrim(BASE_URL, '/'); ?>/frontend/images/default-profile.png" alt="Profile Picture" class="sidebar-profile-pic">
 
                 <h3><span id="sidebarUserName"><?php echo htmlspecialchars($full_name); ?></span></h3>
                 <p><span id="sidebarUserEmail"><?php echo htmlspecialchars($user_email); ?></span></p>

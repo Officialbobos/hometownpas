@@ -326,6 +326,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_transfer']))
             $destination_account_display = "USA Bank: " . htmlspecialchars($recipient_usa_routing_number) . " Acc: " . htmlspecialchars($recipient_usa_account_number);
             break;
 
+        case 'external_canada_eft': // ADDED: Canadian Electronic Funds Transfer (EFT)
+            $recipient_bank_name_canada = sanitize_input($_POST['recipient_bank_name_canada'] ?? '');
+            $recipient_transit_number_canada = sanitize_input($_POST['recipient_transit_number_canada'] ?? '');
+            $recipient_institution_number_canada = sanitize_input($_POST['recipient_institution_number_canada'] ?? '');
+            $recipient_external_account_number_canada = sanitize_input($_POST['recipient_external_account_number_canada'] ?? '');
+
+            // Basic validation for Canadian EFT
+            if (empty($recipient_bank_name_canada) || empty($recipient_transit_number_canada) || empty($recipient_institution_number_canada) || empty($recipient_external_account_number_canada) || empty($recipient_name)) {
+                $_SESSION['message'] = "All recipient Canadian bank details (Bank Name, Transit No, Institution No, Account No, Recipient Name) are required.";
+                $_SESSION['message_type'] = "error";
+                header('Location: ' . BASE_URL . '/frontend/transfer.php');
+                exit;
+            }
+            // Canadian Transit Number (5 digits)
+            if (!preg_match('/^\d{5}$/', $recipient_transit_number_canada)) {
+                $_SESSION['message'] = "Invalid Canadian Transit Number format (must be 5 digits).";
+                $_SESSION['message_type'] = "error";
+                header('Location: ' . BASE_URL . '/frontend/transfer.php');
+                exit;
+            }
+            // Canadian Institution Number (3 digits)
+            if (!preg_match('/^\d{3}$/', $recipient_institution_number_canada)) {
+                $_SESSION['message'] = "Invalid Canadian Institution Number format (must be 3 digits).";
+                $_SESSION['message_type'] = "error";
+                header('Location: ' . BASE_URL . '/frontend/transfer.php');
+                exit;
+            }
+            // Canadian Account Number (usually 7-12 digits)
+            if (!preg_match('/^\d{7,12}$/', $recipient_external_account_number_canada)) {
+                $_SESSION['message'] = "Invalid Canadian Account Number format (must be 7 to 12 digits).";
+                $_SESSION['message_type'] = "error";
+                header('Location: ' . BASE_URL . '/frontend/transfer.php');
+                exit;
+            }
+
+            $transaction_data['recipient_bank_name'] = $recipient_bank_name_canada;
+            $transaction_data['recipient_transit_number_canada'] = $recipient_transit_number_canada;
+            $transaction_data['recipient_institution_number_canada'] = $recipient_institution_number_canada;
+            $transaction_data['recipient_external_account_number'] = $recipient_external_account_number_canada;
+            $destination_account_display = "Canada EFT: Transit " . htmlspecialchars($recipient_transit_number_canada) . " Inst: " . htmlspecialchars($recipient_institution_number_canada) . " Acc: " . htmlspecialchars($recipient_external_account_number_canada);
+            break;
+            
         default:
             $_SESSION['message'] = "Invalid transfer method selected.";
             $_SESSION['message_type'] = "error";
