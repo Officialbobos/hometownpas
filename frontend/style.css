@@ -1507,6 +1507,18 @@ body.profile-page, body.dashboard-page { /* Added body.dashboard-page to cover a
     background-color: #0056b3;
 }
 
+.reason-detail {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.9em;
+    font-weight: normal;
+    white-space: pre-wrap; /* Preserve whitespace and line breaks */
+}
+
+.message-box strong {
+    font-weight: 700;
+}
+
 /* The Bank Card Display (Specific for individual card display on manage_card.php, if any) */
 /* Note: This block assumes a separate .bank-card-display container.
    If .bank-card (above) is the primary display for individual cards too,
