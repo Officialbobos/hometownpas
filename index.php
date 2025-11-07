@@ -295,8 +295,8 @@ switch ($path) {
     case 'admin/generate_mock_transaction':
         require __DIR__ . '/heritagebank_admin/users/generate_mock_transaction.php';
         break;
-    case 'admin/edit_users':
-        require __DIR__ . '/heritagebank_admin/users/edit_users.php';
+    case 'admin/edit_user':
+        require __DIR__ . '/heritagebank_admin/users/edit_user.php';
         break;
     case 'admin/fetch_user_accounts':
         require __DIR__ . '/heritagebank_admin/users/fetch_user_accounts.php';
